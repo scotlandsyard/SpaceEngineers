@@ -29,12 +29,15 @@ public class BobScreen : MyGuiScreenBase
 		GrindTargets,
 		CollectTargets,
 		MissingComponents,
+		Settings,
 		WeldPriority,
 		GrindPriority,
-		Setup
+		Setup,
+		Help
 	}
 
-	private static readonly string[] ViewNames = { "Status", "Weld targets", "Grind targets", "Collect targets", "Missing components", "Weld priority", "Grind priority", "Setup: groups" };
+	// In the same order as View.
+	private static readonly string[] ViewNames = { "Status", "Weld targets", "Grind targets", "Collect targets", "Missing components", "BaR settings", "Weld priority", "Grind priority", "Setup: groups", "Help" };
 
 	private class Column
 	{
@@ -66,7 +69,12 @@ public class BobScreen : MyGuiScreenBase
 
 	private static View s_view = View.Status;
 
+	/// <summary>The view Back returns to from Help.</summary>
+	private static View s_viewBeforeHelp = View.Status;
+
 	private static string s_assignName = "";
+
+	private MyGuiControlMultilineText _helpText;
 
 	private MyGuiControlCombobox _groupCombo;
 
@@ -112,6 +120,7 @@ public class BobScreen : MyGuiScreenBase
 		EnabledBackgroundFade = true;
 		m_closeOnEsc = true;
 		CanHideOthers = true;
+		CloseButtonEnabled = true;
 		RecreateControls(constructor: true);
 	}
 
@@ -144,6 +153,15 @@ public class BobScreen : MyGuiScreenBase
 		_viewCombo.ItemSelected += OnViewSelected;
 		Controls.Add(_viewCombo);
 
+		// The help page shows text where the table normally is. An empty, hidden table keeps the refresh code simple.
+		_helpText = null;
+		if (s_view == View.Help)
+		{
+			_helpText = new MyGuiControlMultilineText(new Vector2(0f, -0.29f), new Vector2(0.84f, 0.55f), null, "Blue", 0.8f, MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_TOP, null, drawScrollbarV: true, drawScrollbarH: false, MyGuiDrawAlignEnum.HORISONTAL_CENTER_AND_VERTICAL_TOP);
+			BobHelp.Write(_helpText);
+			Controls.Add(_helpText);
+		}
+
 		List<Column> columns = ColumnsFor(s_view);
 		_table = new MyGuiControlTable
 		{
@@ -167,15 +185,25 @@ public class BobScreen : MyGuiScreenBase
 				_table.SetColumnComparison(i, CompareCells);
 			}
 		}
+		_table.Visible = s_view != View.Help;
+		_table.ItemDoubleClicked += (MyGuiControlTable table, MyGuiControlTable.EventArgs args) =>
+		{
+			if (s_view == View.Settings)
+			{
+				ChangeSetting(+1);
+			}
+		};
 		Controls.Add(_table);
 
-		_status = new MyGuiControlLabel(new Vector2(-0.42f, 0.285f), null, "", null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER);
+		_status =new MyGuiControlLabel(new Vector2(-0.42f, 0.285f), null, "", null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER);
 		Controls.Add(_status);
 
+		// Four button slots per view; the window closes with the X in the corner or Esc.
 		_autoQueueButton = null;
 		_groupNameBox = null;
-		if (s_view == View.Setup)
+		switch (s_view)
 		{
+		case View.Setup:
 			_groupNameBox = new MyGuiControlTextbox(new Vector2(-0.315f, 0.37f), s_assignName, 40)
 			{
 				Size = new Vector2(0.19f, 0.045f)
@@ -184,14 +212,25 @@ public class BobScreen : MyGuiScreenBase
 			Controls.Add(_groupNameBox);
 			AddButton(-0.105f, "Assign to group", AssignSelected);
 			AddButton(0.105f, "Remove from groups", RemoveSelected);
-		}
-		else
-		{
+			AddButton(0.315f, "Turn on / off", ToggleSelectedBlock);
+			break;
+		case View.Settings:
+			AddButton(-0.315f, "< Lower / Previous", () => ChangeSetting(-1));
+			AddButton(-0.105f, "Raise / Next >", () => ChangeSetting(+1));
+			AddButton(0.105f, "Rescan", Rescan);
+			AddButton(0.315f, "Help", ShowHelp);
+			break;
+		case View.Help:
+			_autoQueueButton = AddButton(-0.315f, "Auto-queue", ToggleAutoQueue);
+			AddButton(0.315f, "Back", () => SwitchView(s_viewBeforeHelp));
+			break;
+		default:
 			_autoQueueButton = AddButton(-0.315f, "Auto-queue", ToggleAutoQueue);
 			AddButton(-0.105f, "Queue now", QueueNow);
 			AddButton(0.105f, "Rescan", Rescan);
+			AddButton(0.315f, "Help", ShowHelp);
+			break;
 		}
-		AddButton(0.315f, "Close", () => CloseScreen());
 
 		_rowsSignature = null;
 		_groupsVersion = -1;
@@ -242,12 +281,26 @@ public class BobScreen : MyGuiScreenBase
 
 	private void OnViewSelected()
 	{
-		View view = (View)_viewCombo.GetSelectedKey();
-		if (view != s_view)
+		SwitchView((View)_viewCombo.GetSelectedKey());
+	}
+
+	private void SwitchView(View view)
+	{
+		if (view == s_view)
 		{
-			s_view = view;
-			_recreatePending = true;
+			return;
 		}
+		if (view == View.Help)
+		{
+			s_viewBeforeHelp = s_view;
+		}
+		s_view = view;
+		_recreatePending = true;
+	}
+
+	private void ShowHelp()
+	{
+		SwitchView(View.Help);
 	}
 
 	private void RefreshAll()
@@ -308,10 +361,17 @@ public class BobScreen : MyGuiScreenBase
 		}
 		switch (s_view)
 		{
+		case View.Help:
+			return "Scroll for more. Back returns to the view you were on.";
+		case View.Settings:
+			return "Select a setting, then Lower / Raise (hold Shift for 10x). Double-click steps it. Changes every system in the group.";
+		case View.WeldPriority:
+		case View.GrindPriority:
+			return "Read only: change the order in the Build and Repair block's terminal. The mod only saves order changes made there.";
 		case View.MissingComponents:
 			return group.AutoQueue ? "Auto-queue is on: missing components are queued in the group's assemblers every few seconds." : "Auto-queue is off. Queue now queues everything listed once.";
 		case View.Setup:
-			return "Select a block, type a group name (blank = Default), then Assign. Remove takes it out of every group.";
+			return "Group names are yours to choose. Select a block, type a name (blank = Default), then Assign. See Help for more.";
 		case View.WeldTargets:
 		case View.GrindTargets:
 		case View.CollectTargets:
@@ -440,7 +500,14 @@ public class BobScreen : MyGuiScreenBase
 	{
 		switch (view)
 		{
+		case View.Settings:
+			return new List<Column>
+			{
+				new Column { Name = "Setting", Width = 0.6f, Sortable = false },
+				new Column { Name = "Value", Width = 0.4f, Sortable = false }
+			};
 		case View.Status:
+		case View.Help:
 			return new List<Column>
 			{
 				new Column { Name = "", Width = 0.3f, Sortable = false },
@@ -581,6 +648,10 @@ public class BobScreen : MyGuiScreenBase
 			return CollectRows(group);
 		case View.MissingComponents:
 			return MissingRows(group);
+		case View.Settings:
+			return SettingRows(group);
+		case View.Help:
+			return new List<RowData> { Row("help", null, "") };
 		case View.WeldPriority:
 			return PriorityRows(group.FirstSystem == null ? null : BarApi.WeldPriority(group.FirstSystem));
 		case View.GrindPriority:
@@ -764,6 +835,66 @@ public class BobScreen : MyGuiScreenBase
 			});
 		}
 		return rows;
+	}
+
+	private static List<RowData> SettingRows(BobGroup group)
+	{
+		List<IMyShipWelder> systems = group.LiveSystems.ToList();
+		List<RowData> rows = new List<RowData>();
+		IMyShipWelder first = systems.FirstOrDefault();
+		if (first == null)
+		{
+			return rows;
+		}
+		foreach (BarSetting setting in BarSetting.All)
+		{
+			if (!setting.Exists(first))
+			{
+				continue;
+			}
+			string value = setting.Format(first) ?? "?";
+			bool mixed = systems.Skip(1).Any(s => setting.Format(s) != value);
+			rows.Add(Row("s:" + setting.Id, mixed ? WarningColor : (Color?)null, setting.Label, mixed ? value + " (systems differ)" : value));
+		}
+		return rows;
+	}
+
+	private void ChangeSetting(int direction)
+	{
+		BobGroup group = CurrentGroup;
+		string key = _table.SelectedRow?.UserData as string;
+		BarSetting setting = key != null && key.StartsWith("s:") ? BarSetting.All.FirstOrDefault(s => "s:" + s.Id == key) : null;
+		if (group == null || setting == null)
+		{
+			ShowMessage("Select a setting first.", WarningColor);
+			return;
+		}
+		bool bigStep = MyAPIGateway.Input != null && MyAPIGateway.Input.IsAnyShiftKeyPressed();
+		string error = setting.Change(group.LiveSystems.ToList(), direction, bigStep);
+		if (error != null)
+		{
+			ShowMessage(error, WarningColor);
+		}
+		else
+		{
+			ShowMessage($"{setting.Label}: {setting.Format(group.FirstSystem)} on {group.LiveSystems.Count()} system(s).", GoodColor);
+		}
+		_rowsSignature = null;
+		RefreshAll();
+	}
+
+	private void ToggleSelectedBlock()
+	{
+		IMyTerminalBlock block = SelectedBlock();
+		if (!(block is IMyFunctionalBlock functional))
+		{
+			ShowMessage("Select a block first.", WarningColor);
+			return;
+		}
+		functional.Enabled = !functional.Enabled;
+		ShowMessage($"{block.CustomName} switched {(functional.Enabled ? "on" : "off")}.", functional.Enabled ? GoodColor : (Color?)null);
+		_rowsSignature = null;
+		RefreshAll();
 	}
 
 	private static List<RowData> PriorityRows(List<string> entries)

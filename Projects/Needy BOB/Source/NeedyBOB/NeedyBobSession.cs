@@ -27,7 +27,13 @@ public class NeedyBobSession : MySessionComponentBase
 
 	private const string ChatCommand = "/bob";
 
-	private const string ActionId = "NeedyBOB_OpenMenu";
+	private const string MenuActionId = "NeedyBOB_OpenMenu";
+
+	private const string AutoQueueToggleId = "NeedyBOB_AutoQueueToggle";
+
+	private const string AutoQueueOnId = "NeedyBOB_AutoQueueOn";
+
+	private const string AutoQueueOffId = "NeedyBOB_AutoQueueOff";
 
 	/// <summary>Ticks between the starts of two passes looking for Build and Repair systems.</summary>
 	private const int DiscoveryIntervalTicks = 300;
@@ -71,7 +77,7 @@ public class NeedyBobSession : MySessionComponentBase
 
 	private int _queueCursor;
 
-	private IMyTerminalAction _action;
+	private readonly List<IMyTerminalAction> _actions = new List<IMyTerminalAction>();
 
 	private bool _started;
 
@@ -84,7 +90,7 @@ public class NeedyBobSession : MySessionComponentBase
 				return;
 			}
 			Instance = this;
-			CreateAction();
+			CreateActions();
 			MyAPIGateway.TerminalControls.CustomActionGetter += CustomActionGetter;
 			MyAPIGateway.Utilities.MessageEntered += OnMessageEntered;
 			_started = true;
@@ -133,23 +139,82 @@ public class NeedyBobSession : MySessionComponentBase
 		}
 	}
 
-	private void CreateAction()
+	private void CreateActions()
 	{
-		_action = MyAPIGateway.TerminalControls.CreateAction<IMyShipWelder>(ActionId);
-		_action.Name = new StringBuilder("Needy BOB");
-		_action.Icon = "Textures\\GUI\\Icons\\Actions\\Start.dds";
-		_action.ValidForGroups = false;
-		_action.Enabled = (IMyTerminalBlock b) => b is IMyShipWelder welder && IsKnownSystem(welder);
-		_action.Action = (IMyTerminalBlock b) => OpenMenu(b as IMyShipWelder);
+		AddAction(MenuActionId, "Needy BOB", "Start", b => OpenMenu(b), null);
+		AddAction(AutoQueueToggleId, "Needy BOB Auto-queue On/Off", "Toggle", b => SetAutoQueueFromToolbar(b, null), AutoQueueWriter);
+		AddAction(AutoQueueOnId, "Needy BOB Auto-queue On", "SwitchOn", b => SetAutoQueueFromToolbar(b, true), AutoQueueWriter);
+		AddAction(AutoQueueOffId, "Needy BOB Auto-queue Off", "SwitchOff", b => SetAutoQueueFromToolbar(b, false), AutoQueueWriter);
+	}
+
+	private void AddAction(string id, string name, string icon, Action<IMyShipWelder> run, Action<IMyTerminalBlock, StringBuilder> writer)
+	{
+		IMyTerminalAction action = MyAPIGateway.TerminalControls.CreateAction<IMyShipWelder>(id);
+		action.Name = new StringBuilder(name);
+		action.Icon = $"Textures\\GUI\\Icons\\Actions\\{icon}.dds";
+		action.ValidForGroups = false;
+		action.Enabled = (IMyTerminalBlock b) => b is IMyShipWelder welder && IsKnownSystem(welder);
+		action.Action = (IMyTerminalBlock b) =>
+		{
+			if (b is IMyShipWelder welder)
+			{
+				run(welder);
+			}
+		};
+		if (writer != null)
+		{
+			action.Writer = writer;
+		}
+		_actions.Add(action);
+	}
+
+	/// <summary>Shows On/Off under the toolbar slot.</summary>
+	private void AutoQueueWriter(IMyTerminalBlock block, StringBuilder text)
+	{
+		BobGroup group = GroupOf(block);
+		text.Append(group == null ? "-" : group.AutoQueue ? "On" : "Off");
+	}
+
+	/// <summary>Sets auto-queue for the block's group; null flips it.</summary>
+	private void SetAutoQueueFromToolbar(IMyShipWelder block, bool? enabled)
+	{
+		if (MyAPIGateway.Session?.Player == null)
+		{
+			return;
+		}
+		BobGroup group = GroupOf(block);
+		if (group == null)
+		{
+			RefreshNow();
+			group = GroupOf(block);
+		}
+		if (group == null)
+		{
+			MyAPIGateway.Utilities.ShowNotification($"Needy BOB: {block.CustomName} isn't in a group.", 3000, MyFontEnum.Red);
+			return;
+		}
+		SetAutoQueue(group, enabled ?? !group.AutoQueue);
+		MyAPIGateway.Utilities.ShowNotification($"Needy BOB: auto-queue {(group.AutoQueue ? "on" : "off")} for {group.Label}", 3000);
+	}
+
+	private BobGroup GroupOf(IMyTerminalBlock block)
+	{
+		return block is IMyShipWelder welder ? _sortedGroups.FirstOrDefault(g => g.Systems.Contains(welder)) : null;
 	}
 
 	private void CustomActionGetter(IMyTerminalBlock block, List<IMyTerminalAction> actions)
 	{
 		try
 		{
-			if (block is IMyShipWelder welder && IsKnownSystem(welder) && !actions.Contains(_action))
+			if (block is IMyShipWelder welder && IsKnownSystem(welder))
 			{
-				actions.Add(_action);
+				foreach (IMyTerminalAction action in _actions)
+				{
+					if (!actions.Contains(action))
+					{
+						actions.Add(action);
+					}
+				}
 			}
 		}
 		catch (Exception ex)

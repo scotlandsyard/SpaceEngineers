@@ -19,12 +19,27 @@ The menu opens on the group of the block you used. From chat, it opens on a grou
 | Control | What it does |
 |---|---|
 | Group | Every group you can access that is loaded near you, shown as `Grid: Group (n systems)` |
-| View | Status, Weld targets, Grind targets, Collect targets, Missing components, Weld priority, Grind priority, Setup: groups |
+| View | Status, Weld targets, Grind targets, Collect targets, Missing components, BaR settings, Weld priority, Grind priority, Setup: groups, Help |
 | Auto-queue | Turns auto-queuing on or off for the group |
 | Queue now | Queues what's missing once, whether auto-queue is on or not |
 | Rescan | Looks for systems and assemblers again straight away (this also happens every 5 seconds by itself) |
+| Help | Opens the in-game help page; Back returns to the view you came from |
 
-Tables update every half second. Click a column header to sort. Until you do, targets are listed in the mod's own order.
+The window closes with the X in its corner or with Esc. Tables update every half second. Click a column header to sort. Until you do, targets are listed in the mod's own order.
+
+**BaR settings** lists the Build and Repair settings the server's mod settings allow: search, work and weld mode, projections, colours, janitor options, grind order, push options, work area size and offset, sound and effects, and script control. Select one and press **Lower / Previous** or **Raise / Next** (hold Shift for 10x steps), or double-click it to step it forward. The change is made on every system in the group through the mod's own terminal properties, so it syncs exactly like a terminal change, and settings the server has locked don't move. **Weld priority** and **Grind priority** are read-only: the mod only saves order changes made in its own terminal list.
+
+### Toolbar actions
+
+Build and Repair blocks get four actions:
+
+| Action | What it does |
+|---|---|
+| Needy BOB | Opens the menu on this block's group |
+| Needy BOB Auto-queue On/Off | Flips auto-queue for this block's group; the slot shows On or Off |
+| Needy BOB Auto-queue On / Off | Switches it on or off |
+
+They work from your own toolbar (cockpit or character). Button panels, timers and event controllers run their actions on the server, where the plugin isn't loaded.
 
 ## Groups
 
@@ -36,7 +51,9 @@ Group=Hangar 1
 AutoQueue=true
 ```
 
-You don't have to type this yourself. In **Setup: groups**, select a block, type a group name and press **Assign to group**.
+You don't have to type this yourself. In **Setup: groups**, select a block, type a group name and press **Assign to group**. **Turn on / off** switches the selected block.
+
+There are no predefined group names: any name you type creates that group once a Build and Repair system is in it. The script's group settings (`BuildAndRepairGroup1`, `AssemblerGroup1`) and terminal block groups are not used.
 
 - A Build and Repair block with no group joins **Default**.
 - An assembler with no group works for **Default**. Every unassigned assembler on the construct counts, so simple setups need nothing. Survival kits are never used.
@@ -78,4 +95,4 @@ Everything runs on your client. Nothing is needed on the server.
 
 Set `Bin64` in `Source/NeedyBOB.csproj` if Space Engineers isn't in the default Steam location. Then run `dotnet build -c Release` in `Source`. The plugin is written to `Source/bin/Release/net481/NeedyBOB.dll`.
 
-The plugin uses its own assembly name (`NeedyBOB`), action ID (`NeedyBOB_OpenMenu`), chat command (`/bob`) and Custom Data section (`[Needy BOB]`), so it can't clash with the other plugins in this repo.
+The plugin uses its own assembly name (`NeedyBOB`), action IDs (`NeedyBOB_*`), chat command (`/bob`) and Custom Data section (`[Needy BOB]`), so it can't clash with the other plugins in this repo.

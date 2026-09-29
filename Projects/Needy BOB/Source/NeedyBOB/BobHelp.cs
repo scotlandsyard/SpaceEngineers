@@ -1,0 +1,69 @@
+using Sandbox.Graphics.GUI;
+using VRageMath;
+
+namespace NeedyBOB;
+
+/// <summary>The text of the Help view.</summary>
+internal static class BobHelp
+{
+	private static readonly string[] Lines =
+	{
+		"# What Needy BOB does",
+		"Needy BOB watches your Nanobot Build and Repair systems (BaR). When they can't weld because components are missing, it queues those components in your assemblers. It also shows what the systems are doing and lets you change their settings. It runs in your own game, so it only works while you are online and near the grid.",
+		"",
+		"# Opening this window",
+		"- Type /bob in chat, or put a Build and Repair block on a toolbar and pick 'Needy BOB'.",
+		"- The same block also has toolbar actions 'Needy BOB Auto-queue On/Off', '... On' and '... Off'. They switch auto-queue for that block's group without opening the window, and the slot shows On or Off. Use them from your own toolbar: button panels and timers run on the server, where Needy BOB isn't loaded.",
+		"",
+		"# Groups",
+		"A group is a set of Build and Repair systems plus the assemblers that build for them, on one ship or station (everything connected to the same terminal). The Group list at the top shows them as 'Grid: Group'.",
+		"- There are no set group names. You make them up: in 'Setup: groups', type any name (for example Hangar 1), select a block and press Assign to group. A group exists as long as at least one Build and Repair system is in it.",
+		"- Default: every block you haven't assigned. With no setup at all, all systems on a grid are the Default group, and it uses every unassigned assembler (never survival kits).",
+		"- An assembler assigned to a named group builds only for that group.",
+		"- Remove from groups takes a block out of every group; it then shows as (none). Assign it again to bring it back.",
+		"- The group names from the original script's settings (like BuildAndRepairGroup1 and AssemblerGroup1) are not used, and neither are terminal block groups.",
+		"- The group is stored in a [Needy BOB] section of the block's Custom Data. It is saved with the world and the same for every player, and the rest of the Custom Data is left alone.",
+		"",
+		"# Views",
+		"- Status: whether the systems are working, what they are welding or grinding, how much is waiting, their main settings, each system on its own, and the last things queued.",
+		"- Weld targets / Grind targets: blocks waiting to be welded or ground, with integrity and distance from the first system. Green rows are being worked on right now.",
+		"- Collect targets: floating items the systems will pick up.",
+		"- Missing components: what the systems need but can't find. Queued = already in the group's assembler queues. Built = finished and waiting in an assembler. The last column says what Needy BOB did about it, or why it couldn't.",
+		"- BaR settings: the Build and Repair settings of every system in the group (see below).",
+		"- Weld priority / Grind priority: which kinds of block are handled first. Read only here; change the order in the block's terminal.",
+		"- Setup: groups: every Build and Repair system and assembler on this grid, with its group and state. Green rows belong to the group picked at the top.",
+		"Click a column header to sort a list; click it again to reverse. Everything refreshes by itself.",
+		"",
+		"# Buttons",
+		"- Auto-queue: switches auto-queuing on or off for the group. While it's on, Needy BOB checks every 3 seconds and queues what is missing, minus what is already queued or built.",
+		"- Queue now: queues what is missing once, even while auto-queue is off.",
+		"- Rescan: looks for systems and assemblers again straight away (it also does this every 5 seconds).",
+		"- Setup: Assign to group / Remove from groups as above. Turn on / off switches the selected block on or off.",
+		"- BaR settings: select a setting, then press Lower / Previous or Raise / Next. Hold Shift for steps 10 times bigger. Double-click a setting to step it forward. The change goes to every system in the group, just as if you had changed each one in its terminal. Settings the server has locked stay as they are, and the status line says so. A value shown as '(systems differ)' means the systems in the group don't all have the same value.",
+		"",
+		"# Good to know",
+		"- Only assemblers that are on, intact, in assembly mode and accessible to you are used.",
+		"- After queuing a component, Needy BOB waits 15 seconds before queuing it again, so the server has time to confirm the first order.",
+		"- In multiplayer the mod only sends the first 24 targets and missing components to players, so long lists are cut off.",
+		"- If two players with Needy BOB have auto-queue on for the same group, an item can now and then be queued twice.",
+		"- Needs the SKO maintained Nanobot Build and Repair mod."
+	};
+
+	public static void Write(MyGuiControlMultilineText text)
+	{
+		Vector4 heading = Color.White.ToVector4();
+		Vector4 body = new Color(200, 215, 230).ToVector4();
+		foreach (string line in Lines)
+		{
+			if (line.StartsWith("# "))
+			{
+				text.AppendText(line.Substring(2), "White", 0.85f, heading);
+			}
+			else
+			{
+				text.AppendText(line, "Blue", 0.75f, body);
+			}
+			text.AppendLine();
+		}
+	}
+}
