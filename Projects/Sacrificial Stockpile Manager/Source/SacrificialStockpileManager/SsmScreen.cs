@@ -131,6 +131,14 @@ public partial class SsmScreen : MyGuiScreenBase
 	/// <summary>Buttons that need the grid to be loaded.</summary>
 	private readonly List<MyGuiControlButton> _liveButtons = new List<MyGuiControlButton>();
 
+	/// <summary>Space between a right-aligned column's text and the column's right edge (the table's own default margin).</summary>
+	private const float ColumnGap = 0.01f;
+
+	/// <summary>Cell margin for right-aligned cells: with the column's -ColumnGap it leaves the text ColumnGap from the edge, like the header.</summary>
+	private static readonly Thickness RightCellMargin = new Thickness(2f * ColumnGap, 0f, 0f, 0f);
+
+	private bool[] _rightAligned = new bool[0];
+
 	private string _rowsSignature;
 
 	private string _gridsSignature;
@@ -273,6 +281,7 @@ public partial class SsmScreen : MyGuiScreenBase
 			VisibleRowsCount = rows
 		};
 		_table.SetCustomColumnWidths(columns.Select(c => c.Width).ToArray());
+		_rightAligned = columns.Select(c => c.RightAligned).ToArray();
 		for (int i = 0; i < columns.Count; i++)
 		{
 			_table.SetColumnName(i, new StringBuilder(columns[i].Name));
@@ -280,6 +289,10 @@ public partial class SsmScreen : MyGuiScreenBase
 			{
 				_table.SetColumnAlign(i, MyGuiDrawAlignEnum.HORISONTAL_RIGHT_AND_VERTICAL_CENTER);
 				_table.SetHeaderColumnAlign(i, MyGuiDrawAlignEnum.HORISONTAL_RIGHT_AND_VERTICAL_CENTER);
+				// The table always adds the column's left margin to a header, even a right-aligned one, but subtracts
+				// it from a right-aligned cell. A negative left margin pulls the header in from the column's edge, and
+				// each cell's own margin (see RightCellMargin) puts the cell text at the same place.
+				_table.SetHeaderColumnMargin(i, new Thickness(-ColumnGap, 0f, ColumnGap, 0f));
 			}
 			if (columns[i].Sortable)
 			{
@@ -787,7 +800,12 @@ public partial class SsmScreen : MyGuiScreenBase
 				// A cell draws every line of its text, so line breaks (from block or modded item names) would spill over the rows below.
 				string text = (i < data.Texts.Length ? data.Texts[i] ?? "" : "").Replace("\r", "").Replace('\n', ' ');
 				object sortValue = data.SortValues != null && i < data.SortValues.Length && data.SortValues[i] != null ? data.SortValues[i] : text;
-				row.AddCell(new MyGuiControlTable.Cell(text, sortValue, null, data.Color));
+				MyGuiControlTable.Cell cell = new MyGuiControlTable.Cell(text, sortValue, null, data.Color);
+				if (i < _rightAligned.Length && _rightAligned[i])
+				{
+					cell.Margin = RightCellMargin;
+				}
+				row.AddCell(cell);
 			}
 			_table.Add(row);
 		}
