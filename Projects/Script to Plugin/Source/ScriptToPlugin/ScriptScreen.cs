@@ -63,6 +63,9 @@ public class ScriptScreen : MyGuiScreenBase
 
 	private bool _updatingArgumentBox;
 
+	/// <summary>What to do once the host picker has closed (open the code editor or the copy question).</summary>
+	private Action _afterPicker;
+
 	private static Color MutedColor => new Color(150, 160, 170);
 
 	private static Color WarningColor => new Color(255, 190, 90);
@@ -172,6 +175,14 @@ public class ScriptScreen : MyGuiScreenBase
 		bool result = base.Update(hasFocus);
 		try
 		{
+			// Screens opened straight from the picker's click end up without input focus (the picker is still
+			// closing and this window is still coming back), so they wait until this window has focus again.
+			if (_afterPicker != null && State == MyGuiScreenState.OPENED && MyScreenManager.GetScreenWithFocus() == this)
+			{
+				Action next = _afterPicker;
+				_afterPicker = null;
+				next();
+			}
 			if (++_frames >= RefreshFrames)
 			{
 				_frames = 0;
@@ -430,7 +441,7 @@ public class ScriptScreen : MyGuiScreenBase
 
 	private void NewScript()
 	{
-		MyGuiSandbox.AddScreen(new HostPickerScreen(ScriptSession.ControlledBlock(), CreateScriptOn));
+		MyGuiSandbox.AddScreen(new HostPickerScreen(ScriptSession.ControlledBlock(), block => _afterPicker = () => CreateScriptOn(block)));
 	}
 
 	private void CreateScriptOn(MyTerminalBlock host)
