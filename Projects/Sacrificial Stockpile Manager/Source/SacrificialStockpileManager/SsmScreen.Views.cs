@@ -34,12 +34,32 @@ public partial class SsmScreen
 		case View.Items:
 			return new List<Column>
 			{
-				new Column { Name = "Item", Width = 0.27f },
-				new Column { Name = "Category", Width = 0.13f },
-				new Column { Name = "Amount", Width = 0.13f, RightAligned = true },
-				new Column { Name = "Quota", Width = 0.12f, RightAligned = true },
-				new Column { Name = "Queued", Width = 0.11f, RightAligned = true },
-				new Column { Name = "Autocraft", Width = 0.24f }
+				new Column { Name = "Item", Width = 0.24f },
+				new Column { Name = "Category", Width = 0.11f },
+				new Column { Name = "Amount", Width = 0.12f, RightAligned = true },
+				new Column { Name = "Quota", Width = 0.1f, RightAligned = true },
+				new Column { Name = "Maximum", Width = 0.11f, RightAligned = true },
+				new Column { Name = "Queued", Width = 0.1f, RightAligned = true },
+				new Column { Name = "Autocraft", Width = 0.22f }
+			};
+		case View.Machine:
+			return new List<Column>
+			{
+				new Column { Name = "Item", Width = 0.3f, Sortable = false },
+				new Column { Name = "Amount", Width = 0.12f, RightAligned = true, Sortable = false },
+				new Column { Name = "Needed", Width = 0.12f, RightAligned = true, Sortable = false },
+				new Column { Name = "On grid", Width = 0.12f, RightAligned = true, Sortable = false },
+				new Column { Name = "Missing", Width = 0.12f, RightAligned = true, Sortable = false },
+				new Column { Name = "Note", Width = 0.22f, Sortable = false }
+			};
+		case View.Refining:
+			return new List<Column>
+			{
+				new Column { Name = "Priority", Width = 0.1f, RightAligned = true, Sortable = false },
+				new Column { Name = "Ore", Width = 0.3f, Sortable = false },
+				new Column { Name = "In storage", Width = 0.15f, RightAligned = true, Sortable = false },
+				new Column { Name = "In refineries", Width = 0.15f, RightAligned = true, Sortable = false },
+				new Column { Name = "Being refined in", Width = 0.3f, Sortable = false }
 			};
 		case View.Blocks:
 			return new List<Column>
@@ -96,6 +116,8 @@ public partial class SsmScreen
 			return "Empty, and no limits set. Pick an item below to add one.";
 		case View.Production:
 			return "No production blocks.";
+		case View.Machine:
+			return "No assembler or refinery on this grid.";
 		case View.Displays:
 			return "No blocks with screens that you can access.";
 		case View.Log:
@@ -119,6 +141,10 @@ public partial class SsmScreen
 			return BlockItemRows(grid);
 		case View.Production:
 			return ProductionRows(grid);
+		case View.Machine:
+			return MachineRows(grid);
+		case View.Refining:
+			return RefiningRows(grid);
 		case View.Displays:
 			return DisplayRows(grid);
 		case View.Log:
@@ -140,6 +166,8 @@ public partial class SsmScreen
 		rows.Add(Row("set:autocraft", rules != null && rules.Autocraft ? GoodColor : (Color?)null, "Autocraft", rules != null && rules.Autocraft ? "On: quotas are queued in assemblers" : "Off"));
 		rows.Add(Row("set:drain", rules != null && rules.DrainOutputs ? GoodColor : (Color?)null, "Empty production output", rules != null && rules.DrainOutputs ? "On: refinery and assembler output goes to storage" : "Off"));
 		rows.Add(Row("set:kits", rules != null && rules.UseSurvivalKits ? GoodColor : (Color?)null, "Survival kits autocraft", rules != null && rules.UseSurvivalKits ? "On" : "Off"));
+		rows.Add(Row("set:disassemble", rules != null && rules.Disassemble ? GoodColor : (Color?)null, "Disassemble surplus", rules != null && rules.Disassemble ? "On: items above their maximum are disassembled" : "Off"));
+		rows.Add(Row("set:bottles", rules != null && rules.FillBottles ? GoodColor : (Color?)null, "Keep bottles filled", rules != null && rules.FillBottles ? "On: bottles go to a tank to refill (needs Automation)" : "Off"));
 
 		Vector3D player = MyAPIGateway.Session?.Player?.GetPosition() ?? Vector3D.Zero;
 		string distance = FormatDistance(Vector3D.Distance(player, grid.Position));
@@ -224,6 +252,14 @@ public partial class SsmScreen
 		case "kits":
 			on = rules.UseSurvivalKits = !rules.UseSurvivalKits;
 			text = "Autocraft in survival kits";
+			break;
+		case "disassemble":
+			on = rules.Disassemble = !rules.Disassemble;
+			text = "Disassembly above maximums";
+			break;
+		case "bottles":
+			on = rules.FillBottles = !rules.FillBottles;
+			text = "Keeping bottles filled";
 			break;
 		default:
 			return;
@@ -361,15 +397,19 @@ public partial class SsmScreen
 			double queued = live?.QueuedAmount(key) ?? 0.0;
 			string note = live != null && live.QuotaNotes.TryGetValue(key, out string text) ? text : "";
 			Color? color = null;
-			if (quota != null && quota.HasMin)
+			if (quota != null && ((quota.HasMin && amount < quota.Min) || (quota.HasMax && amount > quota.Max)))
 			{
-				color = amount >= quota.Min ? GoodColor : WarningColor;
+				color = WarningColor;
+			}
+			else if (quota != null)
+			{
+				color = GoodColor;
 			}
 			rows.Add(new RowData
 			{
 				Key = "i:" + key,
-				Texts = new[] { Items.Name(key), Items.CategoryNames[(int)Items.Category(key)], Items.Amount(amount), quota != null && quota.HasMin ? Items.Amount(quota.Min) : "", queued > 0.0 ? Items.Amount(queued) : "", note },
-				SortValues = new object[] { null, ((int)Items.Category(key)).ToString("D2") + Items.Name(key), amount, quota?.Min ?? -1.0, queued, null },
+				Texts = new[] { Items.Name(key), Items.CategoryNames[(int)Items.Category(key)], Items.Amount(amount), quota != null && quota.HasMin ? Items.Amount(quota.Min) : "", quota != null && quota.HasMax ? Items.Amount(quota.Max) : "", queued > 0.0 ? Items.Amount(queued) : "", note },
+				SortValues = new object[] { null, ((int)Items.Category(key)).ToString("D2") + Items.Name(key), amount, quota?.Min ?? -1.0, quota?.Max ?? -1.0, queued, null },
 				Color = color
 			});
 		}
@@ -387,7 +427,8 @@ public partial class SsmScreen
 		return s_itemKey;
 	}
 
-	private void SetQuota()
+	/// <summary>Sets the quota (minimum, autocrafted) or the maximum (disassembled above). A blank amount clears that one.</summary>
+	private void SetQuota(bool minimum)
 	{
 		GridSnapshot grid = Grid;
 		string key = SelectedItem(out string problem);
@@ -396,28 +437,71 @@ public partial class SsmScreen
 			ShowMessage(problem ?? "No grid selected.", WarningColor);
 			return;
 		}
-		if (!Items.TryParseAmount(_amountBox?.Text, out double amount) || amount <= 0.0)
+		string text = _amountBox?.Text ?? "";
+		double amount = -1.0;
+		if (text.Trim().Length > 0 && (!Items.TryParseAmount(text, out amount) || (minimum && amount <= 0.0)))
 		{
-			ShowMessage("Type the amount to keep in stock, e.g. 500 or 2.5k.", WarningColor);
+			ShowMessage("Type an amount like 500 or 2.5k, or leave it blank to clear.", WarningColor);
 			return;
 		}
-		if (Items.Blueprint(key) == null)
+		if (amount >= 0.0 && Items.IsIntegral(key))
 		{
-			ShowMessage($"No blueprint makes {Items.Name(key)}, so autocraft can't queue it. The quota is kept for the LCD pages.", WarningColor);
+			amount = minimum ? Math.Ceiling(amount) : Math.Floor(amount);
 		}
 		GridRules rules = Store.EditGridRules(grid);
 		ItemLimit quota = rules.Quota(key);
 		if (quota == null)
 		{
+			if (amount < 0.0)
+			{
+				ShowMessage($"{Items.Name(key)} has no {(minimum ? "quota" : "maximum")} to clear.", null);
+				return;
+			}
 			quota = new ItemLimit { Item = key };
 			rules.Quotas.Add(quota);
 		}
-		quota.Min = Items.IsIntegral(key) ? Math.Ceiling(amount) : amount;
+		if (minimum)
+		{
+			quota.Min = amount;
+		}
+		else
+		{
+			quota.Max = amount;
+		}
+		if (quota.HasMin && quota.HasMax && quota.Min > quota.Max)
+		{
+			// Keep them consistent, or autocraft and disassembly would fight: the one just typed wins.
+			if (minimum)
+			{
+				quota.Max = quota.Min;
+			}
+			else
+			{
+				quota.Min = quota.Max;
+			}
+		}
+		if (!quota.HasMin && !quota.HasMax)
+		{
+			rules.Quotas.Remove(quota);
+		}
 		Store.SaveSettings();
 		Session?.RunNow(Live);
-		if (Items.Blueprint(key) != null)
+		string name = Items.Name(key);
+		if (amount < 0.0)
 		{
-			ShowMessage($"Quota for {Items.Name(key)}: {Items.Amount(quota.Min)}.{(rules.Autocraft ? "" : " Autocraft is off; switch it on to queue it.")}", GoodColor);
+			ShowMessage($"{(minimum ? "Quota" : "Maximum")} for {name} cleared.", null);
+		}
+		else if (Items.Blueprint(key) == null)
+		{
+			ShowMessage($"No blueprint makes {name}, so it can't be {(minimum ? "assembled" : "disassembled")}. The setting is kept for the LCD pages.", WarningColor);
+		}
+		else if (minimum)
+		{
+			ShowMessage($"Quota for {name}: {Items.Amount(amount)}.{(rules.Autocraft ? "" : " Autocraft is off; switch it on to queue it.")}", rules.Autocraft ? GoodColor : WarningColor);
+		}
+		else
+		{
+			ShowMessage($"Maximum for {name}: {Items.Amount(amount)}.{(rules.Disassemble ? " Anything above it is disassembled." : " Disassembly is off; switch it on in the Overview.")}", rules.Disassemble ? GoodColor : WarningColor);
 		}
 		_rowsSignature = null;
 		RefreshAll();
@@ -439,7 +523,7 @@ public partial class SsmScreen
 			return;
 		}
 		Store.SaveSettings();
-		ShowMessage($"Cleared the quota for {Items.Name(key)}. Anything already queued stays queued.", null);
+		ShowMessage($"Cleared the quota and maximum for {Items.Name(key)}. Anything already queued stays queued.", null);
 		_rowsSignature = null;
 		RefreshAll();
 	}

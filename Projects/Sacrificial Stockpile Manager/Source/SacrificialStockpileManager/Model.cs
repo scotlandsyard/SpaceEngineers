@@ -110,6 +110,15 @@ public class GridRules
 
 	public bool UseSurvivalKits;
 
+	/// <summary>Disassemble what's above a quota's maximum, using one idle assembler at a time.</summary>
+	public bool Disassemble;
+
+	/// <summary>Take bottles that aren't full to a gas tank with Auto-Refill on, and put them back once full.</summary>
+	public bool FillBottles;
+
+	/// <summary>Ore keys refineries work on first, highest priority first.</summary>
+	public List<string> OrePriority = new List<string>();
+
 	public List<ItemLimit> Quotas = new List<ItemLimit>();
 
 	public ItemLimit Quota(string item)
@@ -125,6 +134,9 @@ public class SettingsFile
 	public List<GridRules> Grids = new List<GridRules>();
 
 	public List<DisplayRule> Displays = new List<DisplayRule>();
+
+	/// <summary>Assemblers the plugin switched to disassembly, so it can switch them back (and only those) when done.</summary>
+	public List<long> Disassemblers = new List<long>();
 }
 
 /// <summary>

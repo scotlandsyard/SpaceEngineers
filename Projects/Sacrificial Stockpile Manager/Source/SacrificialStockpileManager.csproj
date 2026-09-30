@@ -36,6 +36,7 @@
     <Reference Include="VRage.Library"><HintPath>$(Bin64)\VRage.Library.dll</HintPath><Private>False</Private></Reference>
     <Reference Include="VRage.Math"><HintPath>$(Bin64)\VRage.Math.dll</HintPath><Private>False</Private></Reference>
     <Reference Include="VRage.Render"><HintPath>$(Bin64)\VRage.Render.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="SpaceEngineers.ObjectBuilders"><HintPath>$(Bin64)\SpaceEngineers.ObjectBuilders.dll</HintPath><Private>False</Private></Reference>
     <Reference Include="ProtoBuf.Net.Core"><HintPath>$(Bin64)\ProtoBuf.Net.Core.dll</HintPath><Private>False</Private></Reference>
   </ItemGroup>
 </Project>

@@ -205,6 +205,21 @@ internal class Construct
 		}
 	}
 
+	/// <summary>Everything the ship or station itself holds, in every inventory; a docked ship's cargo isn't counted.</summary>
+	public static Dictionary<string, double> StationTotals(GridSnapshot grid)
+	{
+		Dictionary<string, double> totals = new Dictionary<string, double>();
+		foreach (BlockSnapshot block in grid.Blocks.Where(b => !b.Docked))
+		{
+			foreach (KeyValuePair<string, double> item in block.ItemAmounts.Concat(block.OutputAmounts))
+			{
+				totals.TryGetValue(item.Key, out double existing);
+				totals[item.Key] = existing + item.Value;
+			}
+		}
+		return totals;
+	}
+
 	public static bool IsProductionKind(BlockKind kind)
 	{
 		return kind == BlockKind.Assembler || kind == BlockKind.SurvivalKit || kind == BlockKind.Refinery;

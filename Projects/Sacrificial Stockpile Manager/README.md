@@ -16,7 +16,7 @@ A client-side Pulsar plugin for inventory management and auto-restocking. It tak
 | Control | What it does |
 |---|---|
 | Grid | Your ships and stations: loaded ones first, then the rest with when they were last seen |
-| View | All grids, Overview, Items & quotas, Blocks, Block settings, Production, Displays (LCD), Log, Help |
+| View | All grids, Overview, Items & quotas, Blocks, Block settings, Production, Production details, Refinery priority, Displays (LCD), Log, Help |
 
 The window closes with the X in its corner or with Esc. Tables update every half second. Click a column header to sort.
 
@@ -26,10 +26,12 @@ The window closes with the X in its corner or with Esc. Tables update every half
 |---|---|---|
 | All grids | Every grid: last sync (Live when loaded), distance, storage used, storage size, fill, kinds of item; totals under the table | Open grid, GPS marker, Remove from list, Help |
 | Overview | Grid settings (double-click to switch), status, storage used / size / free, item totals, warnings, recent actions | Change setting, GPS marker, Remove from list, Help |
-| Items & quotas | Every item on the grid with its quota, queued amount and autocraft state | Set quota, Clear quota, Autocraft on/off, Help |
+| Items & quotas | Every item on the grid with its quota, maximum, queued amount and autocraft / disassembly state | Set quota, Set maximum, Clear quota, Autocraft on/off; Find box |
 | Blocks | Every block with an inventory: role, fill %, used / size in litres, settings | Edit block, Turn on / off, Rescan, Help |
 | Block settings | One block: role, Accepts checkboxes, and per item what's there and its min/max | Set minimum, Set maximum, Clear limits, Back; Accept item |
-| Production | Assemblers, refineries, reactors, generators: state and queue or contents | Edit block, Turn on / off, Rescan, Help |
+| Production | Assemblers, refineries, reactors, generators: state and queue or contents | Details, Edit block, Turn on / off, Help |
+| Production details | One assembler: its queue (with progress) and every material the queue needs, how much the grid has and how much is missing, and whether it blocks the current item. One refinery: input in refining order, and output | Remove from queue, Turn on / off, Edit block, Back |
+| Refinery priority | Every refinable ore: its priority, amount in storage and in refineries, and which refineries are working on it | Raise priority, Lower priority, No priority, Help |
 | Displays (LCD) | Every screen on the grid and the page it shows | Show page, Stop showing, Rescan, Help |
 | Log | What the plugin did on this grid, newest first | Clear log, Rescan, Help |
 
@@ -49,6 +51,14 @@ Set in the Overview; all are off for a new grid.
 | Autocraft | Queue the shortfall of quotas in the grid's assemblers |
 | Empty production output | Move what refineries and assemblers made into storage |
 | Survival kits autocraft | Let autocraft use survival kits too |
+| Disassemble surplus | Disassemble what's above an item's maximum (Items & quotas) |
+| Keep bottles filled | Take bottles that aren't full to a gas tank to refill, and put them back when full (needs Automation) |
+
+**Disassembly.** The plugin picks one idle assembler (on, powered, nothing queued, not Manual), switches it to disassembly with the same request as the terminal's mode switch, and queues the surplus. Once that queue is done, it switches the assembler back to assembly. The game keeps the assembly queue aside meanwhile. It only switches back assemblers it switched itself, and it remembers them across restarts. The assembler pulls the items itself through conveyors, from any connected inventory. If the surplus disappears first, the plugin takes those entries out of the queue.
+
+**Refinery priority.** Refineries refine their input top to bottom. With Automation on, the plugin moves the highest-priority ore a refinery holds to the front, using the same request as dragging a stack inside an inventory. If the refinery holds none of a better ore that's in storage, it brings some in, sending back its lowest-priority stack first if it's full.
+
+**Bottles.** Bottles below 100% in storage or intakes go to a tank of the same gas with Auto-Refill on, power and gas in it. The tank fills them as they arrive, and full bottles go back to storage. Gas generators aren't used, because they refill bottles only on the server and a client can't see when a bottle in one is full. Stock blocks with bottle minimums get the fullest bottles first.
 
 ## Block roles
 

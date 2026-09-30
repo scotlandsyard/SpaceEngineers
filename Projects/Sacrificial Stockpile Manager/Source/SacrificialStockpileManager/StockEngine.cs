@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Sandbox.Common.ObjectBuilders.Definitions;
+using Sandbox.Definitions;
 using Sandbox.Game;
+using Sandbox.Game.Entities.Blocks;
 using Sandbox.ModAPI;
 using VRage;
 using VRage.Game;
@@ -47,6 +50,9 @@ internal class StockEngine
 		public string Key;
 
 		public double Amount;
+
+		/// <summary>0..1 for gas bottles, -1 for everything else.</summary>
+		public double GasLevel = -1.0;
 	}
 
 	private class Inv
@@ -133,12 +139,20 @@ internal class StockEngine
 		StockEngine engine = new StockEngine(construct, rules != null && rules.Automation, now);
 		engine.FillMinimums();
 		engine.TrimMaximums();
+		if (rules != null && rules.OrePriority.Count > 0)
+		{
+			engine.PrioritizeOres(rules.OrePriority);
+		}
 		engine.ClearStockBlocks();
 		engine.DrainIntakes();
 		engine.SortStorage();
 		if (rules != null && rules.DrainOutputs)
 		{
 			engine.DrainOutputs();
+		}
+		if (rules != null && rules.FillBottles)
+		{
+			engine.FillBottles();
 		}
 		return engine;
 	}
@@ -170,7 +184,13 @@ internal class StockEngine
 		{
 			string key = Items.Key(item.Content.GetId());
 			double amount = (double)item.Amount;
-			inv.Stacks.Add(new Stack { ItemId = item.ItemId, Key = key, Amount = amount });
+			inv.Stacks.Add(new Stack
+			{
+				ItemId = item.ItemId,
+				Key = key,
+				Amount = amount,
+				GasLevel = item.Content is MyObjectBuilder_GasContainerObject bottle ? bottle.GasLevel : -1.0
+			});
 			inv.Amounts.TryGetValue(key, out double existing);
 			inv.Amounts[key] = existing + amount;
 		}
@@ -497,8 +517,142 @@ internal class StockEngine
 		}
 	}
 
+	/// <summary>
+	/// Makes refineries work on the highest-priority ore first. A refinery refines its input in inventory order,
+	/// so the best ore it holds is moved to the front (the same request as dragging a stack within an inventory
+	/// in the terminal). When a better ore is in storage, some is brought in, making room by sending the
+	/// lowest-priority stack back to storage if the refinery is full.
+	/// </summary>
+	private void PrioritizeOres(List<string> priority)
+	{
+		if (!_move)
+		{
+			return;
+		}
+		int Rank(string key)
+		{
+			int rank = priority.IndexOf(key);
+			return rank < 0 ? int.MaxValue : rank;
+		}
+		foreach (Inv refinery in _inventories.Where(i => !i.IsOutput && i.Block.Kind == BlockKind.Refinery && !i.Block.Docked && i.Block.Block.IsFunctional).ToList())
+		{
+			if (!Budget)
+			{
+				return;
+			}
+			Stack best = refinery.Stacks.Where(s => s.Amount > Epsilon && Rank(s.Key) != int.MaxValue).OrderBy(s => Rank(s.Key)).FirstOrDefault();
+			int bestRank = best == null ? int.MaxValue : Rank(best.Key);
+			// A better ore in storage? Bring it in first; it goes to the front on a later pass.
+			bool fetched = false;
+			foreach (string key in priority.Take(Math.Min(bestRank, priority.Count)))
+			{
+				if (!Items.TryParse(key, out MyDefinitionId id) || !refinery.Inventory.CheckConstraint(id) || !_inventories.Any(s => s.Block != refinery.Block && Available(s, key) > Epsilon))
+				{
+					continue;
+				}
+				if (Fits(refinery, key, id) < 1.0)
+				{
+					// Full: send back the stack refined last (the lowest priority one), so there's room next pass.
+					Stack worst = refinery.Stacks.Where(s => s.Amount > Epsilon && Rank(s.Key) > Rank(key)).OrderByDescending(s => Rank(s.Key)).FirstOrDefault();
+					if (worst != null)
+					{
+						Put(refinery, worst.Key, worst.Amount, 1, s => s == worst);
+					}
+					fetched = true;
+					break;
+				}
+				double before = Have(refinery, key);
+				Fill(refinery, key, Fits(refinery, key, id));
+				if (Have(refinery, key) > before + Epsilon)
+				{
+					fetched = true;
+					break;
+				}
+			}
+			if (fetched || best == null || !Budget)
+			{
+				continue;
+			}
+			Stack first = refinery.Stacks.FirstOrDefault(s => s.Amount > Epsilon);
+			if (first != null && first.Key != best.Key)
+			{
+				MyInventory.TransferByUser(refinery.Inventory, refinery.Inventory, best.ItemId, 0, (MyFixedPoint)best.Amount);
+				_transfers++;
+				refinery.Stacks.Remove(best);
+				refinery.Stacks.Insert(0, best);
+				_construct.AddLog($"{Items.Name(best.Key)} to the front of {refinery.Block.Name} (ore priority)");
+			}
+		}
+	}
+
+	/// <summary>
+	/// Takes bottles that aren't full from storage to a gas tank of the same gas with Auto-Refill on and gas in
+	/// it; the tank fills them when they arrive. Full bottles in tanks go back to storage.
+	/// </summary>
+	private void FillBottles()
+	{
+		if (!_move)
+		{
+			return;
+		}
+		const double Full = 0.999;
+		List<Inv> tanks = _inventories.Where(i => !i.IsOutput && i.Block.Kind == BlockKind.GasTank && !i.Block.Docked && i.Block.Block is MyGasTank).ToList();
+		foreach (Inv tank in tanks)
+		{
+			foreach (Stack bottle in tank.Stacks.Where(s => s.GasLevel >= 0.0 && s.Amount > Epsilon).ToList())
+			{
+				if (!Budget)
+				{
+					return;
+				}
+				// Full, or stuck in a tank that can't fill it.
+				if (bottle.GasLevel >= Full || !CanFill((MyGasTank)tank.Block.Block))
+				{
+					Put(tank, bottle.Key, bottle.Amount, 1, s => s == bottle);
+				}
+			}
+		}
+		Dictionary<string, int> unserved = new Dictionary<string, int>();
+		foreach (Inv source in _inventories.Where(i => !i.IsOutput && (i.Block.Role == Effective.Storage || i.Block.Role == Effective.Intake)).ToList())
+		{
+			foreach (Stack bottle in source.Stacks.Where(s => s.GasLevel >= 0.0 && s.GasLevel < Full && s.Amount > Epsilon).ToList())
+			{
+				if (!Budget)
+				{
+					return;
+				}
+				MyDefinitionId gas = (Items.Definition(bottle.Key) as MyOxygenContainerDefinition)?.StoredGasId ?? default;
+				if (!Items.TryParse(bottle.Key, out MyDefinitionId id))
+				{
+					continue;
+				}
+				Inv target = tanks
+					.Where(t => ((MyGasTank)t.Block.Block).BlockDefinition.StoredGasId == gas && CanFill((MyGasTank)t.Block.Block) && t.Inventory.CheckConstraint(id) && Fits(t, bottle.Key, id) >= 1.0)
+					.OrderByDescending(t => ((MyGasTank)t.Block.Block).FilledRatio)
+					.FirstOrDefault(t => Connected(source, t, id, bottle.Key));
+				if (target == null)
+				{
+					string gasName = gas.SubtypeName ?? "gas";
+					unserved.TryGetValue(gasName, out int count);
+					unserved[gasName] = count + 1;
+					continue;
+				}
+				Transfer(source, target, bottle.Key, bottle.Amount, s => s == bottle);
+			}
+		}
+		foreach (KeyValuePair<string, int> entry in unserved)
+		{
+			Warnings.Add($"{entry.Value} {entry.Key.ToLowerInvariant()} bottle(s) need filling - no connected {entry.Key.ToLowerInvariant()} tank with Auto-Refill on, power and gas in it, or no room in one");
+		}
+	}
+
+	private static bool CanFill(MyGasTank tank)
+	{
+		return tank.IsWorking && ((Sandbox.ModAPI.Ingame.IMyGasTank)tank).AutoRefillBottles && tank.FilledRatio > 0.01;
+	}
+
 	/// <summary>Moves up to <paramref name="amount"/> into storage of at least <paramref name="minTier"/>. Returns how much was sent.</summary>
-	private double Put(Inv source, string key, double amount, int minTier)
+	private double Put(Inv source, string key, double amount, int minTier, Func<Stack, bool> stacks = null)
 	{
 		if (!_move || amount <= Epsilon || !Budget || !Items.TryParse(key, out MyDefinitionId id))
 		{
@@ -539,7 +693,7 @@ internal class StockEngine
 			{
 				continue;
 			}
-			sent += Transfer(source, destination, key, Math.Min(room, fit));
+			sent += Transfer(source, destination, key, Math.Min(room, fit), stacks);
 			if (sent >= amount - Epsilon)
 			{
 				break;
@@ -548,14 +702,18 @@ internal class StockEngine
 		return sent;
 	}
 
-	/// <summary>Sends the transfer requests, stack by stack. Returns the amount sent.</summary>
-	private double Transfer(Inv source, Inv destination, string key, double amount)
+	/// <summary>
+	/// Sends the transfer requests, stack by stack (only the stacks <paramref name="stacks"/> accepts, when given).
+	/// Bottles go fullest first. Returns the amount sent.
+	/// </summary>
+	private double Transfer(Inv source, Inv destination, string key, double amount, Func<Stack, bool> stacks = null)
 	{
 		bool integral = Items.IsIntegral(key);
 		double moved = 0.0;
-		foreach (Stack stack in source.Stacks)
+		// OrderBy is stable, so everything that isn't a bottle keeps its inventory order.
+		foreach (Stack stack in source.Stacks.OrderByDescending(s => s.GasLevel).ToList())
 		{
-			if (stack.Key != key || stack.Amount <= Epsilon)
+			if (stack.Key != key || stack.Amount <= Epsilon || (stacks != null && !stacks(stack)))
 			{
 				continue;
 			}

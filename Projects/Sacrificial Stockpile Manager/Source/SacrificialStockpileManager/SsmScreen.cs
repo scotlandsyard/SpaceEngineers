@@ -25,13 +25,15 @@ public partial class SsmScreen : MyGuiScreenBase
 		Blocks,
 		Block,
 		Production,
+		Machine,
+		Refining,
 		Displays,
 		Log,
 		Help
 	}
 
 	// In the same order as View.
-	private static readonly string[] ViewNames = { "All grids", "Overview", "Items & quotas", "Blocks", "Block settings", "Production", "Displays (LCD)", "Log", "Help" };
+	private static readonly string[] ViewNames = { "All grids", "Overview", "Items & quotas", "Blocks", "Block settings", "Production", "Production details", "Refinery priority", "Displays (LCD)", "Log", "Help" };
 
 	// In the same order as BlockRole.
 	private static readonly string[] RoleNames = { "Auto", "Storage", "Intake", "Stock", "Manual" };
@@ -87,6 +89,12 @@ public partial class SsmScreen : MyGuiScreenBase
 	private static string s_itemKey;
 
 	private static string s_amount = "";
+
+	/// <summary>Text typed in the Find box; filters the item list and the item rows.</summary>
+	private static string s_search = "";
+
+	/// <summary>The assembler or refinery shown in Production details.</summary>
+	private static long s_machineId;
 
 	private static int s_page;
 
@@ -259,6 +267,12 @@ public partial class SsmScreen : MyGuiScreenBase
 			tableTop = -0.245f;
 			rows = 10;
 		}
+		else if (s_view == View.Machine)
+		{
+			CreateMachineControls();
+			tableTop = -0.29f;
+			rows = 14;
+		}
 
 		if (s_view == View.Help)
 		{
@@ -332,16 +346,37 @@ public partial class SsmScreen : MyGuiScreenBase
 			AddButton(0.315f, "Help", ShowHelp);
 			break;
 		case View.Items:
-			AddButton(-0.315f, "Set quota", SetQuota);
-			AddButton(-0.105f, "Clear quota", ClearQuota);
-			_autocraftButton = AddButton(0.105f, "Autocraft", () => ToggleGridSetting("autocraft"));
-			AddButton(0.315f, "Help", ShowHelp);
+			AddButton(-0.315f, "Set quota", () => SetQuota(minimum: true));
+			AddButton(-0.105f, "Set maximum", () => SetQuota(minimum: false));
+			AddButton(0.105f, "Clear quota", ClearQuota);
+			_autocraftButton = AddButton(0.315f, "Autocraft", () => ToggleGridSetting("autocraft"));
 			break;
 		case View.Blocks:
-		case View.Production:
 			AddButton(-0.315f, "Edit block", EditSelectedBlock);
 			_liveButtons.Add(AddButton(-0.105f, "Turn on / off", ToggleSelectedBlock));
 			_liveButtons.Add(AddButton(0.105f, "Rescan", Rescan));
+			AddButton(0.315f, "Help", ShowHelp);
+			break;
+		case View.Production:
+			AddButton(-0.315f, "Details", ShowSelectedMachine);
+			AddButton(-0.105f, "Edit block", EditSelectedBlock);
+			_liveButtons.Add(AddButton(0.105f, "Turn on / off", ToggleSelectedBlock));
+			AddButton(0.315f, "Help", ShowHelp);
+			break;
+		case View.Machine:
+			_liveButtons.Add(AddButton(-0.315f, "Remove from queue", RemoveSelectedQueueItem));
+			_liveButtons.Add(AddButton(-0.105f, "Turn on / off", ToggleMachine));
+			AddButton(0.105f, "Edit block", () =>
+			{
+				s_blockId = s_machineId;
+				SwitchView(View.Block);
+			});
+			AddButton(0.315f, "Back", () => SwitchView(View.Production));
+			break;
+		case View.Refining:
+			AddButton(-0.315f, "Raise priority", () => MoveOre(-1));
+			AddButton(-0.105f, "Lower priority", () => MoveOre(+1));
+			AddButton(0.105f, "No priority", RemoveOrePriority);
 			AddButton(0.315f, "Help", ShowHelp);
 			break;
 		case View.Block:
@@ -427,27 +462,59 @@ public partial class SsmScreen : MyGuiScreenBase
 		}
 	}
 
-	/// <summary>Item picker and amount box, used by Items & quotas and Block settings.</summary>
+	/// <summary>Production block picker at the top of Production details.</summary>
+	private void CreateMachineControls()
+	{
+		GridSnapshot grid = Grid;
+		List<BlockSnapshot> machines = grid == null ? new List<BlockSnapshot>() : grid.Blocks.Where(b => Construct.IsProductionKind(b.Kind)).OrderBy(b => b.Kind).ThenBy(b => b.Name, StringComparer.OrdinalIgnoreCase).ToList();
+		if (machines.Count > 0 && !machines.Any(b => b.Id == s_machineId))
+		{
+			s_machineId = machines[0].Id;
+		}
+		AddLabel(Left, Row2Y, "Block");
+		_blockCombo = AddCombo(-0.36f, Row2Y, 0.78f, 14);
+		_blockKeys.Clear();
+		foreach (BlockSnapshot machine in machines)
+		{
+			_blockCombo.AddItem(_blockKeys.Count, $"{machine.Name}  ({machine.Type})", _blockKeys.Count, null, sort: false);
+			_blockKeys.Add(machine.Id);
+		}
+		if (_blockKeys.Contains(s_machineId))
+		{
+			_blockCombo.SelectItemByKey(_blockKeys.IndexOf(s_machineId), sendEvent: false);
+		}
+		_blockCombo.ItemSelected += () =>
+		{
+			int index = (int)_blockCombo.GetSelectedKey();
+			if (!_suppressEvents && index >= 0 && index < _blockKeys.Count)
+			{
+				s_machineId = _blockKeys[index];
+				_rowsSignature = null;
+				RefreshAll();
+			}
+		};
+	}
+
+	/// <summary>Find box, item picker and amount box, used by Items & quotas and Block settings.</summary>
 	private void CreateItemEditor()
 	{
-		_itemCombo = AddCombo(Left, EditorY, 0.4f, 14);
-		_itemKeys.Clear();
-		IEnumerable<string> keys = Items.Catalog;
-		GridSnapshot grid = Grid;
-		if (grid != null)
+		AddLabel(Left, EditorY, "Find");
+		MyGuiControlTextbox searchBox = new MyGuiControlTextbox(new Vector2(-0.375f, EditorY), s_search, 30)
 		{
-			// Modded or unusual items that exist on the grid but aren't in the catalog.
-			keys = keys.Concat(grid.Totals.Keys.Where(k => !Items.Catalog.Contains(k)));
-		}
-		foreach (string key in keys)
+			Size = new Vector2(0.11f, 0.045f),
+			OriginAlign = MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER
+		};
+		searchBox.TextChanged += box =>
 		{
-			_itemCombo.AddItem(_itemKeys.Count, $"{Items.Name(key)}  ({Items.CategoryShort[(int)Items.Category(key)]})", _itemKeys.Count, null, sort: false);
-			_itemKeys.Add(key);
-		}
-		if (s_itemKey != null && _itemKeys.Contains(s_itemKey))
-		{
-			_itemCombo.SelectItemByKey(_itemKeys.IndexOf(s_itemKey), sendEvent: false);
-		}
+			s_search = box.Text ?? "";
+			FillItemCombo();
+			_rowsSignature = null;
+			RefreshRows();
+		};
+		Controls.Add(searchBox);
+
+		_itemCombo = AddCombo(-0.255f, EditorY, 0.245f, 14);
+		FillItemCombo();
 		_itemCombo.ItemSelected += () =>
 		{
 			int index = (int)_itemCombo.GetSelectedKey();
@@ -471,6 +538,53 @@ public partial class SsmScreen : MyGuiScreenBase
 		{
 			AddButton(0.315f, "Accept item", ToggleAcceptItem, EditorY);
 		}
+	}
+
+	/// <summary>Fills the item picker with every item matching the Find box, keeping the picked item selected if it's still there.</summary>
+	private void FillItemCombo()
+	{
+		if (_itemCombo == null)
+		{
+			return;
+		}
+		_itemCombo.ClearItems();
+		_itemKeys.Clear();
+		IEnumerable<string> keys = Items.Catalog;
+		GridSnapshot grid = Grid;
+		if (grid != null)
+		{
+			// Modded or unusual items that exist on the grid but aren't in the catalog.
+			keys = keys.Concat(grid.Totals.Keys.Where(k => !Items.Catalog.Contains(k)));
+		}
+		foreach (string key in keys.Where(MatchesSearch))
+		{
+			_itemCombo.AddItem(_itemKeys.Count, $"{Items.Name(key)}  ({Items.CategoryShort[(int)Items.Category(key)]})", _itemKeys.Count, null, sort: false);
+			_itemKeys.Add(key);
+		}
+		int selected = s_itemKey == null ? -1 : _itemKeys.IndexOf(s_itemKey);
+		if (selected < 0 && _itemKeys.Count > 0 && s_search.Trim().Length > 0)
+		{
+			// Typing in Find picks the first match, so the buttons act on what's shown.
+			selected = 0;
+			s_itemKey = _itemKeys[0];
+		}
+		if (selected >= 0)
+		{
+			_itemCombo.SelectItemByKey(selected, sendEvent: false);
+		}
+	}
+
+	/// <summary>True when the item's name, category or key contains the Find text (or Find is empty).</summary>
+	private static bool MatchesSearch(string key)
+	{
+		string search = s_search.Trim();
+		if (search.Length == 0)
+		{
+			return true;
+		}
+		return Items.Name(key).IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0
+			|| key.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0
+			|| Items.CategoryNames[(int)Items.Category(key)].IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0;
 	}
 
 	private void CreateDisplayEditor()
@@ -722,7 +836,7 @@ public partial class SsmScreen : MyGuiScreenBase
 		case View.Overview:
 			return "Double-click a setting (or select it and press Change setting) to switch it." + offline;
 		case View.Items:
-			return "Select an item (or pick one below), type an amount, then Set quota. Autocraft queues the shortfall." + offline;
+			return "Pick an item, type an amount: Set quota to keep at least that many (autocraft), Set maximum to disassemble above it." + offline;
 		case View.Blocks:
 			return "Double-click a block to edit its role, what it accepts and its stock limits." + offline;
 		case View.Block:
@@ -732,7 +846,11 @@ public partial class SsmScreen : MyGuiScreenBase
 			return volume + "Pick an item, type an amount, set a minimum or maximum. Blank clears it.";
 		}
 		case View.Production:
-			return live ? "Assemblers, refineries, reactors and generators. Double-click one to edit its limits." : "Last known state." + offline;
+			return live ? "Double-click an assembler or refinery (or press Details) to see its queue and what it's missing." : "Last known state." + offline;
+		case View.Machine:
+			return live ? "Queue first, then the materials the whole queue needs. Missing = what the grid doesn't have." : "Not loaded: queue details show while the grid is in range.";
+		case View.Refining:
+			return "Refineries work on ores with a priority first, in this order. Double-click or Raise priority to add one. Needs Automation.";
 		case View.Displays:
 			return "Select a screen, pick a page and what it shows, then Show page. The LCD updates by itself." + offline;
 		case View.Log:
@@ -761,6 +879,10 @@ public partial class SsmScreen : MyGuiScreenBase
 	{
 		GridSnapshot grid = Grid;
 		List<RowData> rows = s_view == View.AllGrids ? AllGridRows() : grid == null ? new List<RowData>() : BuildRows(grid);
+		if ((s_view == View.Items || s_view == View.Block) && s_search.Trim().Length > 0)
+		{
+			rows = rows.Where(r => !r.Key.StartsWith("i:", StringComparison.Ordinal) || MatchesSearch(r.Key.Substring(2))).ToList();
+		}
 		if (s_view == View.AllGrids)
 		{
 			if (rows.Count == 0)
@@ -888,8 +1010,13 @@ public partial class SsmScreen : MyGuiScreenBase
 			ChangeSelectedSetting();
 			break;
 		case View.Blocks:
-		case View.Production:
 			EditSelectedBlock();
+			break;
+		case View.Production:
+			ShowSelectedMachine();
+			break;
+		case View.Refining:
+			MoveOre(-1);
 			break;
 		case View.Displays:
 			AssignDisplay();

@@ -166,6 +166,33 @@ internal static class Items
 		return total > 0.0 ? total : 1.0;
 	}
 
+	private static HashSet<string> s_refinable;
+
+	/// <summary>True for ores some refinery blueprint turns into ingots (not ice, for example).</summary>
+	public static bool IsRefinable(string key)
+	{
+		if (s_refinable == null)
+		{
+			s_refinable = new HashSet<string>();
+			foreach (MyBlueprintDefinitionBase blueprint in MyDefinitionManager.Static.GetBlueprintDefinitions())
+			{
+				if (blueprint?.Prerequisites == null || blueprint.Results == null || !blueprint.Results.Any(r => Category(Key(r.Id)) == ItemCategory.Ingot))
+				{
+					continue;
+				}
+				foreach (MyBlueprintDefinitionBase.Item prerequisite in blueprint.Prerequisites)
+				{
+					string ore = Key(prerequisite.Id);
+					if (Category(ore) == ItemCategory.Ore)
+					{
+						s_refinable.Add(ore);
+					}
+				}
+			}
+		}
+		return s_refinable.Contains(key);
+	}
+
 	/// <summary>Every public item in the game, sorted by category and then name.</summary>
 	public static List<string> Catalog
 	{

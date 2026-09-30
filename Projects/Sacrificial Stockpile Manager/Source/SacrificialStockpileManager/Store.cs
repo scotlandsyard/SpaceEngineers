@@ -33,6 +33,9 @@ internal static class Store
 
 	public static List<DisplayRule> Displays => s_settings.Displays;
 
+	/// <summary>Assemblers the plugin switched to disassembly mode. Call <see cref="SaveSettings"/> after changing it.</summary>
+	public static List<long> Disassemblers => s_settings.Disassemblers;
+
 	public static void Load()
 	{
 		s_world = WorldName();
@@ -40,6 +43,7 @@ internal static class Store
 		s_settings.Blocks ??= new List<BlockRules>();
 		s_settings.Grids ??= new List<GridRules>();
 		s_settings.Displays ??= new List<DisplayRule>();
+		s_settings.Disassemblers ??= new List<long>();
 		s_blockRules.Clear();
 		foreach (BlockRules rules in s_settings.Blocks)
 		{
@@ -51,6 +55,7 @@ internal static class Store
 		foreach (GridRules rules in s_settings.Grids)
 		{
 			rules.Quotas ??= new List<ItemLimit>();
+			rules.OrePriority ??= new List<string>();
 			s_gridRules[rules.GridId] = rules;
 		}
 		s_grids.Clear();
