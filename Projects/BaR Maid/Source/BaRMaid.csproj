@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <AssemblyName>NeedyBOB</AssemblyName>
-    <RootNamespace>NeedyBOB</RootNamespace>
+    <AssemblyName>BaRMaid</AssemblyName>
+    <RootNamespace>BaRMaid</RootNamespace>
     <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
     <TargetFramework>net481</TargetFramework>
     <PlatformTarget>x64</PlatformTarget>

@@ -4,7 +4,7 @@ using System.Linq;
 using Sandbox.ModAPI;
 using Sandbox.ModAPI.Interfaces;
 
-namespace NeedyBOB;
+namespace BaRMaid;
 
 internal enum SettingKind
 {

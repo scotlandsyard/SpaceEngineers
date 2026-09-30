@@ -14,13 +14,13 @@ using IngameEntity = VRage.Game.ModAPI.Ingame.IMyEntity;
 using IngameSlimBlock = VRage.Game.ModAPI.Ingame.IMySlimBlock;
 using MyAssemblerMode = Sandbox.ModAPI.Ingame.MyAssemblerMode;
 
-namespace NeedyBOB;
+namespace BaRMaid;
 
 /// <summary>
-/// The Needy BOB window: pick a group and a view, and the table below shows it live. It replaces the LCD
+/// The BaR Maid window: pick a group and a view, and the table below shows it live. It replaces the LCD
 /// pages of the original script, plus a setup view for sorting blocks into groups.
 /// </summary>
-public class BobScreen : MyGuiScreenBase
+public class MaidScreen : MyGuiScreenBase
 {
 	private enum View
 	{
@@ -115,7 +115,7 @@ public class BobScreen : MyGuiScreenBase
 
 	private static Color GoodColor => new Color(140, 230, 140);
 
-	public BobScreen(string groupKey)
+	public MaidScreen(string groupKey)
 		: base(new Vector2(0.5f, 0.5f), MyGuiConstants.SCREEN_BACKGROUND_COLOR, new Vector2(0.9f, 0.86f))
 	{
 		if (groupKey != null)
@@ -131,17 +131,17 @@ public class BobScreen : MyGuiScreenBase
 
 	public override string GetFriendlyName()
 	{
-		return "NeedyBobScreen";
+		return "BaRMaidScreen";
 	}
 
-	private static NeedyBobSession Session => NeedyBobSession.Instance;
+	private static BaRMaidSession Session => BaRMaidSession.Instance;
 
-	private BobGroup CurrentGroup => Session?.FindGroup(s_groupKey);
+	private MaidGroup CurrentGroup => Session?.FindGroup(s_groupKey);
 
 	public override void RecreateControls(bool constructor)
 	{
 		base.RecreateControls(constructor);
-		AddCaption("Needy BOB");
+		AddCaption("BaR Maid");
 
 		Controls.Add(new MyGuiControlLabel(new Vector2(-0.42f, -0.325f), null, "Group", null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER));
 		_groupCombo = new MyGuiControlCombobox(new Vector2(-0.35f, -0.325f), new Vector2(0.43f, 0.04f), null, null, 12, null, false, null, MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER);
@@ -167,7 +167,7 @@ public class BobScreen : MyGuiScreenBase
 				// textBoxAlign above only places the text inside the control; this anchors the control itself by its top edge, like the table.
 				OriginAlign = MyGuiDrawAlignEnum.HORISONTAL_CENTER_AND_VERTICAL_TOP
 			};
-			BobHelp.Write(_helpText);
+			MaidHelp.Write(_helpText);
 			Controls.Add(_helpText);
 		}
 
@@ -284,7 +284,7 @@ public class BobScreen : MyGuiScreenBase
 		}
 		catch (Exception ex)
 		{
-			MyLog.Default.WriteLineAndConsole($"[NeedyBOB] Screen update: {ex}");
+			MyLog.Default.WriteLineAndConsole($"[BaRMaid] Screen update: {ex}");
 		}
 		return result;
 	}
@@ -328,7 +328,7 @@ public class BobScreen : MyGuiScreenBase
 	{
 		if (Session == null)
 		{
-			SetStatus("Needy BOB isn't running in this session.", WarningColor);
+			SetStatus("BaR Maid isn't running in this session.", WarningColor);
 			return;
 		}
 		if (_groupsVersion != Session.GroupsVersion && !_groupCombo.IsOpen)
@@ -336,13 +336,13 @@ public class BobScreen : MyGuiScreenBase
 			FillGroupCombo();
 		}
 		RefreshRows();
-		BobGroup group = CurrentGroup;
+		MaidGroup group = CurrentGroup;
 		if (_autoQueueButton != null)
 		{
 			_autoQueueButton.Text = group == null ? "Auto-queue" : group.AutoQueue ? "Auto-queue: ON" : "Auto-queue: OFF";
 			_autoQueueButton.Enabled = group != null;
 		}
-		if (_message != null && NeedyBobSession.Now < _messageUntil)
+		if (_message != null && BaRMaidSession.Now < _messageUntil)
 		{
 			return;
 		}
@@ -355,7 +355,7 @@ public class BobScreen : MyGuiScreenBase
 		_groupsVersion = Session.GroupsVersion;
 		_groupCombo.ClearItems();
 		_comboKeys.Clear();
-		foreach (BobGroup group in Session.Groups)
+		foreach (MaidGroup group in Session.Groups)
 		{
 			int systems = group.LiveSystems.Count();
 			_groupCombo.AddItem(_comboKeys.Count, $"{group.Label}  ({systems} system{(systems == 1 ? "" : "s")})", _comboKeys.Count, null, sort: false);
@@ -374,7 +374,7 @@ public class BobScreen : MyGuiScreenBase
 		}
 	}
 
-	private string HintFor(BobGroup group)
+	private string HintFor(MaidGroup group)
 	{
 		if (group == null)
 		{
@@ -411,13 +411,13 @@ public class BobScreen : MyGuiScreenBase
 	private void ShowMessage(string text, Color? color = null)
 	{
 		_message = text;
-		_messageUntil = NeedyBobSession.Now + 6.0;
+		_messageUntil = BaRMaidSession.Now + 6.0;
 		SetStatus(text, color);
 	}
 
 	private void ToggleAutoQueue()
 	{
-		BobGroup group = CurrentGroup;
+		MaidGroup group = CurrentGroup;
 		if (group == null)
 		{
 			return;
@@ -430,7 +430,7 @@ public class BobScreen : MyGuiScreenBase
 
 	private void QueueNow()
 	{
-		BobGroup group = CurrentGroup;
+		MaidGroup group = CurrentGroup;
 		if (group == null)
 		{
 			return;
@@ -440,7 +440,7 @@ public class BobScreen : MyGuiScreenBase
 			ShowMessage("This group has no assembler that is on, working, in assembly mode and accessible to you.", WarningColor);
 			return;
 		}
-		int kinds = group.QueueMissing(NeedyBobSession.Now);
+		int kinds = group.QueueMissing(BaRMaidSession.Now);
 		ShowMessage(kinds > 0 ? $"Queued {kinds} kind(s) of component." : "Nothing new to queue. Anything queued in the last 15 s is waiting for the server to confirm it.", kinds > 0 ? GoodColor : (Color?)null);
 		_rowsSignature = null;
 		RefreshAll();
@@ -467,7 +467,7 @@ public class BobScreen : MyGuiScreenBase
 			return;
 		}
 		string name = (_groupNameBox?.Text ?? "").Trim();
-		if (BobConfig.IsNoGroup(name))
+		if (MaidConfig.IsNoGroup(name))
 		{
 			RemoveSelected();
 			return;
@@ -478,11 +478,11 @@ public class BobScreen : MyGuiScreenBase
 			return;
 		}
 		Session.AssignBlock(block, name);
-		string shown = name.Length == 0 ? BobConfig.DefaultGroup : name;
+		string shown = name.Length == 0 ? MaidConfig.DefaultGroup : name;
 		// Keep showing the same construct: follow the group the block went into when it's a Build and Repair system.
 		if (block is IMyShipWelder)
 		{
-			BobGroup target = Session.Groups.FirstOrDefault(g => g.Systems.Contains(block));
+			MaidGroup target = Session.Groups.FirstOrDefault(g => g.Systems.Contains(block));
 			if (target != null)
 			{
 				s_groupKey = target.Key;
@@ -501,12 +501,12 @@ public class BobScreen : MyGuiScreenBase
 			ShowMessage("Select a block first.", WarningColor);
 			return;
 		}
-		BobGroup previous = CurrentGroup;
-		Session.AssignBlock(block, BobConfig.NoGroup);
+		MaidGroup previous = CurrentGroup;
+		Session.AssignBlock(block, MaidConfig.NoGroup);
 		if (previous != null && Session.FindGroup(previous.Key) == null)
 		{
 			// The group is gone; show another one on the same construct if there is one.
-			BobGroup sibling = Session.Groups.FirstOrDefault(g => g.TerminalSystem == previous.TerminalSystem);
+			MaidGroup sibling = Session.Groups.FirstOrDefault(g => g.TerminalSystem == previous.TerminalSystem);
 			if (sibling != null)
 			{
 				s_groupKey = sibling.Key;
@@ -581,7 +581,7 @@ public class BobScreen : MyGuiScreenBase
 
 	private void RefreshRows()
 	{
-		BobGroup group = CurrentGroup;
+		MaidGroup group = CurrentGroup;
 		_rowBlocks.Clear();
 		List<RowData> rows = group == null ? new List<RowData>() : BuildRows(group);
 		if (group == null)
@@ -660,7 +660,7 @@ public class BobScreen : MyGuiScreenBase
 		}
 	}
 
-	private List<RowData> BuildRows(BobGroup group)
+	private List<RowData> BuildRows(MaidGroup group)
 	{
 		switch (s_view)
 		{
@@ -692,7 +692,7 @@ public class BobScreen : MyGuiScreenBase
 		return new RowData { Key = key, Texts = texts, Color = color };
 	}
 
-	private List<RowData> StatusRows(BobGroup group)
+	private List<RowData> StatusRows(MaidGroup group)
 	{
 		List<IMyShipWelder> systems = group.LiveSystems.ToList();
 		IMyShipWelder first = systems.FirstOrDefault();
@@ -726,7 +726,7 @@ public class BobScreen : MyGuiScreenBase
 		return rows;
 	}
 
-	private static string AutoQueueText(BobGroup group)
+	private static string AutoQueueText(MaidGroup group)
 	{
 		int assemblers = group.Assemblers.Count(a => !a.Closed);
 		if (assemblers == 0)
@@ -765,7 +765,7 @@ public class BobScreen : MyGuiScreenBase
 		return "idle";
 	}
 
-	private List<RowData> TargetRows(BobGroup group, List<IngameSlimBlock> targets, string activeText, Func<IMyTerminalBlock, IngameSlimBlock> current)
+	private List<RowData> TargetRows(MaidGroup group, List<IngameSlimBlock> targets, string activeText, Func<IMyTerminalBlock, IngameSlimBlock> current)
 	{
 		HashSet<IngameSlimBlock> active = new HashSet<IngameSlimBlock>(group.LiveSystems.Select(s => current(s)).Where(t => t != null));
 		Vector3D origin = group.FirstSystem?.GetPosition() ?? Vector3D.Zero;
@@ -793,7 +793,7 @@ public class BobScreen : MyGuiScreenBase
 		return rows;
 	}
 
-	private List<RowData> CollectRows(BobGroup group)
+	private List<RowData> CollectRows(MaidGroup group)
 	{
 		Vector3D origin = group.FirstSystem?.GetPosition() ?? Vector3D.Zero;
 		List<RowData> rows = new List<RowData>();
@@ -807,7 +807,7 @@ public class BobScreen : MyGuiScreenBase
 			double amount = 0.0;
 			if (entity is MyFloatingObject floating)
 			{
-				name = BobGroup.ComponentName(floating.Item.Content.GetId());
+				name = MaidGroup.ComponentName(floating.Item.Content.GetId());
 				amount = (double)floating.Item.Amount;
 			}
 			double distance = Vector3D.Distance(origin, entity.WorldMatrix.Translation);
@@ -821,13 +821,13 @@ public class BobScreen : MyGuiScreenBase
 		return rows;
 	}
 
-	private List<RowData> MissingRows(BobGroup group)
+	private List<RowData> MissingRows(MaidGroup group)
 	{
 		List<IMyAssembler> assemblers = group.Assemblers.Where(a => !a.Closed).ToList();
 		bool canQueue = group.UsableAssemblers().Count > 0;
-		double now = NeedyBobSession.Now;
+		double now = BaRMaidSession.Now;
 		List<RowData> rows = new List<RowData>();
-		foreach (KeyValuePair<MyDefinitionId, int> item in group.MissingComponents().Where(m => m.Value > 0).OrderBy(m => BobGroup.ComponentName(m.Key)))
+		foreach (KeyValuePair<MyDefinitionId, int> item in group.MissingComponents().Where(m => m.Value > 0).OrderBy(m => MaidGroup.ComponentName(m.Key)))
 		{
 			int queued = AssemblerQueue.QueuedAmount(assemblers, item.Key);
 			int built = AssemblerQueue.OutputAmount(assemblers, item.Key);
@@ -855,7 +855,7 @@ public class BobScreen : MyGuiScreenBase
 			rows.Add(new RowData
 			{
 				Key = "m" + item.Key,
-				Texts = new[] { BobGroup.ComponentName(item.Key), item.Value.ToString("N0"), queued.ToString("N0"), built.ToString("N0"), state },
+				Texts = new[] { MaidGroup.ComponentName(item.Key), item.Value.ToString("N0"), queued.ToString("N0"), built.ToString("N0"), state },
 				SortValues = new object[] { null, (double)item.Value, (double)queued, (double)built, null },
 				Color = color
 			});
@@ -863,7 +863,7 @@ public class BobScreen : MyGuiScreenBase
 		return rows;
 	}
 
-	private static List<RowData> SettingRows(BobGroup group)
+	private static List<RowData> SettingRows(MaidGroup group)
 	{
 		List<IMyShipWelder> systems = group.LiveSystems.ToList();
 		List<RowData> rows = new List<RowData>();
@@ -887,7 +887,7 @@ public class BobScreen : MyGuiScreenBase
 
 	private void ChangeSetting(int direction)
 	{
-		BobGroup group = CurrentGroup;
+		MaidGroup group = CurrentGroup;
 		string key = _table.SelectedRow?.UserData as string;
 		BarSetting setting = key != null && key.StartsWith("s:") ? BarSetting.All.FirstOrDefault(s => "s:" + s.Id == key) : null;
 		if (group == null || setting == null)
@@ -942,14 +942,14 @@ public class BobScreen : MyGuiScreenBase
 		return rows;
 	}
 
-	private List<RowData> SetupRows(BobGroup group)
+	private List<RowData> SetupRows(MaidGroup group)
 	{
 		List<RowData> rows = new List<RowData>();
 		foreach (IMyTerminalBlock block in group.ConstructBlocks.Where(b => !b.Closed))
 		{
 			bool isSystem = block is IMyShipWelder;
-			string name = BobConfig.GetGroup(block);
-			string groupText = BobConfig.IsNoGroup(name) ? "(none)" : BobConfig.IsDefaultGroup(name) ? (isSystem ? BobConfig.DefaultGroup : "Default (unassigned)") : name;
+			string name = MaidConfig.GetGroup(block);
+			string groupText = MaidConfig.IsNoGroup(name) ? "(none)" : MaidConfig.IsDefaultGroup(name) ? (isSystem ? MaidConfig.DefaultGroup : "Default (unassigned)") : name;
 			string state = !block.IsFunctional ? "Damaged" : block is IMyFunctionalBlock functional && !functional.Enabled ? "Off" : !block.IsWorking ? "No power" : "Working";
 			if (block is IMyAssembler assembler && assembler.Mode != MyAssemblerMode.Assembly)
 			{
@@ -962,7 +962,7 @@ public class BobScreen : MyGuiScreenBase
 			{
 				Key = key,
 				Texts = new[] { block.CustomName, isSystem ? "Build and Repair" : "Assembler", groupText, state },
-				Color = inThisGroup ? GoodColor : BobConfig.IsNoGroup(name) ? MutedColor : (Color?)null
+				Color = inThisGroup ? GoodColor : MaidConfig.IsNoGroup(name) ? MutedColor : (Color?)null
 			});
 		}
 		return rows.OrderBy(r => r.Texts[1] == "Assembler").ThenBy(r => r.Texts[0], StringComparer.OrdinalIgnoreCase).ToList();

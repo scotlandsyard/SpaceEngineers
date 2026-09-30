@@ -1,11 +1,11 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
 
-[assembly: AssemblyTitle("NeedyBOB")]
+[assembly: AssemblyTitle("BaRMaid")]
 [assembly: AssemblyDescription("Auto-queuing and status menu for the Nanobot Build and Repair System")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("NeedyBOB")]
+[assembly: AssemblyProduct("BaRMaid")]
 [assembly: AssemblyCopyright("Copyright ©  2026")]
 [assembly: AssemblyTrademark("")]
 [assembly: ComVisible(false)]

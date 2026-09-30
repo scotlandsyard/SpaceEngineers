@@ -1,4 +1,4 @@
-# Needy BOB
+# BaR Maid
 
 A client-side Pulsar plugin version of the [BaR companion script](https://steamcommunity.com/sharedfiles/filedetails/?id=3472701905) (v2.5.4) for the SKO Nanobot Build and Repair System. It does what the programmable block script does, but shows everything in an in-game menu instead of on LCD panels:
 
@@ -11,8 +11,8 @@ It needs the **SKO maintained** Nanobot Build and Repair mod (workshop 211107356
 
 ## Opening the menu
 
-- Type `/bob` in chat, or
-- Drag a Build and Repair block onto a toolbar and pick the **Needy BOB** action.
+- Type `/barmaid` in chat, or
+- Drag a Build and Repair block onto a toolbar and pick the **BaR Maid** action.
 
 The menu opens on the group of the block you used. From chat, it opens on a group on the grid you're controlling, or failing that the nearest one.
 
@@ -35,9 +35,9 @@ Build and Repair blocks get four actions:
 
 | Action | What it does |
 |---|---|
-| Needy BOB | Opens the menu on this block's group |
-| Needy BOB Auto-queue On/Off | Flips auto-queue for this block's group; the slot shows On or Off |
-| Needy BOB Auto-queue On / Off | Switches it on or off |
+| BaR Maid | Opens the menu on this block's group |
+| BaR Maid Auto-queue On/Off | Flips auto-queue for this block's group; the slot shows On or Off |
+| BaR Maid Auto-queue On / Off | Switches it on or off |
 
 They work from your own toolbar (cockpit or character). Button panels, timers and event controllers run their actions on the server, where the plugin isn't loaded.
 
@@ -46,7 +46,7 @@ They work from your own toolbar (cockpit or character). Button panels, timers an
 Groups belong to one construct (all the grids that share a terminal system). The setting is stored in each block's Custom Data:
 
 ```
-[Needy BOB]
+[BaR Maid]
 Group=Hangar 1
 AutoQueue=true
 ```
@@ -62,6 +62,8 @@ There are no predefined group names: any name you type creates that group once a
 - `AutoQueue` is stored on the group's Build and Repair blocks. It's off until you switch it on. A system moved into another group takes on that group's setting.
 
 Everything else in the block's Custom Data is left alone. Because the settings live on the blocks, they are saved with the world and synced to the server, so they are the same for everyone.
+
+The plugin was called Needy BOB at first. A `[Needy BOB]` section from then is still read, and is renamed to `[BaR Maid]` the next time the plugin writes to that block. Toolbar slots holding the old Needy BOB actions have to be set up again.
 
 ## Auto-queuing
 
@@ -93,6 +95,6 @@ Everything runs on your client. Nothing is needed on the server.
 
 ## Building
 
-Set `Bin64` in `Source/NeedyBOB.csproj` if Space Engineers isn't in the default Steam location. Then run `dotnet build -c Release` in `Source`. The plugin is written to `Source/bin/Release/net481/NeedyBOB.dll`.
+Set `Bin64` in `Source/BaRMaid.csproj` if Space Engineers isn't in the default Steam location. Then run `dotnet build -c Release` in `Source`. The plugin is written to `Source/bin/Release/net481/BaRMaid.dll`.
 
-The plugin uses its own assembly name (`NeedyBOB`), action IDs (`NeedyBOB_*`), chat command (`/bob`) and Custom Data section (`[Needy BOB]`), so it can't clash with the other plugins in this repo.
+The plugin uses its own assembly name (`BaRMaid`), action IDs (`BaRMaid_*`), chat command (`/barmaid`) and Custom Data section (`[BaR Maid]`), so it can't clash with the other plugins in this repo.

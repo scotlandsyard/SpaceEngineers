@@ -2,15 +2,18 @@ using System;
 using System.Collections.Generic;
 using Sandbox.ModAPI;
 
-namespace NeedyBOB;
+namespace BaRMaid;
 
 /// <summary>
-/// Reads and writes the [Needy BOB] section of a block's Custom Data. It only ever touches its own section,
+/// Reads and writes the [BaR Maid] section of a block's Custom Data. It only ever touches its own section,
 /// and it doesn't need the rest of the Custom Data to be valid INI (other scripts use all sorts of formats).
 /// </summary>
-internal static class BobConfig
+internal static class MaidConfig
 {
-	public const string Section = "Needy BOB";
+	public const string Section = "BaR Maid";
+
+	/// <summary>The section name from before the plugin was renamed. Still read; renamed on the next write.</summary>
+	private const string LegacySection = "Needy BOB";
 
 	public const string GroupKey = "Group";
 
@@ -70,6 +73,11 @@ internal static class BobConfig
 			lines.Clear();
 		}
 		FindSection(lines.ToArray(), out int start, out int end);
+		if (start >= 0)
+		{
+			// Brings an old [Needy BOB] header up to date.
+			lines[start] = "[" + Section + "]";
+		}
 		if (start < 0)
 		{
 			if (value == null)
@@ -156,7 +164,7 @@ internal static class BobConfig
 			string line = lines[i].Trim();
 			if (start < 0)
 			{
-				if (line.Equals("[" + Section + "]", StringComparison.OrdinalIgnoreCase))
+				if (line.Equals("[" + Section + "]", StringComparison.OrdinalIgnoreCase) || line.Equals("[" + LegacySection + "]", StringComparison.OrdinalIgnoreCase))
 				{
 					start = i;
 				}

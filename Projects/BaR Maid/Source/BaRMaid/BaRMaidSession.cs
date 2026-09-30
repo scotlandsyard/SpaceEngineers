@@ -13,7 +13,7 @@ using VRage.ModAPI;
 using VRage.Utils;
 using VRageMath;
 
-namespace NeedyBOB;
+namespace BaRMaid;
 
 /// <summary>
 /// Finds the Build and Repair systems this player can access, sorts them into groups, and keeps each group's
@@ -21,19 +21,19 @@ namespace NeedyBOB;
 /// through the same server requests the terminal uses.
 /// </summary>
 [MySessionComponentDescriptor(MyUpdateOrder.AfterSimulation)]
-public class NeedyBobSession : MySessionComponentBase
+public class BaRMaidSession : MySessionComponentBase
 {
-	public const string ChatSender = "Needy BOB";
+	public const string ChatSender = "BaR Maid";
 
-	private const string ChatCommand = "/bob";
+	private const string ChatCommand = "/barmaid";
 
-	private const string MenuActionId = "NeedyBOB_OpenMenu";
+	private const string MenuActionId = "BaRMaid_OpenMenu";
 
-	private const string AutoQueueToggleId = "NeedyBOB_AutoQueueToggle";
+	private const string AutoQueueToggleId = "BaRMaid_AutoQueueToggle";
 
-	private const string AutoQueueOnId = "NeedyBOB_AutoQueueOn";
+	private const string AutoQueueOnId = "BaRMaid_AutoQueueOn";
 
-	private const string AutoQueueOffId = "NeedyBOB_AutoQueueOff";
+	private const string AutoQueueOffId = "BaRMaid_AutoQueueOff";
 
 	/// <summary>Ticks between the starts of two passes looking for Build and Repair systems.</summary>
 	private const int DiscoveryIntervalTicks = 300;
@@ -47,19 +47,19 @@ public class NeedyBobSession : MySessionComponentBase
 	/// <summary>Seconds between two auto-queue checks of the same group.</summary>
 	private const double QueueIntervalSeconds = 3.0;
 
-	internal static NeedyBobSession Instance { get; private set; }
+	internal static BaRMaidSession Instance { get; private set; }
 
 	internal static double Now => MyAPIGateway.Session?.ElapsedPlayTime.TotalSeconds ?? 0.0;
 
 	/// <summary>Groups, sorted by label.</summary>
-	internal IReadOnlyList<BobGroup> Groups => _sortedGroups;
+	internal IReadOnlyList<MaidGroup> Groups => _sortedGroups;
 
 	/// <summary>Goes up whenever the set of groups or their members change.</summary>
 	internal int GroupsVersion { get; private set; }
 
-	private readonly Dictionary<string, BobGroup> _groups = new Dictionary<string, BobGroup>(StringComparer.Ordinal);
+	private readonly Dictionary<string, MaidGroup> _groups = new Dictionary<string, MaidGroup>(StringComparer.Ordinal);
 
-	private readonly List<BobGroup> _sortedGroups = new List<BobGroup>();
+	private readonly List<MaidGroup> _sortedGroups = new List<MaidGroup>();
 
 	private readonly HashSet<long> _knownSystems = new HashSet<long>();
 
@@ -97,7 +97,7 @@ public class NeedyBobSession : MySessionComponentBase
 		}
 		catch (Exception ex)
 		{
-			MyLog.Default.WriteLineAndConsole($"[NeedyBOB] BeforeStart failed: {ex}");
+			MyLog.Default.WriteLineAndConsole($"[BaRMaid] BeforeStart failed: {ex}");
 		}
 	}
 
@@ -135,16 +135,16 @@ public class NeedyBobSession : MySessionComponentBase
 		}
 		catch (Exception ex)
 		{
-			MyLog.Default.WriteLineAndConsole($"[NeedyBOB] Update: {ex}");
+			MyLog.Default.WriteLineAndConsole($"[BaRMaid] Update: {ex}");
 		}
 	}
 
 	private void CreateActions()
 	{
-		AddAction(MenuActionId, "Needy BOB", "Start", b => OpenMenu(b), null);
-		AddAction(AutoQueueToggleId, "Needy BOB Auto-queue On/Off", "Toggle", b => SetAutoQueueFromToolbar(b, null), AutoQueueWriter);
-		AddAction(AutoQueueOnId, "Needy BOB Auto-queue On", "SwitchOn", b => SetAutoQueueFromToolbar(b, true), AutoQueueWriter);
-		AddAction(AutoQueueOffId, "Needy BOB Auto-queue Off", "SwitchOff", b => SetAutoQueueFromToolbar(b, false), AutoQueueWriter);
+		AddAction(MenuActionId, "BaR Maid", "Start", b => OpenMenu(b), null);
+		AddAction(AutoQueueToggleId, "BaR Maid Auto-queue On/Off", "Toggle", b => SetAutoQueueFromToolbar(b, null), AutoQueueWriter);
+		AddAction(AutoQueueOnId, "BaR Maid Auto-queue On", "SwitchOn", b => SetAutoQueueFromToolbar(b, true), AutoQueueWriter);
+		AddAction(AutoQueueOffId, "BaR Maid Auto-queue Off", "SwitchOff", b => SetAutoQueueFromToolbar(b, false), AutoQueueWriter);
 	}
 
 	private void AddAction(string id, string name, string icon, Action<IMyShipWelder> run, Action<IMyTerminalBlock, StringBuilder> writer)
@@ -171,7 +171,7 @@ public class NeedyBobSession : MySessionComponentBase
 	/// <summary>Shows On/Off under the toolbar slot.</summary>
 	private void AutoQueueWriter(IMyTerminalBlock block, StringBuilder text)
 	{
-		BobGroup group = GroupOf(block);
+		MaidGroup group = GroupOf(block);
 		text.Append(group == null ? "-" : group.AutoQueue ? "On" : "Off");
 	}
 
@@ -182,7 +182,7 @@ public class NeedyBobSession : MySessionComponentBase
 		{
 			return;
 		}
-		BobGroup group = GroupOf(block);
+		MaidGroup group = GroupOf(block);
 		if (group == null)
 		{
 			RefreshNow();
@@ -190,14 +190,14 @@ public class NeedyBobSession : MySessionComponentBase
 		}
 		if (group == null)
 		{
-			MyAPIGateway.Utilities.ShowNotification($"Needy BOB: {block.CustomName} isn't in a group.", 3000, MyFontEnum.Red);
+			MyAPIGateway.Utilities.ShowNotification($"BaR Maid: {block.CustomName} isn't in a group.", 3000, MyFontEnum.Red);
 			return;
 		}
 		SetAutoQueue(group, enabled ?? !group.AutoQueue);
-		MyAPIGateway.Utilities.ShowNotification($"Needy BOB: auto-queue {(group.AutoQueue ? "on" : "off")} for {group.Label}", 3000);
+		MyAPIGateway.Utilities.ShowNotification($"BaR Maid: auto-queue {(group.AutoQueue ? "on" : "off")} for {group.Label}", 3000);
 	}
 
-	private BobGroup GroupOf(IMyTerminalBlock block)
+	private MaidGroup GroupOf(IMyTerminalBlock block)
 	{
 		return block is IMyShipWelder welder ? _sortedGroups.FirstOrDefault(g => g.Systems.Contains(welder)) : null;
 	}
@@ -219,7 +219,7 @@ public class NeedyBobSession : MySessionComponentBase
 		}
 		catch (Exception ex)
 		{
-			MyLog.Default.WriteLineAndConsole($"[NeedyBOB] CustomActionGetter: {ex}");
+			MyLog.Default.WriteLineAndConsole($"[BaRMaid] CustomActionGetter: {ex}");
 		}
 	}
 
@@ -246,12 +246,12 @@ public class NeedyBobSession : MySessionComponentBase
 		try
 		{
 			RefreshNow();
-			MyGuiSandbox.AddScreen(new BobScreen(PickGroupKey(fromBlock)));
+			MyGuiSandbox.AddScreen(new MaidScreen(PickGroupKey(fromBlock)));
 		}
 		catch (Exception ex)
 		{
 			MyAPIGateway.Utilities.ShowMessage(ChatSender, "Could not open the menu: " + ex.Message);
-			MyLog.Default.WriteLineAndConsole($"[NeedyBOB] {ex}");
+			MyLog.Default.WriteLineAndConsole($"[BaRMaid] {ex}");
 		}
 	}
 
@@ -263,7 +263,7 @@ public class NeedyBobSession : MySessionComponentBase
 	{
 		if (fromBlock != null)
 		{
-			BobGroup owner = _sortedGroups.FirstOrDefault(g => g.Systems.Contains(fromBlock));
+			MaidGroup owner = _sortedGroups.FirstOrDefault(g => g.Systems.Contains(fromBlock));
 			if (owner != null)
 			{
 				return owner.Key;
@@ -272,7 +272,7 @@ public class NeedyBobSession : MySessionComponentBase
 		if (MyAPIGateway.Session.Player.Controller?.ControlledEntity?.Entity is IMyCubeBlock controlled)
 		{
 			IMyGridTerminalSystem terminal = MyAPIGateway.TerminalActionsHelper.GetTerminalSystemForGrid(controlled.CubeGrid);
-			BobGroup onGrid = _sortedGroups.FirstOrDefault(g => g.TerminalSystem == terminal);
+			MaidGroup onGrid = _sortedGroups.FirstOrDefault(g => g.TerminalSystem == terminal);
 			if (onGrid != null)
 			{
 				return onGrid.Key;
@@ -380,14 +380,14 @@ public class NeedyBobSession : MySessionComponentBase
 			list.Add(system);
 		}
 
-		Dictionary<string, BobGroup> rebuilt = new Dictionary<string, BobGroup>(StringComparer.Ordinal);
+		Dictionary<string, MaidGroup> rebuilt = new Dictionary<string, MaidGroup>(StringComparer.Ordinal);
 		foreach (KeyValuePair<IMyGridTerminalSystem, List<IMyShipWelder>> entry in byTerminal)
 		{
 			BuildConstructGroups(entry.Key, entry.Value, rebuilt);
 		}
 
 		_groups.Clear();
-		foreach (KeyValuePair<string, BobGroup> entry in rebuilt)
+		foreach (KeyValuePair<string, MaidGroup> entry in rebuilt)
 		{
 			_groups[entry.Key] = entry.Value;
 		}
@@ -395,7 +395,7 @@ public class NeedyBobSession : MySessionComponentBase
 		_sortedGroups.AddRange(_groups.Values.OrderBy(g => g.Label, StringComparer.OrdinalIgnoreCase));
 
 		StringBuilder signature = new StringBuilder();
-		foreach (BobGroup group in _sortedGroups)
+		foreach (MaidGroup group in _sortedGroups)
 		{
 			signature.Append(group.Key).Append(group.AutoQueue).Append(group.GridName);
 			foreach (IMyShipWelder system in group.Systems)
@@ -416,7 +416,7 @@ public class NeedyBobSession : MySessionComponentBase
 	}
 
 	/// <summary>Sorts one construct's systems and assemblers into groups by their Custom Data.</summary>
-	private void BuildConstructGroups(IMyGridTerminalSystem terminal, List<IMyShipWelder> systems, Dictionary<string, BobGroup> rebuilt)
+	private void BuildConstructGroups(IMyGridTerminalSystem terminal, List<IMyShipWelder> systems, Dictionary<string, MaidGroup> rebuilt)
 	{
 		// Name groups after the biggest grid of the construct and key them by its entity id, so the key survives
 		// renaming and stays the same from pass to pass.
@@ -427,25 +427,25 @@ public class NeedyBobSession : MySessionComponentBase
 		constructBlocks.AddRange(systems);
 		constructBlocks.AddRange(assemblers);
 
-		Dictionary<string, BobGroup> local = new Dictionary<string, BobGroup>(StringComparer.OrdinalIgnoreCase);
+		Dictionary<string, MaidGroup> local = new Dictionary<string, MaidGroup>(StringComparer.OrdinalIgnoreCase);
 		foreach (IMyShipWelder system in systems)
 		{
-			string name = BobConfig.GetGroup(system);
-			if (BobConfig.IsNoGroup(name))
+			string name = MaidConfig.GetGroup(system);
+			if (MaidConfig.IsNoGroup(name))
 			{
 				continue;
 			}
-			bool isDefault = BobConfig.IsDefaultGroup(name);
+			bool isDefault = MaidConfig.IsDefaultGroup(name);
 			if (isDefault)
 			{
-				name = BobConfig.DefaultGroup;
+				name = MaidConfig.DefaultGroup;
 			}
-			if (!local.TryGetValue(name, out BobGroup group))
+			if (!local.TryGetValue(name, out MaidGroup group))
 			{
 				string key = mainGrid.EntityId + "|" + name.ToUpperInvariant();
 				if (!_groups.TryGetValue(key, out group))
 				{
-					group = new BobGroup { Key = key };
+					group = new MaidGroup { Key = key };
 				}
 				group.Name = name;
 				group.IsDefault = isDefault;
@@ -459,35 +459,35 @@ public class NeedyBobSession : MySessionComponentBase
 				rebuilt[key] = group;
 			}
 			group.Systems.Add(system);
-			group.AutoQueue |= BobConfig.GetAutoQueue(system);
+			group.AutoQueue |= MaidConfig.GetAutoQueue(system);
 		}
 
 		foreach (IMyAssembler assembler in assemblers)
 		{
-			string name = BobConfig.GetGroup(assembler);
-			if (BobConfig.IsNoGroup(name))
+			string name = MaidConfig.GetGroup(assembler);
+			if (MaidConfig.IsNoGroup(name))
 			{
 				continue;
 			}
 			// Assemblers with no group of their own work for the Default group.
-			if (local.TryGetValue(BobConfig.IsDefaultGroup(name) ? BobConfig.DefaultGroup : name, out BobGroup group))
+			if (local.TryGetValue(MaidConfig.IsDefaultGroup(name) ? MaidConfig.DefaultGroup : name, out MaidGroup group))
 			{
 				group.Assemblers.Add(assembler);
 			}
 		}
 	}
 
-	internal BobGroup FindGroup(string key)
+	internal MaidGroup FindGroup(string key)
 	{
-		return key != null && _groups.TryGetValue(key, out BobGroup group) ? group : null;
+		return key != null && _groups.TryGetValue(key, out MaidGroup group) ? group : null;
 	}
 
 	/// <summary>Switches auto-queuing for a group. The setting lives in the systems' Custom Data, so it syncs to the server and other players.</summary>
-	internal void SetAutoQueue(BobGroup group, bool enabled)
+	internal void SetAutoQueue(MaidGroup group, bool enabled)
 	{
 		foreach (IMyShipWelder system in group.LiveSystems)
 		{
-			BobConfig.Set(system, BobConfig.AutoQueueKey, enabled ? "true" : null);
+			MaidConfig.Set(system, MaidConfig.AutoQueueKey, enabled ? "true" : null);
 		}
 		group.AutoQueue = enabled;
 		group.NextQueueCheck = Now;
@@ -498,12 +498,12 @@ public class NeedyBobSession : MySessionComponentBase
 	internal void AssignBlock(IMyTerminalBlock block, string groupName)
 	{
 		string name = string.IsNullOrWhiteSpace(groupName) ? null : groupName.Trim();
-		BobConfig.Set(block, BobConfig.GroupKey, BobConfig.IsDefaultGroup(name) ? null : name);
+		MaidConfig.Set(block, MaidConfig.GroupKey, MaidConfig.IsDefaultGroup(name) ? null : name);
 		if (block is IMyShipWelder system)
 		{
 			// A moved system takes on its new group's auto-queue setting instead of switching the group's.
-			BobGroup target = _sortedGroups.FirstOrDefault(g => g.TerminalSystem != null && g.ConstructBlocks.Contains(block) && g.Name.Equals(BobConfig.IsDefaultGroup(name) ? BobConfig.DefaultGroup : name, StringComparison.OrdinalIgnoreCase));
-			BobConfig.Set(system, BobConfig.AutoQueueKey, target != null && target.AutoQueue ? "true" : null);
+			MaidGroup target = _sortedGroups.FirstOrDefault(g => g.TerminalSystem != null && g.ConstructBlocks.Contains(block) && g.Name.Equals(MaidConfig.IsDefaultGroup(name) ? MaidConfig.DefaultGroup : name, StringComparison.OrdinalIgnoreCase));
+			MaidConfig.Set(system, MaidConfig.AutoQueueKey, target != null && target.AutoQueue ? "true" : null);
 		}
 		RefreshNow();
 	}
@@ -517,7 +517,7 @@ public class NeedyBobSession : MySessionComponentBase
 		double now = Now;
 		for (int i = 0; i < _sortedGroups.Count; i++)
 		{
-			BobGroup group = _sortedGroups[(_queueCursor + i) % _sortedGroups.Count];
+			MaidGroup group = _sortedGroups[(_queueCursor + i) % _sortedGroups.Count];
 			if (group.AutoQueue && now >= group.NextQueueCheck)
 			{
 				_queueCursor = (_queueCursor + i + 1) % _sortedGroups.Count;

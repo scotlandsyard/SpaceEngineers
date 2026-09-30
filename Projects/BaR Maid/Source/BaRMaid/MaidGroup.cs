@@ -8,13 +8,13 @@ using IngameEntity = VRage.Game.ModAPI.Ingame.IMyEntity;
 using IngameSlimBlock = VRage.Game.ModAPI.Ingame.IMySlimBlock;
 using MyAssemblerMode = Sandbox.ModAPI.Ingame.MyAssemblerMode;
 
-namespace NeedyBOB;
+namespace BaRMaid;
 
 /// <summary>
 /// One group of Build and Repair systems and the assemblers that build for them, on one construct
 /// (everything sharing a terminal system).
 /// </summary>
-internal class BobGroup
+internal class MaidGroup
 {
 	/// <summary>After queuing a component, wait this long before queuing it again, so the server has time to
 	/// send the updated assembler queues back to this client.</summary>

@@ -6,7 +6,7 @@ using Sandbox.ModAPI;
 using VRage;
 using VRage.Game;
 
-namespace NeedyBOB;
+namespace BaRMaid;
 
 /// <summary>
 /// Puts components into assembler queues the same way the Build and Repair mod's EnsureQueued does: count

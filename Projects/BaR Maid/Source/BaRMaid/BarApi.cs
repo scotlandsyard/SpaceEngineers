@@ -7,7 +7,7 @@ using VRage.Scripting.MemorySafeTypes;
 using IngameEntity = VRage.Game.ModAPI.Ingame.IMyEntity;
 using IngameSlimBlock = VRage.Game.ModAPI.Ingame.IMySlimBlock;
 
-namespace NeedyBOB;
+namespace BaRMaid;
 
 /// <summary>
 /// Reads a Build and Repair block through the terminal properties the SKO Nanobot Build and Repair mod
