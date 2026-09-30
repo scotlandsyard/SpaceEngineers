@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
+using Sandbox.ModAPI;
+using VRage.Input;
 using Sandbox.Game.Gui;
 using Sandbox.Game.Localization;
 using Sandbox.Graphics.GUI;
@@ -46,9 +49,49 @@ internal static class ScriptEditors
 		When(() => screen.State == MyGuiScreenState.CLOSED, action);
 	}
 
+	/// <summary>The editor on screen, watched for keys the game thinks are held down.</summary>
+	private static MyGuiScreenBase s_watchedEditor;
+
+	private static int s_heldFrames;
+
+	/// <summary>
+	/// The game's code box claims all input while any keyboard key reads as held down, which leaves the editor's
+	/// buttons dead. When that lasts a second, say which key it is so it can be found.
+	/// </summary>
+	private static void WatchHeldKeys()
+	{
+		// Any code or text editor, including a real programmable block's.
+		MyGuiScreenBase focused = MyScreenManager.GetScreenWithFocus();
+		if (!(focused is MyGuiScreenEditor) && !(focused is MyGuiScreenTextPanel))
+		{
+			s_watchedEditor = null;
+			return;
+		}
+		if (focused != s_watchedEditor)
+		{
+			s_watchedEditor = focused;
+			s_heldFrames = 0;
+		}
+		if (MyInput.Static == null || !MyInput.Static.IsAnyKeyPress())
+		{
+			s_heldFrames = 0;
+			return;
+		}
+		if (++s_heldFrames != 60)
+		{
+			return;
+		}
+		List<MyKeys> keys = new List<MyKeys>();
+		MyInput.Static.GetPressedKeys(keys);
+		string names = keys.Count == 0 ? "(unknown)" : string.Join(", ", keys.Select(k => $"{k} ({(int)k})"));
+		MyLog.Default.WriteLineAndConsole($"[ScriptToPlugin] Keys reported as held while the editor is open: {names}");
+		MyAPIGateway.Utilities?.ShowMessage(ScriptSession.ChatSender, $"The game reports these keys as held down: {names}. While a key is held, the editor's buttons don't respond.");
+	}
+
 	/// <summary>Called every frame, on the game thread.</summary>
 	public static void Pump()
 	{
+		WatchHeldKeys();
 		if (s_pending.Count == 0)
 		{
 			return;
