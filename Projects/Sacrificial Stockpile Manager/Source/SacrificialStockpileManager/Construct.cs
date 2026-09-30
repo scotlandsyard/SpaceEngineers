@@ -322,7 +322,7 @@ internal class Construct
 				{
 					text.Append(", ");
 				}
-				text.Append(item.Blueprint?.DisplayNameText ?? "?").Append(" x").Append(Items.Amount((double)item.Amount));
+				text.Append(BlueprintName(item.Blueprint)).Append(" x").Append(Items.Amount((double)item.Amount));
 				shown++;
 			}
 			else
@@ -339,6 +339,34 @@ internal class Construct
 			return production.IsProducing ? "Working" : "Idle";
 		}
 		return (production.IsProducing ? "" : "Waiting: ") + text;
+	}
+
+	/// <summary>
+	/// A short name for a queued blueprint: the item it makes when it makes one thing, else its display name on one
+	/// line. Some modded blueprints have multi-line display names with a description, which spill out of a table cell.
+	/// </summary>
+	private static string BlueprintName(Sandbox.Definitions.MyBlueprintDefinitionBase blueprint)
+	{
+		if (blueprint == null)
+		{
+			return "?";
+		}
+		if (blueprint.Results != null && blueprint.Results.Length == 1)
+		{
+			return Items.Name(Items.Key(blueprint.Results[0].Id));
+		}
+		return OneLine(blueprint.DisplayNameText ?? blueprint.Id.SubtypeName);
+	}
+
+	/// <summary>The first line of a text, trimmed.</summary>
+	public static string OneLine(string text)
+	{
+		if (string.IsNullOrEmpty(text))
+		{
+			return "";
+		}
+		int end = text.IndexOfAny(new[] { '\r', '\n' });
+		return (end < 0 ? text : text.Substring(0, end)).Trim();
 	}
 
 	/// <summary>How many of the item are in the assembler queues (blueprint runs times what one run makes).</summary>

@@ -762,7 +762,8 @@ public partial class SsmScreen : MyGuiScreenBase
 			MyGuiControlTable.Row row = new MyGuiControlTable.Row(data.Key);
 			for (int i = 0; i < _table.ColumnsCount; i++)
 			{
-				string text = i < data.Texts.Length ? data.Texts[i] ?? "" : "";
+				// A cell draws every line of its text, so line breaks (from block or modded item names) would spill over the rows below.
+				string text = (i < data.Texts.Length ? data.Texts[i] ?? "" : "").Replace("\r", "").Replace('\n', ' ');
 				object sortValue = data.SortValues != null && i < data.SortValues.Length && data.SortValues[i] != null ? data.SortValues[i] : text;
 				row.AddCell(new MyGuiControlTable.Cell(text, sortValue, null, data.Color));
 			}

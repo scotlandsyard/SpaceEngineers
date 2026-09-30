@@ -115,8 +115,8 @@ internal static class Items
 	/// <summary>The item's display name, or null when the game has no such item.</summary>
 	private static string BaseName(string key)
 	{
-		string name = Definition(key)?.DisplayNameText;
-		return string.IsNullOrWhiteSpace(name) ? null : name;
+		string name = Construct.OneLine(Definition(key)?.DisplayNameText);
+		return name.Length == 0 ? null : name;
 	}
 
 	public static MyPhysicalItemDefinition Definition(string key)
