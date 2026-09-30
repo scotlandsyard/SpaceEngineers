@@ -1,0 +1,814 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Sandbox.ModAPI;
+using VRageMath;
+
+namespace SacrificialStockpileManager;
+
+// The rows of each view, and what the buttons do.
+public partial class SsmScreen
+{
+	private static List<Column> ColumnsFor(View view)
+	{
+		switch (view)
+		{
+		case View.Overview:
+			return new List<Column>
+			{
+				new Column { Name = "", Width = 0.3f, Sortable = false },
+				new Column { Name = "", Width = 0.7f, Sortable = false }
+			};
+		case View.Items:
+			return new List<Column>
+			{
+				new Column { Name = "Item", Width = 0.27f },
+				new Column { Name = "Category", Width = 0.13f },
+				new Column { Name = "Amount", Width = 0.13f, RightAligned = true },
+				new Column { Name = "Quota", Width = 0.12f, RightAligned = true },
+				new Column { Name = "Queued", Width = 0.11f, RightAligned = true },
+				new Column { Name = "Autocraft", Width = 0.24f }
+			};
+		case View.Blocks:
+			return new List<Column>
+			{
+				new Column { Name = "Block", Width = 0.29f },
+				new Column { Name = "Type", Width = 0.19f },
+				new Column { Name = "Role", Width = 0.14f },
+				new Column { Name = "Fill", Width = 0.09f, RightAligned = true },
+				new Column { Name = "Settings", Width = 0.29f }
+			};
+		case View.Block:
+			return new List<Column>
+			{
+				new Column { Name = "Item", Width = 0.3f },
+				new Column { Name = "Here", Width = 0.15f, RightAligned = true },
+				new Column { Name = "Minimum", Width = 0.13f, RightAligned = true },
+				new Column { Name = "Maximum", Width = 0.13f, RightAligned = true },
+				new Column { Name = "State", Width = 0.29f }
+			};
+		case View.Production:
+			return new List<Column>
+			{
+				new Column { Name = "Block", Width = 0.27f },
+				new Column { Name = "Type", Width = 0.15f },
+				new Column { Name = "State", Width = 0.11f },
+				new Column { Name = "Queue / contents", Width = 0.47f }
+			};
+		case View.Displays:
+			return new List<Column>
+			{
+				new Column { Name = "Block", Width = 0.3f },
+				new Column { Name = "Screen", Width = 0.2f },
+				new Column { Name = "Page", Width = 0.18f },
+				new Column { Name = "Showing", Width = 0.32f }
+			};
+		default:
+			return new List<Column>
+			{
+				new Column { Name = "", Width = 1f, Sortable = false }
+			};
+		}
+	}
+
+	private static string EmptyText(View view)
+	{
+		switch (view)
+		{
+		case View.Items:
+			return "No items on this grid.";
+		case View.Blocks:
+			return "No blocks with an inventory that you can access.";
+		case View.Block:
+			return "Empty, and no limits set. Pick an item below to add one.";
+		case View.Production:
+			return "No production blocks.";
+		case View.Displays:
+			return "No blocks with screens that you can access.";
+		case View.Log:
+			return Live == null ? "The log is only kept while the grid is loaded." : "Nothing done yet.";
+		default:
+			return "Nothing to show.";
+		}
+	}
+
+	private List<RowData> BuildRows(GridSnapshot grid)
+	{
+		switch (s_view)
+		{
+		case View.Overview:
+			return OverviewRows(grid);
+		case View.Items:
+			return ItemRows(grid);
+		case View.Blocks:
+			return BlockRows(grid);
+		case View.Block:
+			return BlockItemRows(grid);
+		case View.Production:
+			return ProductionRows(grid);
+		case View.Displays:
+			return DisplayRows(grid);
+		case View.Log:
+			return (Live?.Log ?? new List<string>()).Select((line, i) => Row("log" + i, null, line)).ToList();
+		default:
+			return new List<RowData> { Row("help", null, "") };
+		}
+	}
+
+	// ---- Overview ----
+
+	private List<RowData> OverviewRows(GridSnapshot grid)
+	{
+		GridRules rules = Store.GridRules(grid);
+		Construct live = Live;
+		List<RowData> rows = new List<RowData>();
+		bool automation = rules != null && rules.Automation;
+		rows.Add(Row("set:automation", automation ? GoodColor : WarningColor, "Automation", automation ? "On: limits, sorting and draining are applied" : "Off: nothing is moved (settings are kept)"));
+		rows.Add(Row("set:autocraft", rules != null && rules.Autocraft ? GoodColor : (Color?)null, "Autocraft", rules != null && rules.Autocraft ? "On: quotas are queued in assemblers" : "Off"));
+		rows.Add(Row("set:drain", rules != null && rules.DrainOutputs ? GoodColor : (Color?)null, "Empty production output", rules != null && rules.DrainOutputs ? "On: refinery and assembler output goes to storage" : "Off"));
+		rows.Add(Row("set:kits", rules != null && rules.UseSurvivalKits ? GoodColor : (Color?)null, "Survival kits autocraft", rules != null && rules.UseSurvivalKits ? "On" : "Off"));
+
+		Vector3D player = MyAPIGateway.Session?.Player?.GetPosition() ?? Vector3D.Zero;
+		string distance = FormatDistance(Vector3D.Distance(player, grid.Position));
+		rows.Add(Row("status", live != null ? GoodColor : MutedColor, "Status", live != null ? $"Loaded ({distance} away), updating live" : $"Last seen {Displays.Ago(grid.LastSeenUtc)}, {distance} away"));
+		rows.Add(Row("type", null, "Type", $"{(grid.IsStation ? "Station" : "Ship")}, {grid.GridIds.Count} grid(s), {grid.BlockCount:N0} blocks"));
+
+		double used = 0.0;
+		double max = 0.0;
+		foreach (BlockSnapshot block in grid.Blocks.Where(b => b.Kind == BlockKind.Cargo))
+		{
+			used += block.Volume;
+			max += block.MaxVolume;
+		}
+		rows.Add(Row("cargo", max > 0.0 && used / max > 0.9 ? WarningColor : (Color?)null, "Cargo", max > 0.0 ? $"{used / max:P0} full ({Items.Amount(used)} of {Items.Amount(max)} L)" : "No cargo containers"));
+
+		Dictionary<Effective, int> roles = new Dictionary<Effective, int>();
+		foreach (BlockSnapshot block in grid.Blocks.Where(b => b.HasInventory))
+		{
+			Effective role = Construct.Resolve(block);
+			roles.TryGetValue(role, out int count);
+			roles[role] = count + 1;
+		}
+		rows.Add(Row("roles", null, "Inventories", string.Join(", ", roles.OrderBy(r => r.Key).Select(r => $"{r.Value} {r.Key.ToString().ToLowerInvariant()}"))));
+
+		foreach (ItemCategory category in Items.Categories)
+		{
+			List<KeyValuePair<string, double>> items = grid.Totals.Where(t => Items.Category(t.Key) == category).ToList();
+			if (items.Count > 0)
+			{
+				rows.Add(Row("cat:" + category, null, Items.CategoryNames[(int)category], $"{items.Count} kind(s), {Items.Amount(items.Sum(i => i.Value))} total"));
+			}
+		}
+
+		int blockRules = grid.Blocks.Count(b => Store.BlockRules(b.Id) != null);
+		int displays = Store.Displays.Count(d => grid.Blocks.Any(b => b.Id == d.BlockId));
+		rows.Add(Row("rules", null, "Settings", $"{blockRules} block(s) set up, {rules?.Quotas.Count ?? 0} quota(s), {displays} display(s)"));
+
+		if (live != null)
+		{
+			rows.Add(Row("warnings", live.Warnings.Count > 0 ? WarningColor : GoodColor, "Warnings", live.Warnings.Count == 0 ? "None" : $"{live.Warnings.Count}"));
+			for (int i = 0; i < live.Warnings.Count; i++)
+			{
+				rows.Add(Row("w" + i, WarningColor, "", live.Warnings[i]));
+			}
+			for (int i = 0; i < Math.Min(5, live.Log.Count); i++)
+			{
+				rows.Add(Row("log" + i, MutedColor, i == 0 ? "Recent" : "", live.Log[i]));
+			}
+		}
+		return rows;
+	}
+
+	private void ChangeSelectedSetting()
+	{
+		string key = SelectedKey;
+		if (key == null || !key.StartsWith("set:", StringComparison.Ordinal))
+		{
+			ShowMessage("Select one of the settings at the top of the list first.", WarningColor);
+			return;
+		}
+		ToggleGridSetting(key.Substring(4));
+	}
+
+	private void ToggleGridSetting(string setting)
+	{
+		GridSnapshot grid = Grid;
+		if (grid == null)
+		{
+			return;
+		}
+		GridRules rules = Store.EditGridRules(grid);
+		string text;
+		bool on;
+		switch (setting)
+		{
+		case "automation":
+			on = rules.Automation = !rules.Automation;
+			text = "Automation";
+			break;
+		case "autocraft":
+			on = rules.Autocraft = !rules.Autocraft;
+			text = "Autocraft";
+			break;
+		case "drain":
+			on = rules.DrainOutputs = !rules.DrainOutputs;
+			text = "Emptying production output";
+			break;
+		case "kits":
+			on = rules.UseSurvivalKits = !rules.UseSurvivalKits;
+			text = "Autocraft in survival kits";
+			break;
+		default:
+			return;
+		}
+		Store.SaveSettings();
+		Live?.AddLog($"{text} switched {(on ? "on" : "off")}");
+		Session?.RunNow(Live);
+		ShowMessage($"{text} {(on ? "on" : "off")} for {grid.Name}.", on ? GoodColor : (Color?)null);
+		_rowsSignature = null;
+		RefreshAll();
+	}
+
+	private void MarkGps()
+	{
+		GridSnapshot grid = Grid;
+		if (grid == null)
+		{
+			return;
+		}
+		bool updated = GridGps.Mark(grid);
+		ShowMessage(updated ? $"Moved the GPS marker for {grid.Name} to where it was last seen." : $"Added a GPS marker for {grid.Name}.", GoodColor);
+	}
+
+	private void ForgetGrid()
+	{
+		GridSnapshot grid = Grid;
+		if (grid == null)
+		{
+			return;
+		}
+		if (Live != null)
+		{
+			ShowMessage("This grid is loaded, so it would come straight back.", WarningColor);
+			return;
+		}
+		Store.ForgetGrid(grid.Key);
+		ShowMessage($"Forgot {grid.Name}. Its settings are kept in case it comes back.", null);
+		_gridsSignature = null;
+		_recreatePending = true;
+	}
+
+	// ---- Items & quotas ----
+
+	private List<RowData> ItemRows(GridSnapshot grid)
+	{
+		GridRules rules = Store.GridRules(grid);
+		Construct live = Live;
+		IEnumerable<string> keys = grid.Totals.Keys;
+		if (rules != null)
+		{
+			keys = keys.Union(rules.Quotas.Select(q => q.Item));
+		}
+		List<RowData> rows = new List<RowData>();
+		foreach (string key in keys.OrderBy(k => (int)Items.Category(k)).ThenBy(k => Items.Name(k), StringComparer.OrdinalIgnoreCase))
+		{
+			grid.Totals.TryGetValue(key, out double amount);
+			ItemLimit quota = rules?.Quota(key);
+			double queued = live?.QueuedAmount(key) ?? 0.0;
+			string note = live != null && live.QuotaNotes.TryGetValue(key, out string text) ? text : "";
+			Color? color = null;
+			if (quota != null && quota.HasMin)
+			{
+				color = amount >= quota.Min ? GoodColor : WarningColor;
+			}
+			rows.Add(new RowData
+			{
+				Key = "i:" + key,
+				Texts = new[] { Items.Name(key), Items.CategoryNames[(int)Items.Category(key)], Items.Amount(amount), quota != null && quota.HasMin ? Items.Amount(quota.Min) : "", queued > 0.0 ? Items.Amount(queued) : "", note },
+				SortValues = new object[] { null, ((int)Items.Category(key)).ToString("D2") + Items.Name(key), amount, quota?.Min ?? -1.0, queued, null },
+				Color = color
+			});
+		}
+		return rows;
+	}
+
+	private string SelectedItem(out string problem)
+	{
+		problem = null;
+		if (string.IsNullOrEmpty(s_itemKey))
+		{
+			problem = "Pick an item first: select a row, or choose one in the list below.";
+			return null;
+		}
+		return s_itemKey;
+	}
+
+	private void SetQuota()
+	{
+		GridSnapshot grid = Grid;
+		string key = SelectedItem(out string problem);
+		if (grid == null || key == null)
+		{
+			ShowMessage(problem ?? "No grid selected.", WarningColor);
+			return;
+		}
+		if (!Items.TryParseAmount(_amountBox?.Text, out double amount) || amount <= 0.0)
+		{
+			ShowMessage("Type the amount to keep in stock, e.g. 500 or 2.5k.", WarningColor);
+			return;
+		}
+		if (Items.Blueprint(key) == null)
+		{
+			ShowMessage($"No blueprint makes {Items.Name(key)}, so autocraft can't queue it. The quota is kept for the LCD pages.", WarningColor);
+		}
+		GridRules rules = Store.EditGridRules(grid);
+		ItemLimit quota = rules.Quota(key);
+		if (quota == null)
+		{
+			quota = new ItemLimit { Item = key };
+			rules.Quotas.Add(quota);
+		}
+		quota.Min = Items.IsIntegral(key) ? Math.Ceiling(amount) : amount;
+		Store.SaveSettings();
+		Session?.RunNow(Live);
+		if (Items.Blueprint(key) != null)
+		{
+			ShowMessage($"Quota for {Items.Name(key)}: {Items.Amount(quota.Min)}.{(rules.Autocraft ? "" : " Autocraft is off; switch it on to queue it.")}", GoodColor);
+		}
+		_rowsSignature = null;
+		RefreshAll();
+	}
+
+	private void ClearQuota()
+	{
+		GridSnapshot grid = Grid;
+		string key = SelectedItem(out string problem);
+		if (grid == null || key == null)
+		{
+			ShowMessage(problem ?? "No grid selected.", WarningColor);
+			return;
+		}
+		GridRules rules = Store.GridRules(grid);
+		if (rules == null || rules.Quotas.RemoveAll(q => q.Item == key) == 0)
+		{
+			ShowMessage($"{Items.Name(key)} has no quota.", null);
+			return;
+		}
+		Store.SaveSettings();
+		ShowMessage($"Cleared the quota for {Items.Name(key)}. Anything already queued stays queued.", null);
+		_rowsSignature = null;
+		RefreshAll();
+	}
+
+	// ---- Blocks ----
+
+	private List<RowData> BlockRows(GridSnapshot grid)
+	{
+		List<RowData> rows = new List<RowData>();
+		foreach (BlockSnapshot block in grid.Blocks.Where(b => b.HasInventory))
+		{
+			BlockRules rules = Store.BlockRules(block.Id);
+			Effective role = Construct.Resolve(block);
+			rows.Add(new RowData
+			{
+				Key = "b:" + block.Id,
+				Texts = new[] { block.Name, block.Type, RoleText(rules, role) + (block.Docked ? " (docked)" : ""), block.MaxVolume > 0.0 ? $"{block.Fill:P0}" : "", SettingsText(rules) },
+				SortValues = new object[] { null, null, null, block.Fill, null },
+				Color = role == Effective.Manual ? MutedColor : rules != null && !rules.IsEmpty ? GoodColor : (Color?)null
+			});
+		}
+		return rows.OrderBy(r => r.Texts[0], StringComparer.OrdinalIgnoreCase).ToList();
+	}
+
+	private static string RoleText(BlockRules rules, Effective role)
+	{
+		return rules == null || rules.Role == BlockRole.Auto ? role.ToString().ToLowerInvariant() : role.ToString();
+	}
+
+	private static string SettingsText(BlockRules rules)
+	{
+		if (rules == null)
+		{
+			return "";
+		}
+		List<string> parts = new List<string>();
+		if (rules.Accept.Count > 0)
+		{
+			parts.Add("accepts " + string.Join(", ", rules.Accept.Select(AcceptName)));
+		}
+		if (rules.Limits.Count > 0)
+		{
+			parts.Add($"{rules.Limits.Count} limit(s)");
+		}
+		return string.Join("; ", parts);
+	}
+
+	private static string AcceptName(string token)
+	{
+		return Enum.TryParse(token, out ItemCategory category) ? Items.CategoryShort[(int)category] : Items.Name(token);
+	}
+
+	private long SelectedBlockId()
+	{
+		string key = SelectedKey;
+		return key != null && key.StartsWith("b:", StringComparison.Ordinal) && long.TryParse(key.Substring(2), out long id) ? id : 0;
+	}
+
+	private void EditSelectedBlock()
+	{
+		long id = SelectedBlockId();
+		if (id == 0)
+		{
+			ShowMessage("Select a block first.", WarningColor);
+			return;
+		}
+		s_blockId = id;
+		SwitchView(View.Block);
+	}
+
+	private void ToggleSelectedBlock()
+	{
+		long id = SelectedBlockId();
+		if (id == 0)
+		{
+			ShowMessage("Select a block first.", WarningColor);
+			return;
+		}
+		if (!(LiveEntity(id) is IMyFunctionalBlock block) || !block.HasLocalPlayerAccess())
+		{
+			ShowMessage("That block isn't loaded or can't be switched.", WarningColor);
+			return;
+		}
+		block.Enabled = !block.Enabled;
+		ShowMessage($"{block.CustomName} switched {(block.Enabled ? "on" : "off")}.", block.Enabled ? GoodColor : (Color?)null);
+		Session?.RunNow(Live);
+		_rowsSignature = null;
+		RefreshAll();
+	}
+
+	private void Rescan()
+	{
+		Session?.RefreshNow();
+		ShowMessage($"Rescanned: {Session?.Constructs.Count ?? 0} grid(s) of yours loaded.");
+		_rowsSignature = null;
+		RefreshAll();
+	}
+
+	// ---- Block settings ----
+
+	private List<RowData> BlockItemRows(GridSnapshot grid)
+	{
+		List<RowData> rows = new List<RowData>();
+		BlockSnapshot block = grid.Block(s_blockId);
+		if (block == null)
+		{
+			return rows;
+		}
+		BlockRules rules = Store.BlockRules(block.Id);
+		Effective role = Construct.Resolve(block);
+		IEnumerable<string> keys = block.ItemAmounts.Keys.Union(block.OutputAmounts.Keys);
+		if (rules != null)
+		{
+			keys = keys.Union(rules.Limits.Select(l => l.Item)).Union(rules.Accept.Where(a => a.Contains("/")));
+		}
+		foreach (string key in keys.OrderBy(k => (int)Items.Category(k)).ThenBy(k => Items.Name(k), StringComparer.OrdinalIgnoreCase))
+		{
+			block.ItemAmounts.TryGetValue(key, out double have);
+			block.OutputAmounts.TryGetValue(key, out double output);
+			ItemLimit limit = rules?.Limit(key);
+			string state = "";
+			Color? color = null;
+			if (role == Effective.Manual)
+			{
+				state = "Manual: left alone";
+				color = MutedColor;
+			}
+			else if (limit != null && limit.HasMin && have < limit.Min)
+			{
+				state = "Below minimum";
+				color = WarningColor;
+			}
+			else if (limit != null && limit.HasMax && have > limit.Max)
+			{
+				state = "Above maximum";
+				color = WarningColor;
+			}
+			else if (limit != null)
+			{
+				state = "Within limits";
+				color = GoodColor;
+			}
+			else if (rules != null && rules.Accept.Contains(key))
+			{
+				state = "Accepted here";
+				color = GoodColor;
+			}
+			else if (role == Effective.Stock && have > 0.0)
+			{
+				state = "No limit: moved out";
+			}
+			else if (role == Effective.Storage && rules != null && rules.Accept.Count > 0 && have > 0.0 && !rules.Accept.Contains(Items.Category(key).ToString()))
+			{
+				state = "Doesn't belong: sorted out";
+			}
+			else if (output > 0.0)
+			{
+				state = "In output";
+			}
+			string here = Items.Amount(have) + (output > 0.0 ? $" (+{Items.Amount(output)} out)" : "");
+			rows.Add(new RowData
+			{
+				Key = "i:" + key,
+				Texts = new[] { Items.Name(key), here, limit != null && limit.HasMin ? Items.Amount(limit.Min) : "", limit != null && limit.HasMax ? Items.Amount(limit.Max) : "", state },
+				SortValues = new object[] { null, have + output, limit?.Min ?? -1.0, limit?.Max ?? -1.0, null },
+				Color = color
+			});
+		}
+		return rows;
+	}
+
+	private BlockSnapshot CurrentBlock()
+	{
+		return Grid?.Block(s_blockId);
+	}
+
+	private void OnRoleSelected()
+	{
+		if (_suppressEvents)
+		{
+			return;
+		}
+		BlockSnapshot block = CurrentBlock();
+		if (block == null)
+		{
+			return;
+		}
+		BlockRole role = (BlockRole)_roleCombo.GetSelectedKey();
+		Store.EditBlockRules(block.Id).Role = role;
+		Store.SaveSettings();
+		Session?.RunNow(Live);
+		ShowMessage($"{block.Name} is now {Construct.Resolve(block).ToString().ToLowerInvariant()}. {RoleHelp(Construct.Resolve(block))}", GoodColor);
+		_rowsSignature = null;
+		RefreshAll();
+	}
+
+	private static string RoleHelp(Effective role)
+	{
+		switch (role)
+		{
+		case Effective.Storage:
+			return "Items are stored here and taken from here.";
+		case Effective.Intake:
+			return "Emptied into storage.";
+		case Effective.Stock:
+			return "Keeps only its limited items, between min and max.";
+		case Effective.Manual:
+			return "The plugin never touches it.";
+		default:
+			return "Only its own limits apply.";
+		}
+	}
+
+	private void OnAcceptChanged(ItemCategory category, bool accept)
+	{
+		if (_suppressEvents)
+		{
+			return;
+		}
+		BlockSnapshot block = CurrentBlock();
+		if (block == null)
+		{
+			return;
+		}
+		BlockRules rules = Store.EditBlockRules(block.Id);
+		rules.Accept.Remove(category.ToString());
+		if (accept)
+		{
+			rules.Accept.Add(category.ToString());
+		}
+		Store.SaveSettings();
+		string warning = accept && Construct.Resolve(block) != Effective.Storage ? " Only storage blocks receive sorted items; set Role to Storage." : "";
+		ShowMessage($"{block.Name} {(accept ? "accepts" : "no longer accepts")} {Items.CategoryNames[(int)category].ToLowerInvariant()}.{warning}", warning.Length > 0 ? WarningColor : GoodColor);
+		_rowsSignature = null;
+		RefreshAll();
+	}
+
+	private void ToggleAcceptItem()
+	{
+		BlockSnapshot block = CurrentBlock();
+		string key = SelectedItem(out string problem);
+		if (block == null || key == null)
+		{
+			ShowMessage(problem ?? "Pick a block first.", WarningColor);
+			return;
+		}
+		BlockRules rules = Store.EditBlockRules(block.Id);
+		bool accept = !rules.Accept.Contains(key);
+		rules.Accept.Remove(key);
+		if (accept)
+		{
+			rules.Accept.Add(key);
+		}
+		Store.SaveSettings();
+		string warning = accept && Construct.Resolve(block) != Effective.Storage ? " Only storage blocks receive sorted items; set Role to Storage." : "";
+		ShowMessage($"{block.Name} {(accept ? "accepts" : "no longer accepts")} {Items.Name(key)}.{warning}", warning.Length > 0 ? WarningColor : GoodColor);
+		_rowsSignature = null;
+		RefreshAll();
+	}
+
+	private void SetLimit(bool minimum)
+	{
+		BlockSnapshot block = CurrentBlock();
+		string key = SelectedItem(out string problem);
+		if (block == null || key == null)
+		{
+			ShowMessage(problem ?? "Pick a block first.", WarningColor);
+			return;
+		}
+		string text = _amountBox?.Text ?? "";
+		double amount = -1.0;
+		if (text.Trim().Length > 0 && !Items.TryParseAmount(text, out amount))
+		{
+			ShowMessage("Type an amount like 500 or 2.5k, or leave it blank to clear.", WarningColor);
+			return;
+		}
+		if (amount >= 0.0 && Items.IsIntegral(key))
+		{
+			amount = Math.Ceiling(amount);
+		}
+		BlockRules rules = Store.EditBlockRules(block.Id);
+		ItemLimit limit = rules.Limit(key);
+		if (limit == null)
+		{
+			if (amount < 0.0)
+			{
+				ShowMessage($"{Items.Name(key)} has no limit to clear.", null);
+				return;
+			}
+			limit = new ItemLimit { Item = key };
+			rules.Limits.Add(limit);
+		}
+		if (minimum)
+		{
+			limit.Min = amount;
+		}
+		else
+		{
+			limit.Max = amount;
+		}
+		if (limit.HasMin && limit.HasMax && limit.Min > limit.Max)
+		{
+			// Keep them consistent: the one just typed wins.
+			if (minimum)
+			{
+				limit.Max = limit.Min;
+			}
+			else
+			{
+				limit.Min = limit.Max;
+			}
+		}
+		if (!limit.HasMin && !limit.HasMax)
+		{
+			rules.Limits.Remove(limit);
+		}
+		Store.SaveSettings();
+		Session?.RunNow(Live);
+		string which = minimum ? "Minimum" : "Maximum";
+		string role = Construct.Resolve(block) == Effective.Manual ? " The block is Manual, so limits are ignored." : "";
+		GridRules gridRules = Store.GridRules(Grid);
+		string off = gridRules == null || !gridRules.Automation ? " Automation is off for this grid (see Overview)." : "";
+		ShowMessage(amount < 0.0 ? $"{which} for {Items.Name(key)} cleared." : $"{which} for {Items.Name(key)} in {block.Name}: {Items.Amount(amount)}.{role}{off}", role.Length + off.Length > 0 ? WarningColor : GoodColor);
+		_rowsSignature = null;
+		RefreshAll();
+	}
+
+	private void ClearLimits()
+	{
+		BlockSnapshot block = CurrentBlock();
+		string key = SelectedItem(out string problem);
+		if (block == null || key == null)
+		{
+			ShowMessage(problem ?? "Pick a block first.", WarningColor);
+			return;
+		}
+		BlockRules rules = Store.BlockRules(block.Id);
+		if (rules == null || rules.Limits.RemoveAll(l => l.Item == key) == 0)
+		{
+			ShowMessage($"{Items.Name(key)} has no limits here.", null);
+			return;
+		}
+		Store.SaveSettings();
+		ShowMessage($"Cleared the limits for {Items.Name(key)} in {block.Name}.", null);
+		_rowsSignature = null;
+		RefreshAll();
+	}
+
+	// ---- Production ----
+
+	private List<RowData> ProductionRows(GridSnapshot grid)
+	{
+		List<RowData> rows = new List<RowData>();
+		foreach (BlockSnapshot block in grid.Blocks)
+		{
+			if (!Construct.IsProductionKind(block.Kind) && block.Kind != BlockKind.Reactor && block.Kind != BlockKind.GasGenerator)
+			{
+				continue;
+			}
+			string state = !block.Functional ? "Damaged" : !block.Enabled ? "Off" : block.Status == "No power" ? "No power" : "On";
+			string detail = Construct.IsProductionKind(block.Kind) && block.Status != "No power" && block.Status != "Off" && block.Status != "Damaged" ? block.Status : "";
+			if (block.Kind == BlockKind.Refinery || block.Kind == BlockKind.Reactor || block.Kind == BlockKind.GasGenerator)
+			{
+				string contents = string.Join(", ", block.ItemAmounts.OrderByDescending(i => i.Value).Take(3).Select(i => $"{Items.Name(i.Key)} {Items.Amount(i.Value)}"));
+				detail = block.Kind == BlockKind.Refinery && detail.Length > 0 ? $"{detail}; in: {contents}" : contents.Length > 0 ? contents : detail.Length > 0 ? detail : "Empty";
+			}
+			rows.Add(new RowData
+			{
+				Key = "b:" + block.Id,
+				Texts = new[] { block.Name, block.Type, state, detail },
+				Color = state == "On" ? (Color?)null : WarningColor
+			});
+		}
+		return rows.OrderBy(r => r.Texts[1], StringComparer.OrdinalIgnoreCase).ThenBy(r => r.Texts[0], StringComparer.OrdinalIgnoreCase).ToList();
+	}
+
+	// ---- Displays ----
+
+	private List<RowData> DisplayRows(GridSnapshot grid)
+	{
+		List<RowData> rows = new List<RowData>();
+		foreach (BlockSnapshot block in grid.Blocks.Where(b => b.Surfaces > 0).OrderBy(b => b.Name, StringComparer.OrdinalIgnoreCase))
+		{
+			for (int i = 0; i < block.Surfaces; i++)
+			{
+				DisplayRule rule = Store.Display(block.Id, i);
+				string screen = Displays.Surface(block.Id, i)?.DisplayName;
+				if (string.IsNullOrEmpty(screen))
+				{
+					screen = block.Surfaces == 1 ? "Screen" : $"Screen {i + 1}";
+				}
+				string showing = rule == null ? "" : rule.SourceGrid == 0 ? "This grid" : Store.Grid(rule.SourceGrid)?.Name ?? "(forgotten grid)";
+				rows.Add(new RowData
+				{
+					Key = $"d:{block.Id}:{i}",
+					Texts = new[] { block.Name, screen, rule?.Page ?? "", showing },
+					Color = rule != null ? GoodColor : (Color?)null
+				});
+			}
+		}
+		return rows;
+	}
+
+	private void AssignDisplay()
+	{
+		string key = SelectedKey;
+		if (key == null || !TryParseDisplayKey(key, out long blockId, out int surface))
+		{
+			ShowMessage("Select a screen first.", WarningColor);
+			return;
+		}
+		string page = Displays.Pages[Math.Max(0, Math.Min(s_page, Displays.Pages.Length - 1))];
+		bool isNew = Store.Display(blockId, surface) == null;
+		Store.SetDisplay(blockId, surface, page, s_source);
+		if (isNew)
+		{
+			// Switch the screen to text mode with a monospace font once; later changes by the player stick.
+			Displays.Prepare(blockId, surface);
+		}
+		bool loaded = Displays.Surface(blockId, surface) != null;
+		ShowMessage($"Showing {page} on {Grid?.Block(blockId)?.Name ?? "the screen"}.{(loaded ? "" : " It starts when the block is loaded.")}", GoodColor);
+		_rowsSignature = null;
+		RefreshAll();
+	}
+
+	private void ClearDisplay()
+	{
+		string key = SelectedKey;
+		if (key == null || !TryParseDisplayKey(key, out long blockId, out int surface))
+		{
+			ShowMessage("Select a screen first.", WarningColor);
+			return;
+		}
+		if (Store.Display(blockId, surface) == null)
+		{
+			ShowMessage("That screen isn't showing a page.", null);
+			return;
+		}
+		Store.SetDisplay(blockId, surface, null, 0);
+		ShowMessage("The screen keeps its last text; the plugin no longer updates it.", null);
+		_rowsSignature = null;
+		RefreshAll();
+	}
+
+	private void ClearLog()
+	{
+		Live?.Log.Clear();
+		_rowsSignature = null;
+		RefreshAll();
+	}
+
+	private static string FormatDistance(double metres)
+	{
+		return metres >= 1000.0 ? $"{metres / 1000.0:0.0} km" : $"{metres:0} m";
+	}
+}
