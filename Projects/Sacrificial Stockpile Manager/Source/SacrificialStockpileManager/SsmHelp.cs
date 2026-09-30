@@ -27,7 +27,7 @@ internal static class SsmHelp
 		"Automation is off on every grid until you switch it on. While it's off, nothing is moved; the window only shows what is where and what would need doing. Double-click a setting in the Overview to switch it:",
 		"- Automation: apply minimums, maximums, sorting and intake draining.",
 		"- Autocraft: queue the shortfall of quotas in the assemblers.",
-		"- Empty production output: move what refineries and assemblers made into storage.",
+		"- Empty production output: move what refineries and assemblers made into storage. For an assembler that's disassembling, that's the parts that came out (the game puts them in its input), and the items waiting to be taken apart are left where they are.",
 		"- Survival kits autocraft: let autocraft use survival kits too.",
 		"- Disassemble surplus: disassemble whatever is above an item's maximum (see Quotas below).",
 		"- Keep bottles filled: take oxygen and hydrogen bottles that aren't full to a gas tank to refill, and put them back once full (needs Automation).",

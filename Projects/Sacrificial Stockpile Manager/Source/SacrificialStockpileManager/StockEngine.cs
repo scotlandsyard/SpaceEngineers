@@ -63,6 +63,13 @@ internal class StockEngine
 
 		public bool IsOutput;
 
+		/// <summary>
+		/// Holds what a machine has finished, to be emptied into storage: a production block's output, except for an
+		/// assembler that's disassembling, where the parts land in the input and the output holds what's waiting to
+		/// be taken apart.
+		/// </summary>
+		public bool Finished;
+
 		public int Index;
 
 		/// <summary>Per item, including transfers still on their way.</summary>
@@ -116,9 +123,11 @@ internal class StockEngine
 			{
 				continue;
 			}
+			bool disassembling = block.Block is IMyAssembler assembler && assembler.Mode == Sandbox.ModAPI.Ingame.MyAssemblerMode.Disassembly;
 			if (block.Input != null)
 			{
 				Inv input = Read(block, block.Input, 0, isOutput: false);
+				input.Finished = disassembling;
 				_inventories.Add(input);
 				if (block.Role == Effective.Storage)
 				{
@@ -127,7 +136,9 @@ internal class StockEngine
 			}
 			if (block.Output != null)
 			{
-				_inventories.Add(Read(block, block.Output, 1, isOutput: true));
+				Inv output = Read(block, block.Output, 1, isOutput: true);
+				output.Finished = !disassembling;
+				_inventories.Add(output);
 			}
 		}
 	}
@@ -262,9 +273,14 @@ internal class StockEngine
 		{
 			return 0.0;
 		}
-		if (inv.IsOutput)
+		if (inv.Finished)
 		{
 			return inv.Block.Docked ? 0.0 : have;
+		}
+		if (inv.IsOutput)
+		{
+			// A disassembling assembler's output: items waiting to be taken apart.
+			return 0.0;
 		}
 		ItemLimit limit = inv.Block.Rules?.Limit(key);
 		switch (inv.Block.Role)
@@ -286,7 +302,7 @@ internal class StockEngine
 	/// <summary>Order to take from sources: things that should leave anyway first, other blocks' surplus last.</summary>
 	private static int SourceRank(Inv inv, string key)
 	{
-		if (inv.IsOutput || inv.Block.Role == Effective.Intake || (inv.Block.Role == Effective.Stock && inv.Block.Rules?.Limit(key) == null))
+		if (inv.Finished || inv.Block.Role == Effective.Intake || (inv.Block.Role == Effective.Stock && inv.Block.Rules?.Limit(key) == null))
 		{
 			return 0;
 		}
@@ -507,7 +523,7 @@ internal class StockEngine
 		foreach (Inv source in _inventories)
 		{
 			// A docked ship's production output belongs to the ship.
-			if (source.IsOutput && !source.Block.Docked)
+			if (source.Finished && !source.Block.Docked)
 			{
 				foreach (string key in source.Amounts.Keys.ToList())
 				{
