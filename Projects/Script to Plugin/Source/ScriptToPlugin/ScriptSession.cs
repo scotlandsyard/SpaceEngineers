@@ -144,6 +144,7 @@ public class ScriptSession : MySessionComponentBase
 		}
 		_programs.Clear();
 		_compileQueue.Clear();
+		ScriptEditors.Clear();
 		ScriptStore.Unload();
 		_started = false;
 		Instance = null;

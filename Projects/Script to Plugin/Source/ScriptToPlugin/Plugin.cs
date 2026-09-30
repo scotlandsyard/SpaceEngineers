@@ -16,10 +16,19 @@ public class Plugin : IPlugin, IDisposable
 
 	public void Update()
 	{
+		try
+		{
+			ScriptEditors.Pump();
+		}
+		catch (Exception ex)
+		{
+			VRage.Utils.MyLog.Default.WriteLineAndConsole($"[ScriptToPlugin] Plugin.Update: {ex}");
+		}
 	}
 
 	public void Dispose()
 	{
+		ScriptEditors.Clear();
 		Instance = null;
 	}
 }

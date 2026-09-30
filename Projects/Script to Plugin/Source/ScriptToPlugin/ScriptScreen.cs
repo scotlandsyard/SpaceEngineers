@@ -34,6 +34,10 @@ public class ScriptScreen : MyGuiScreenBase
 
 	private static bool s_showHelp;
 
+	private static string s_queuedMessage;
+
+	private static Color? s_queuedColor;
+
 	private MyGuiControlTable _table;
 
 	private MyGuiControlMultilineText _output;
@@ -85,6 +89,11 @@ public class ScriptScreen : MyGuiScreenBase
 		CanHideOthers = true;
 		CloseButtonEnabled = true;
 		RecreateControls(constructor: true);
+		if (s_queuedMessage != null)
+		{
+			ShowMessage(s_queuedMessage, s_queuedColor);
+			s_queuedMessage = null;
+		}
 	}
 
 	public override string GetFriendlyName()
@@ -494,76 +503,34 @@ public class ScriptScreen : MyGuiScreenBase
 		}
 	}
 
-	/// <summary>Opens the game's code editor the same way the programmable block does.</summary>
+	/// <summary>Closes this window and opens the code editor; the window comes back when the editor closes.</summary>
 	private void OpenEditor(VirtualProgram program)
 	{
-		string original = program.Entry.Code ?? "";
-		MyGuiScreenEditor editor = null;
-		editor = new MyGuiScreenEditor(original, result => OnEditorClosed(program, editor, original, result), () => { });
-		MyGuiScreenGamePlay.TmpGameplayScreenHolder = MyGuiScreenGamePlay.ActiveGameplayScreen;
-		MyScreenManager.AddScreen(MyGuiScreenGamePlay.ActiveGameplayScreen = editor);
-	}
-
-	private void OnEditorClosed(VirtualProgram program, MyGuiScreenEditor editor, string original, ResultEnum result)
-	{
-		MyGuiScreenGamePlay.ActiveGameplayScreen = MyGuiScreenGamePlay.TmpGameplayScreenHolder;
-		MyGuiScreenGamePlay.TmpGameplayScreenHolder = null;
-		string code = editor.Description.Text.ToString();
-		if (editor.TextTooLong())
-		{
-			MyGuiSandbox.AddScreen(MyGuiSandbox.CreateMessageBox(MyMessageBoxStyleEnum.Error, MyMessageBoxButtonsType.OK, messageCaption: MyTexts.Get(MySpaceTexts.ProgrammableBlock_CodeChanged), messageText: MyTexts.Get(MySpaceTexts.ProgrammableBlock_Editor_TextTooLong)));
-			return;
-		}
-		if (result == ResultEnum.OK)
-		{
-			SaveCode(program, code);
-			return;
-		}
-		if (code == original)
-		{
-			return;
-		}
-		MyGuiSandbox.AddScreen(MyGuiSandbox.CreateMessageBox(MyMessageBoxStyleEnum.Info, MyMessageBoxButtonsType.YES_NO, messageCaption: MyTexts.Get(MySpaceTexts.ProgrammableBlock_CodeChanged), messageText: MyTexts.Get(MySpaceTexts.ProgrammableBlock_SaveChanges), callback: answer =>
-		{
-			if (answer == MyGuiScreenMessageBox.ResultEnum.YES)
-			{
-				SaveCode(program, code);
-			}
-		}));
-	}
-
-	private void SaveCode(VirtualProgram program, string code)
-	{
-		if (Session?.FindProgram(program.Entry.Id) == null)
-		{
-			return;
-		}
-		program.SetCode(code);
-		_outputSignature = null;
-		ShowMessage(program.Entry.Enabled ? $"Saved {program.Entry.Name}. It restarts once it has compiled." : $"Saved {program.Entry.Name}. It's off: switch it on to run it.", GoodColor);
-		RefreshAll();
+		string id = program.Entry.Id;
+		HandOff(() => ScriptEditors.EditCode(id));
 	}
 
 	private void EditCustomData()
 	{
 		VirtualProgram program = RequireSelected();
-		if (program == null)
+		if (program != null)
 		{
-			return;
+			string id = program.Entry.Id;
+			HandOff(() => ScriptEditors.EditCustomData(id));
 		}
-		MyGuiScreenTextPanel panel = null;
-		panel = new MyGuiScreenTextPanel(program.Entry.Name, "", MyTexts.GetString(MySpaceTexts.Terminal_CustomData), program.Entry.CustomData ?? "", result =>
-		{
-			MyGuiScreenGamePlay.ActiveGameplayScreen = MyGuiScreenGamePlay.TmpGameplayScreenHolder;
-			MyGuiScreenGamePlay.TmpGameplayScreenHolder = null;
-			if (result == ResultEnum.OK && Session?.FindProgram(program.Entry.Id) != null)
-			{
-				program.SetCustomData(panel.Description.Text.ToString());
-				ShowMessage($"Custom Data of {program.Entry.Name} saved.", GoodColor);
-			}
-		}, null, null, editable: true);
-		MyGuiScreenGamePlay.TmpGameplayScreenHolder = MyGuiScreenGamePlay.ActiveGameplayScreen;
-		MyScreenManager.AddScreen(MyGuiScreenGamePlay.ActiveGameplayScreen = panel);
+	}
+
+	private void HandOff(Action open)
+	{
+		CloseScreen();
+		ScriptEditors.AfterClosed(this, open);
+	}
+
+	/// <summary>A message to show in the status line the next time the window opens.</summary>
+	internal static void QueueMessage(string text, Color? color)
+	{
+		s_queuedMessage = text;
+		s_queuedColor = color;
 	}
 
 	private void PickHost()
