@@ -2,42 +2,55 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using VRage.Input;
+using VRage.Input.Keyboard;
 using VRage.Plugins;
 using VRage.Utils;
 
 namespace ScriptToPlugin;
 
 /// <summary>
-/// Some keyboards and keyboard/mouse software make Windows report key code 255 (or 0) as held down all the time.
+/// Some keyboards and keyboard/mouse software make Windows report key code 0 (or 255) as held down all the time.
 /// Neither is a real key, but the game counts it as "a key is held", and the code editor's text box then claims
 /// every click, so the editor's buttons (OK, Check Code, Browse Scripts, X) never respond. That happens in a
-/// programmable block's own editor too. This clears those two codes each frame, after the game has read the
-/// keyboard and before any screen handles input.
+/// programmable block's own editor too. This clears those two bits in the raw keyboard buffer each frame, after
+/// the game has read the keyboard and before any screen handles input. The game's own SetKey can't do it: it
+/// ignores key 0.
 /// </summary>
 internal static class PhantomKeys
 {
-	// Reused every frame: the arguments for SetKey(code, false) for key codes 0 and 255.
-	private static readonly object[][] ClearArguments = { new object[] { (MyKeys)0, false }, new object[] { (MyKeys)255, false } };
+	private static FieldInfo s_localizedStateField;
 
-	private static FieldInfo s_stateField;
+	private static FieldInfo s_actualStateField;
 
-	private static MethodInfo s_setKey;
+	private static FieldInfo s_bufferField;
 
 	private static bool s_failed;
+
+	private static bool s_reportedRunning;
+
+	private static bool s_reportedCleared;
 
 	/// <summary>Adds the plugin to the game's list of plugins that get HandleInput, which Pulsar doesn't do itself.</summary>
 	public static void Register(IHandleInputPlugin plugin)
 	{
 		try
 		{
-			if (HandleInputPlugins() is List<IHandleInputPlugin> list && !list.Contains(plugin))
+			if (HandleInputPlugins() is List<IHandleInputPlugin> list)
 			{
-				list.Add(plugin);
+				if (!list.Contains(plugin))
+				{
+					list.Add(plugin);
+				}
+				MyLog.Default.WriteLineAndConsole("[ScriptToPlugin] Registered for input handling.");
+			}
+			else
+			{
+				MyLog.Default.WriteLineAndConsole("[ScriptToPlugin] Could not register for input handling: the game's plugin list wasn't found.");
 			}
 		}
 		catch (Exception ex)
 		{
-			MyLog.Default.WriteLineAndConsole($"[ScriptToPlugin] Could not register for input: {ex.Message}");
+			MyLog.Default.WriteLineAndConsole($"[ScriptToPlugin] Could not register for input handling: {ex}");
 		}
 	}
 
@@ -58,7 +71,7 @@ internal static class PhantomKeys
 	}
 
 	/// <summary>Called every frame between the keyboard being read and the screens handling input.</summary>
-	public static void Clear()
+	public static unsafe void Clear()
 	{
 		if (s_failed || MyInput.Static == null)
 		{
@@ -66,25 +79,35 @@ internal static class PhantomKeys
 		}
 		try
 		{
-			if (s_setKey == null)
-			{
-				s_stateField = FindField(MyInput.Static.GetType(), "m_keyboardState");
-				s_setKey = s_stateField?.FieldType.GetMethod("SetKey", new[] { typeof(MyKeys), typeof(bool) });
-				if (s_setKey == null)
-				{
-					s_failed = true;
-					MyLog.Default.WriteLineAndConsole("[ScriptToPlugin] Could not find the keyboard state; phantom keys are left alone.");
-					return;
-				}
-			}
-			object state = s_stateField.GetValue(MyInput.Static);
-			if (state == null)
+			if (s_bufferField == null && !FindFields())
 			{
 				return;
 			}
-			foreach (object[] arguments in ClearArguments)
+			if (!s_reportedRunning)
 			{
-				s_setKey.Invoke(state, arguments);
+				s_reportedRunning = true;
+				MyLog.Default.WriteLineAndConsole("[ScriptToPlugin] Phantom key filter is running.");
+			}
+			object localized = s_localizedStateField.GetValue(MyInput.Static);
+			if (localized == null)
+			{
+				return;
+			}
+			MyKeyboardState state = (MyKeyboardState)s_actualStateField.GetValue(localized);
+			MyKeyboardBuffer buffer = (MyKeyboardBuffer)s_bufferField.GetValue(state);
+			bool key0 = (buffer.Data[0] & 0x01) != 0;
+			bool key255 = (buffer.Data[31] & 0x80) != 0;
+			if (!key0 && !key255)
+			{
+				return;
+			}
+			buffer.Data[0] &= 0xFE;
+			buffer.Data[31] &= 0x7F;
+			s_actualStateField.SetValue(localized, MyKeyboardState.FromBuffer(buffer));
+			if (!s_reportedCleared)
+			{
+				s_reportedCleared = true;
+				MyLog.Default.WriteLineAndConsole($"[ScriptToPlugin] Cleared phantom key(s):{(key0 ? " 0" : "")}{(key255 ? " 255" : "")}. This is logged once.");
 			}
 		}
 		catch (Exception ex)
@@ -92,6 +115,20 @@ internal static class PhantomKeys
 			s_failed = true;
 			MyLog.Default.WriteLineAndConsole($"[ScriptToPlugin] Clearing phantom keys failed, stopped: {ex}");
 		}
+	}
+
+	private static bool FindFields()
+	{
+		s_localizedStateField = FindField(MyInput.Static.GetType(), "m_keyboardState");
+		s_actualStateField = s_localizedStateField == null ? null : FindField(s_localizedStateField.FieldType, "m_actualKeyboardState");
+		s_bufferField = FindField(typeof(MyKeyboardState), "m_buffer");
+		if (s_actualStateField == null || s_actualStateField.FieldType != typeof(MyKeyboardState) || s_bufferField == null)
+		{
+			s_failed = true;
+			MyLog.Default.WriteLineAndConsole($"[ScriptToPlugin] Could not find the keyboard state (input type {MyInput.Static.GetType().FullName}); phantom keys are left alone.");
+			return false;
+		}
+		return true;
 	}
 
 	private static FieldInfo FindField(Type type, string name)

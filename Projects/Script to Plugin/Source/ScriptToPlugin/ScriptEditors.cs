@@ -83,7 +83,7 @@ internal static class ScriptEditors
 		}
 		List<MyKeys> keys = new List<MyKeys>();
 		MyInput.Static.GetPressedKeys(keys);
-		string names = keys.Count == 0 ? "key code 0 or 255 (not a real key; Script to Plugin should be clearing it, so this points to another cause)" : string.Join(", ", keys.Select(k => $"{k} ({(int)k})"));
+		string names = keys.Count == 0 ? "key code 0 or 255 (not a real key; the phantom key filter should be clearing it, see the log)" : string.Join(", ", keys.Select(k => $"{k} ({(int)k})"));
 		MyLog.Default.WriteLineAndConsole($"[ScriptToPlugin] Keys reported as held while the editor is open: {names}");
 		MyAPIGateway.Utilities?.ShowMessage(ScriptSession.ChatSender, $"The game reports these keys as held down: {names}. While a key is held, the editor's buttons don't respond.");
 	}
