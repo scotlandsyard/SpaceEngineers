@@ -82,6 +82,11 @@ public class BobScreen : MyGuiScreenBase
 
 	private MyGuiControlTable _table;
 
+	/// <summary>Space between a right-aligned column's text and the column to its right.</summary>
+	private const float RightAlignGap = 0.015f;
+
+	private readonly HashSet<int> _rightAligned = new HashSet<int>();
+
 	private MyGuiControlLabel _status;
 
 	private MyGuiControlButton _autoQueueButton;
@@ -167,6 +172,14 @@ public class BobScreen : MyGuiScreenBase
 		}
 
 		List<Column> columns = ColumnsFor(s_view);
+		_rightAligned.Clear();
+		for (int i = 0; i < columns.Count; i++)
+		{
+			if (columns[i].RightAligned)
+			{
+				_rightAligned.Add(i);
+			}
+		}
 		_table = new MyGuiControlTable
 		{
 			Position = new Vector2(0f, -0.29f),
@@ -183,6 +196,10 @@ public class BobScreen : MyGuiScreenBase
 			{
 				_table.SetColumnAlign(i, MyGuiDrawAlignEnum.HORISONTAL_RIGHT_AND_VERTICAL_CENTER);
 				_table.SetHeaderColumnAlign(i, MyGuiDrawAlignEnum.HORISONTAL_RIGHT_AND_VERTICAL_CENTER);
+				// The game shifts a right-aligned header right by the column's left margin, which pushes it into the next
+				// column, but shifts the cells left by it. A negative margin pulls the header back inside; the cells
+				// get a cell margin of twice the gap in RefreshRows so they line up with the header again.
+				_table.SetHeaderColumnMargin(i, new Thickness(-RightAlignGap, 0f, 0.01f, 0f));
 			}
 			if (columns[i].Sortable)
 			{
@@ -598,7 +615,12 @@ public class BobScreen : MyGuiScreenBase
 			{
 				string text = i < data.Texts.Length ? data.Texts[i] ?? "" : "";
 				object sortValue = data.SortValues != null && i < data.SortValues.Length && data.SortValues[i] != null ? data.SortValues[i] : text;
-				row.AddCell(new MyGuiControlTable.Cell(text, sortValue, null, data.Color));
+				MyGuiControlTable.Cell cell = new MyGuiControlTable.Cell(text, sortValue, null, data.Color);
+				if (_rightAligned.Contains(i))
+				{
+					cell.Margin = new Thickness(2f * RightAlignGap, 0f, 0f, 0f);
+				}
+				row.AddCell(cell);
 			}
 			_table.Add(row);
 		}
