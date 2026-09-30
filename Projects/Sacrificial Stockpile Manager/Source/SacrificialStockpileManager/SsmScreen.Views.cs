@@ -164,7 +164,8 @@ public partial class SsmScreen
 		bool automation = rules != null && rules.Automation;
 		rows.Add(Row("set:automation", automation ? GoodColor : WarningColor, "Automation", automation ? "On: limits, sorting and draining are applied" : "Off: nothing is moved (settings are kept)"));
 		rows.Add(Row("set:autocraft", rules != null && rules.Autocraft ? GoodColor : (Color?)null, "Autocraft", rules != null && rules.Autocraft ? "On: quotas are queued in assemblers" : "Off"));
-		rows.Add(Row("set:drain", rules != null && rules.DrainOutputs ? GoodColor : (Color?)null, "Empty production output", rules != null && rules.DrainOutputs ? "On: refinery and assembler output goes to storage" : "Off"));
+		bool clean = rules?.DrainOutputs ?? new GridRules().DrainOutputs;
+		rows.Add(Row("set:drain", clean ? GoodColor : (Color?)null, "Clean production blocks", clean ? "On: output emptied, assembler inputs keep only what their queue needs" : "Off"));
 		rows.Add(Row("set:kits", rules != null && rules.UseSurvivalKits ? GoodColor : (Color?)null, "Survival kits autocraft", rules != null && rules.UseSurvivalKits ? "On" : "Off"));
 		rows.Add(Row("set:disassemble", rules != null && rules.Disassemble ? GoodColor : (Color?)null, "Disassemble surplus", rules != null && rules.Disassemble ? "On: items above their maximum are disassembled" : "Off"));
 		rows.Add(Row("set:bottles", rules != null && rules.FillBottles ? GoodColor : (Color?)null, "Keep bottles filled", rules != null && rules.FillBottles ? "On: bottles go to a tank to refill (needs Automation)" : "Off"));
@@ -247,7 +248,7 @@ public partial class SsmScreen
 			break;
 		case "drain":
 			on = rules.DrainOutputs = !rules.DrainOutputs;
-			text = "Emptying production output";
+			text = "Cleaning production blocks";
 			break;
 		case "kits":
 			on = rules.UseSurvivalKits = !rules.UseSurvivalKits;

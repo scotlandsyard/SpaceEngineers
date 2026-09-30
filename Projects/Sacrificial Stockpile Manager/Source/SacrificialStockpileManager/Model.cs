@@ -105,8 +105,11 @@ public class GridRules
 
 	public bool Autocraft;
 
-	/// <summary>Empty refinery and assembler output into storage.</summary>
-	public bool DrainOutputs;
+	/// <summary>
+	/// Keep production blocks clear: empty refinery and assembler output into storage, and take anything out of an
+	/// assembler's input that its queue doesn't need. On by default (it still needs Automation).
+	/// </summary>
+	public bool DrainOutputs = true;
 
 	public bool UseSurvivalKits;
 
@@ -129,6 +132,9 @@ public class GridRules
 
 public class SettingsFile
 {
+	/// <summary>Format version; see Store.Load for what changed. 0 in files written before it existed.</summary>
+	public int Version;
+
 	public List<BlockRules> Blocks = new List<BlockRules>();
 
 	public List<GridRules> Grids = new List<GridRules>();

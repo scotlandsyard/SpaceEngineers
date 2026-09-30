@@ -5,6 +5,7 @@ using Sandbox.Common.ObjectBuilders.Definitions;
 using Sandbox.Definitions;
 using Sandbox.Game;
 using Sandbox.Game.Entities.Blocks;
+using Sandbox.Game.Entities.Cube;
 using Sandbox.ModAPI;
 using VRage;
 using VRage.Game;
@@ -154,13 +155,15 @@ internal class StockEngine
 		{
 			engine.PrioritizeOres(rules.OrePriority);
 		}
+		// A clogged production block stops work, so it comes before routine sorting.
+		if (rules != null && rules.DrainOutputs)
+		{
+			engine.CleanAssemblerInputs();
+			engine.DrainOutputs();
+		}
 		engine.ClearStockBlocks();
 		engine.DrainIntakes();
 		engine.SortStorage();
-		if (rules != null && rules.DrainOutputs)
-		{
-			engine.DrainOutputs();
-		}
 		if (rules != null && rules.FillBottles)
 		{
 			engine.FillBottles();
@@ -516,6 +519,70 @@ internal class StockEngine
 				Put(source, key, Available(source, key), tier == 0 ? 1 : tier + 1);
 			}
 		}
+	}
+
+	/// <summary>
+	/// Takes anything out of an assembler's input that its queue doesn't need: components pulled in by modded
+	/// blueprints, leftovers from removed queue items and so on, which can fill the input until nothing assembles.
+	/// A cooperating assembler (IsSlave) works on others' queues, so it keeps whatever any queue here needs.
+	/// Items with a limit on the assembler are left to the limit.
+	/// </summary>
+	private void CleanAssemblerInputs()
+	{
+		if (!_move)
+		{
+			return;
+		}
+		HashSet<string> neededHere = null;
+		foreach (Inv input in _inventories.Where(i => !i.IsOutput && !i.Finished && !i.Block.Docked && (i.Block.Kind == BlockKind.Assembler || i.Block.Kind == BlockKind.SurvivalKit)).ToList())
+		{
+			if (!Budget)
+			{
+				return;
+			}
+			if (!(input.Block.Block is MyAssembler assembler) || input.Amounts.Count == 0)
+			{
+				continue;
+			}
+			HashSet<string> needed;
+			if (assembler.IsSlave)
+			{
+				neededHere ??= NeededByQueues(_construct.Blocks.Select(b => b.Block).OfType<MyAssembler>().Where(a => !a.Closed && ((IMyAssembler)a).Mode == Sandbox.ModAPI.Ingame.MyAssemblerMode.Assembly));
+				needed = neededHere;
+			}
+			else
+			{
+				needed = NeededByQueues(new[] { assembler });
+			}
+			foreach (string key in input.Amounts.Keys.ToList())
+			{
+				if (needed.Contains(key) || input.Block.Rules?.Limit(key) != null)
+				{
+					continue;
+				}
+				Put(input, key, Have(input, key), 1);
+			}
+		}
+	}
+
+	private static HashSet<string> NeededByQueues(IEnumerable<MyAssembler> assemblers)
+	{
+		HashSet<string> needed = new HashSet<string>();
+		foreach (MyAssembler assembler in assemblers)
+		{
+			foreach (MyProductionBlock.QueueItem item in assembler.Queue)
+			{
+				if (item.Blueprint?.Prerequisites == null)
+				{
+					continue;
+				}
+				foreach (MyBlueprintDefinitionBase.Item prerequisite in item.Blueprint.Prerequisites)
+				{
+					needed.Add(Items.Key(prerequisite.Id));
+				}
+			}
+		}
+		return needed;
 	}
 
 	private void DrainOutputs()

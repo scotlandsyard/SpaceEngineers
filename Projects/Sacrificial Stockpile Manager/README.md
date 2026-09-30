@@ -43,13 +43,13 @@ In Items & quotas and Block settings, pick an item by selecting its row or from 
 
 ## Grid settings
 
-Set in the Overview; all are off for a new grid.
+Set in the Overview. All are off for a new grid except Clean production blocks, and nothing moves until Automation is on.
 
 | Setting | What it does |
 |---|---|
 | Automation | Apply minimums, maximums, sorting and intake draining. While off, nothing is moved and the menu only shows what would need doing. |
 | Autocraft | Queue the shortfall of quotas in the grid's assemblers |
-| Empty production output | Move what refineries and assemblers made into storage |
+| Clean production blocks | **On by default.** Move what refineries and assemblers made into storage, and take anything out of an assembler's input that its queue doesn't need (for example components a modded blueprint pulled in, which can fill the input until nothing assembles). While an assembler disassembles, the parts are moved out and the items waiting to be taken apart are left alone. Cooperating assemblers keep what any queue on the grid needs |
 | Survival kits autocraft | Let autocraft use survival kits too |
 | Disassemble surplus | Disassemble what's above an item's maximum (Items & quotas) |
 | Keep bottles filled | Take bottles that aren't full to a gas tank to refill, and put them back when full (needs Automation) |

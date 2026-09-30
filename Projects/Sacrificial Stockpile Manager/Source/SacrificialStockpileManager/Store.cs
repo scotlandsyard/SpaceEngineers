@@ -44,6 +44,18 @@ internal static class Store
 		s_settings.Grids ??= new List<GridRules>();
 		s_settings.Displays ??= new List<DisplayRule>();
 		s_settings.Disassemblers ??= new List<long>();
+		bool upgraded = false;
+		if (s_settings.Version < 2)
+		{
+			// Version 2 made "clean production blocks" (DrainOutputs) on by default. Grids saved before then only
+			// had it off because that was the old default, so switch it on for them too.
+			foreach (GridRules rules in s_settings.Grids)
+			{
+				rules.DrainOutputs = true;
+			}
+			s_settings.Version = 2;
+			upgraded = true;
+		}
 		s_blockRules.Clear();
 		foreach (BlockRules rules in s_settings.Blocks)
 		{
@@ -70,6 +82,10 @@ internal static class Store
 			}
 		}
 		s_gridsDirty = false;
+		if (upgraded && s_settings.Grids.Count > 0)
+		{
+			SaveSettings();
+		}
 	}
 
 	public static void Unload()
