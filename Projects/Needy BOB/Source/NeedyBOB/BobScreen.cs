@@ -157,7 +157,11 @@ public class BobScreen : MyGuiScreenBase
 		_helpText = null;
 		if (s_view == View.Help)
 		{
-			_helpText = new MyGuiControlMultilineText(new Vector2(0f, -0.29f), new Vector2(0.84f, 0.55f), null, "Blue", 0.8f, MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_TOP, null, drawScrollbarV: true, drawScrollbarH: false, MyGuiDrawAlignEnum.HORISONTAL_CENTER_AND_VERTICAL_TOP);
+			_helpText = new MyGuiControlMultilineText(new Vector2(0f, -0.29f), new Vector2(0.84f, 0.55f), null, "Blue", 0.8f, MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_TOP, null, drawScrollbarV: true, drawScrollbarH: false, MyGuiDrawAlignEnum.HORISONTAL_CENTER_AND_VERTICAL_TOP)
+			{
+				// textBoxAlign above only places the text inside the control; this anchors the control itself by its top edge, like the table.
+				OriginAlign = MyGuiDrawAlignEnum.HORISONTAL_CENTER_AND_VERTICAL_TOP
+			};
 			BobHelp.Write(_helpText);
 			Controls.Add(_helpText);
 		}
