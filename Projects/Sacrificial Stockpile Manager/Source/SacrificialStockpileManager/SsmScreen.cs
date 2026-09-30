@@ -19,6 +19,7 @@ public partial class SsmScreen : MyGuiScreenBase
 {
 	private enum View
 	{
+		AllGrids,
 		Overview,
 		Items,
 		Blocks,
@@ -30,7 +31,7 @@ public partial class SsmScreen : MyGuiScreenBase
 	}
 
 	// In the same order as View.
-	private static readonly string[] ViewNames = { "Overview", "Items & quotas", "Blocks", "Block settings", "Production", "Displays (LCD)", "Log", "Help" };
+	private static readonly string[] ViewNames = { "All grids", "Overview", "Items & quotas", "Blocks", "Block settings", "Production", "Displays (LCD)", "Log", "Help" };
 
 	// In the same order as BlockRole.
 	private static readonly string[] RoleNames = { "Auto", "Storage", "Intake", "Stock", "Manual" };
@@ -305,10 +306,16 @@ public partial class SsmScreen : MyGuiScreenBase
 		// Four button slots per view; the window closes with the X in the corner or Esc.
 		switch (s_view)
 		{
+		case View.AllGrids:
+			AddButton(-0.315f, "Open grid", OpenSelectedGrid);
+			AddButton(-0.105f, "GPS marker", MarkGps);
+			AddButton(0.105f, "Remove from list", ForgetGrid);
+			AddButton(0.315f, "Help", ShowHelp);
+			break;
 		case View.Overview:
 			AddButton(-0.315f, "Change setting", ChangeSelectedSetting);
 			AddButton(-0.105f, "GPS marker", MarkGps);
-			_forgetButton = AddButton(0.105f, "Forget grid", ForgetGrid);
+			_forgetButton = AddButton(0.105f, "Remove from list", ForgetGrid);
 			AddButton(0.315f, "Help", ShowHelp);
 			break;
 		case View.Items:
@@ -687,6 +694,10 @@ public partial class SsmScreen : MyGuiScreenBase
 
 	private string HintFor(GridSnapshot grid)
 	{
+		if (s_view == View.AllGrids)
+		{
+			return AllGridsHint();
+		}
 		if (grid == null)
 		{
 			return "No grids yet. Your ships and stations show up here once they've been in range.";
@@ -702,7 +713,11 @@ public partial class SsmScreen : MyGuiScreenBase
 		case View.Blocks:
 			return "Double-click a block to edit its role, what it accepts and its stock limits." + offline;
 		case View.Block:
-			return "Pick an item (or select a row), type an amount and set a minimum or maximum. Blank amount clears it.";
+		{
+			BlockSnapshot block = grid.Block(s_blockId);
+			string volume = block != null && block.MaxVolume > 0.0 ? $"{Items.Litres(block.Volume)} used of {Items.Litres(block.MaxVolume)} ({block.Fill:P0}), {Items.Litres(block.MaxVolume - block.Volume)} free. " : "";
+			return volume + "Pick an item, type an amount, set a minimum or maximum. Blank clears it.";
+		}
 		case View.Production:
 			return live ? "Assemblers, refineries, reactors and generators. Double-click one to edit its limits." : "Last known state." + offline;
 		case View.Displays:
@@ -732,8 +747,15 @@ public partial class SsmScreen : MyGuiScreenBase
 	private void RefreshRows()
 	{
 		GridSnapshot grid = Grid;
-		List<RowData> rows = grid == null ? new List<RowData>() : BuildRows(grid);
-		if (grid == null)
+		List<RowData> rows = s_view == View.AllGrids ? AllGridRows() : grid == null ? new List<RowData>() : BuildRows(grid);
+		if (s_view == View.AllGrids)
+		{
+			if (rows.Count == 0)
+			{
+				rows.Add(Row("none", MutedColor, "No grids yet. Your ships and stations show up here once they've been in range."));
+			}
+		}
+		else if (grid == null)
 		{
 			rows.Add(Row("none", MutedColor, "No grids found yet."));
 		}
@@ -841,6 +863,9 @@ public partial class SsmScreen : MyGuiScreenBase
 	{
 		switch (s_view)
 		{
+		case View.AllGrids:
+			OpenSelectedGrid();
+			break;
 		case View.Overview:
 			ChangeSelectedSetting();
 			break;

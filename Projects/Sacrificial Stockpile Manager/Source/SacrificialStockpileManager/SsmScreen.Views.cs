@@ -13,6 +13,18 @@ public partial class SsmScreen
 	{
 		switch (view)
 		{
+		case View.AllGrids:
+			return new List<Column>
+			{
+				new Column { Name = "Grid", Width = 0.25f },
+				new Column { Name = "Type", Width = 0.09f },
+				new Column { Name = "Last sync", Width = 0.13f },
+				new Column { Name = "Distance", Width = 0.1f, RightAligned = true },
+				new Column { Name = "Used", Width = 0.12f, RightAligned = true },
+				new Column { Name = "Size", Width = 0.12f, RightAligned = true },
+				new Column { Name = "Fill", Width = 0.08f, RightAligned = true },
+				new Column { Name = "Items", Width = 0.11f, RightAligned = true }
+			};
 		case View.Overview:
 			return new List<Column>
 			{
@@ -32,11 +44,12 @@ public partial class SsmScreen
 		case View.Blocks:
 			return new List<Column>
 			{
-				new Column { Name = "Block", Width = 0.29f },
-				new Column { Name = "Type", Width = 0.19f },
-				new Column { Name = "Role", Width = 0.14f },
-				new Column { Name = "Fill", Width = 0.09f, RightAligned = true },
-				new Column { Name = "Settings", Width = 0.29f }
+				new Column { Name = "Block", Width = 0.24f },
+				new Column { Name = "Type", Width = 0.15f },
+				new Column { Name = "Role", Width = 0.12f },
+				new Column { Name = "Fill", Width = 0.07f, RightAligned = true },
+				new Column { Name = "Used / size", Width = 0.2f, RightAligned = true },
+				new Column { Name = "Settings", Width = 0.22f }
 			};
 		case View.Block:
 			return new List<Column>
@@ -133,14 +146,8 @@ public partial class SsmScreen
 		rows.Add(Row("status", live != null ? GoodColor : MutedColor, "Status", live != null ? $"Loaded ({distance} away), updating live" : $"Last seen {Displays.Ago(grid.LastSeenUtc)}, {distance} away"));
 		rows.Add(Row("type", null, "Type", $"{(grid.IsStation ? "Station" : "Ship")}, {grid.GridIds.Count} grid(s), {grid.BlockCount:N0} blocks"));
 
-		double used = 0.0;
-		double max = 0.0;
-		foreach (BlockSnapshot block in grid.Blocks.Where(b => b.Kind == BlockKind.Cargo))
-		{
-			used += block.Volume;
-			max += block.MaxVolume;
-		}
-		rows.Add(Row("cargo", max > 0.0 && used / max > 0.9 ? WarningColor : (Color?)null, "Cargo", max > 0.0 ? $"{used / max:P0} full ({Items.Amount(used)} of {Items.Amount(max)} L)" : "No cargo containers"));
+		Construct.StorageVolume(grid, out double used, out double max);
+		rows.Add(Row("cargo", max > 0.0 && used / max > 0.9 ? WarningColor : (Color?)null, "Storage", max > 0.0 ? $"{used / max:P0} full: {Items.Litres(used)} used of {Items.Litres(max)}, {Items.Litres(max - used)} free" : "No storage blocks"));
 
 		Dictionary<Effective, int> roles = new Dictionary<Effective, int>();
 		foreach (BlockSnapshot block in grid.Blocks.Where(b => b.HasInventory))
@@ -229,11 +236,23 @@ public partial class SsmScreen
 		RefreshAll();
 	}
 
+	/// <summary>The grid a grid button acts on: the selected row in All grids, else the grid picked at the top.</summary>
+	private GridSnapshot TargetGrid()
+	{
+		if (s_view != View.AllGrids)
+		{
+			return Grid;
+		}
+		string key = SelectedKey;
+		return key != null && key.StartsWith("g:", StringComparison.Ordinal) && long.TryParse(key.Substring(2), out long gridKey) ? Store.Grid(gridKey) : null;
+	}
+
 	private void MarkGps()
 	{
-		GridSnapshot grid = Grid;
+		GridSnapshot grid = TargetGrid();
 		if (grid == null)
 		{
+			ShowMessage("Select a grid first.", WarningColor);
 			return;
 		}
 		bool updated = GridGps.Mark(grid);
@@ -242,20 +261,85 @@ public partial class SsmScreen
 
 	private void ForgetGrid()
 	{
-		GridSnapshot grid = Grid;
+		GridSnapshot grid = TargetGrid();
 		if (grid == null)
 		{
+			ShowMessage("Select a grid first.", WarningColor);
 			return;
 		}
-		if (Live != null)
+		if (Session?.FindConstruct(grid.Key) != null)
 		{
-			ShowMessage("This grid is loaded, so it would come straight back.", WarningColor);
+			ShowMessage($"{grid.Name} is loaded right now, so it would come straight back.", WarningColor);
 			return;
 		}
-		Store.ForgetGrid(grid.Key);
-		ShowMessage($"Forgot {grid.Name}. Its settings are kept in case it comes back.", null);
+		int settings = Store.ForgetGrid(grid.Key);
+		ShowMessage($"Removed {grid.Name}{(settings > 0 ? $" and its settings ({settings} block(s) and displays)" : "")}. If it still exists, it comes back the next time it's in range.", null);
 		_gridsSignature = null;
-		_recreatePending = true;
+		_rowsSignature = null;
+		if (grid.Key == s_gridKey || s_view != View.AllGrids)
+		{
+			_recreatePending = true;
+		}
+	}
+
+	// ---- All grids ----
+
+	private List<RowData> AllGridRows()
+	{
+		Vector3D player = MyAPIGateway.Session?.Player?.GetPosition() ?? Vector3D.Zero;
+		List<RowData> rows = new List<RowData>();
+		foreach (GridSnapshot grid in SortedGrids())
+		{
+			bool live = Session?.FindConstruct(grid.Key) != null;
+			Construct.StorageVolume(grid, out double used, out double max);
+			double distance = Vector3D.Distance(player, grid.Position);
+			double fill = max > 0.0 ? used / max : 0.0;
+			rows.Add(new RowData
+			{
+				Key = "g:" + grid.Key,
+				Texts = new[] { grid.Name, grid.IsStation ? "Station" : "Ship", live ? "Live" : Displays.Ago(grid.LastSeenUtc), FormatDistance(distance), max > 0.0 ? Items.Litres(used) : "-", max > 0.0 ? Items.Litres(max) : "-", max > 0.0 ? $"{fill:P0}" : "", grid.Totals.Count.ToString() },
+				// Live grids sort as the newest.
+				SortValues = new object[] { null, null, live ? double.MaxValue : (double)grid.LastSeenUtc.Ticks, distance, used, max, fill, (double)grid.Totals.Count },
+				Color = grid.Key == s_gridKey ? GoodColor : live ? (Color?)null : MutedColor
+			});
+		}
+		return rows;
+	}
+
+	private static string AllGridsHint()
+	{
+		List<GridSnapshot> grids = Store.Grids.ToList();
+		if (grids.Count == 0)
+		{
+			return "No grids yet. Your ships and stations show up here once they've been in range.";
+		}
+		double used = 0.0;
+		double max = 0.0;
+		foreach (GridSnapshot grid in grids)
+		{
+			Construct.StorageVolume(grid, out double gridUsed, out double gridMax);
+			used += gridUsed;
+			max += gridMax;
+		}
+		int live = grids.Count(g => Session?.FindConstruct(g.Key) != null);
+		return $"{grids.Count} grid(s), {live} loaded. Storage: {Items.Litres(used)} used of {Items.Litres(max)}, {Items.Litres(max - used)} free. Double-click a grid to open it.";
+	}
+
+	private void OpenSelectedGrid()
+	{
+		GridSnapshot grid = TargetGrid();
+		if (grid == null)
+		{
+			ShowMessage("Select a grid first.", WarningColor);
+			return;
+		}
+		s_gridKey = grid.Key;
+		if (Session != null)
+		{
+			Session.ViewedKey = s_gridKey;
+		}
+		_gridsSignature = null;
+		SwitchView(View.Overview);
 	}
 
 	// ---- Items & quotas ----
@@ -372,8 +456,8 @@ public partial class SsmScreen
 			rows.Add(new RowData
 			{
 				Key = "b:" + block.Id,
-				Texts = new[] { block.Name, block.Type, RoleText(rules, role) + (block.Docked ? " (docked)" : ""), block.MaxVolume > 0.0 ? $"{block.Fill:P0}" : "", SettingsText(rules) },
-				SortValues = new object[] { null, null, null, block.Fill, null },
+				Texts = new[] { block.Name, block.Type, RoleText(rules, role) + (block.Docked ? " (docked)" : ""), block.MaxVolume > 0.0 ? $"{block.Fill:P0}" : "", block.MaxVolume > 0.0 ? $"{Items.Litres(block.Volume)} / {Items.Litres(block.MaxVolume)}" : "", SettingsText(rules) },
+				SortValues = new object[] { null, null, null, block.Fill, block.MaxVolume, null },
 				Color = role == Effective.Manual ? MutedColor : rules != null && !rules.IsEmpty ? GoodColor : (Color?)null
 			});
 		}

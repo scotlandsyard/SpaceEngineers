@@ -182,6 +182,29 @@ internal class Construct
 		return BlockKind.Other;
 	}
 
+	/// <summary>
+	/// Litres used and available in the grid's storage: blocks acting as Storage or Stock, not counting docked
+	/// ships. Machines, cockpits and tools are left out so they don't inflate the totals.
+	/// </summary>
+	public static void StorageVolume(GridSnapshot grid, out double used, out double max)
+	{
+		used = 0.0;
+		max = 0.0;
+		foreach (BlockSnapshot block in grid.Blocks)
+		{
+			if (block.Docked || !block.HasInventory)
+			{
+				continue;
+			}
+			Effective role = Resolve(block);
+			if (role == Effective.Storage || role == Effective.Stock)
+			{
+				used += block.Volume;
+				max += block.MaxVolume;
+			}
+		}
+	}
+
 	public static bool IsProductionKind(BlockKind kind)
 	{
 		return kind == BlockKind.Assembler || kind == BlockKind.SurvivalKit || kind == BlockKind.Refinery;

@@ -162,18 +162,13 @@ internal static class Displays
 
 	private static void Overview(StringBuilder text, GridSnapshot grid, GridRules rules, Construct live, int columns)
 	{
-		double used = 0.0;
-		double max = 0.0;
-		foreach (BlockSnapshot block in grid.Blocks)
-		{
-			if (block.Kind == BlockKind.Cargo)
-			{
-				used += block.Volume;
-				max += block.MaxVolume;
-			}
-		}
-		text.Append(Row("Cargo", max > 0.0 ? $"{used / max:P0}" : "-", columns)).Append('\n');
+		Construct.StorageVolume(grid, out double used, out double max);
+		text.Append(Row("Storage", max > 0.0 ? $"{used / max:P0}" : "-", columns)).Append('\n');
 		text.Append(Bar(max > 0.0 ? used / max : 0.0, columns)).Append('\n');
+		if (max > 0.0)
+		{
+			text.Append(Row("Used / size", $"{Items.Litres(used)} / {Items.Litres(max)}", columns)).Append('\n');
+		}
 		foreach (ItemCategory category in Items.Categories)
 		{
 			List<KeyValuePair<string, double>> items = grid.Totals.Where(t => Items.Category(t.Key) == category).ToList();

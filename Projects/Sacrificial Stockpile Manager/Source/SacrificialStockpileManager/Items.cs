@@ -208,6 +208,20 @@ internal static class Items
 		return Math.Floor(value).ToString("N0", CultureInfo.InvariantCulture);
 	}
 
+	/// <summary>A volume in litres, short enough for a table column: 850 L, 3,400 L, 15.6k L, 1.25M L.</summary>
+	public static string Litres(double litres)
+	{
+		if (litres >= 1_000_000.0)
+		{
+			return (litres / 1_000_000.0).ToString("0.00", CultureInfo.InvariantCulture) + "M L";
+		}
+		if (litres >= 10_000.0)
+		{
+			return (litres / 1000.0).ToString("0.0", CultureInfo.InvariantCulture) + "k L";
+		}
+		return Math.Round(litres).ToString("N0", CultureInfo.InvariantCulture) + " L";
+	}
+
 	/// <summary>Reads an amount typed by the player: 500, 1,500, 2.5k, 1.2M.</summary>
 	public static bool TryParseAmount(string text, out double value)
 	{

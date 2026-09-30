@@ -170,13 +170,39 @@ internal static class Store
 		s_gridsDirty = true;
 	}
 
-	public static void ForgetGrid(long key)
+	/// <summary>
+	/// Removes a grid from the list together with its settings (grid settings, block settings and displays on its
+	/// blocks), for grids that were deleted or destroyed. Returns how many block and display settings went with it.
+	/// </summary>
+	public static int ForgetGrid(long key)
 	{
-		if (s_grids.Remove(key))
+		if (!s_grids.TryGetValue(key, out GridSnapshot grid))
 		{
-			s_gridsDirty = true;
-			SaveGrids(background: true);
+			return 0;
 		}
+		s_grids.Remove(key);
+		HashSet<long> blockIds = new HashSet<long>(grid.Blocks.Select(b => b.Id));
+		int removed = s_settings.Blocks.RemoveAll(r => blockIds.Contains(r.BlockId));
+		foreach (long id in blockIds)
+		{
+			s_blockRules.Remove(id);
+		}
+		removed += s_settings.Displays.RemoveAll(d => blockIds.Contains(d.BlockId));
+		// Other grids' displays that showed this grid go back to showing their own grid.
+		foreach (DisplayRule display in s_settings.Displays.Where(d => d.SourceGrid == key || grid.GridIds.Contains(d.SourceGrid)))
+		{
+			display.SourceGrid = 0;
+		}
+		HashSet<long> gridIds = new HashSet<long>(grid.GridIds) { key };
+		s_settings.Grids.RemoveAll(r => gridIds.Contains(r.GridId));
+		foreach (long id in gridIds)
+		{
+			s_gridRules.Remove(id);
+		}
+		SaveSettings();
+		s_gridsDirty = true;
+		SaveGrids(background: true);
+		return removed;
 	}
 
 	// ---- Saving ----

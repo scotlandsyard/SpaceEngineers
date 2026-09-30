@@ -16,7 +16,7 @@ A client-side Pulsar plugin for inventory management and auto-restocking. It tak
 | Control | What it does |
 |---|---|
 | Grid | Your ships and stations: loaded ones first, then the rest with when they were last seen |
-| View | Overview, Items & quotas, Blocks, Block settings, Production, Displays (LCD), Log, Help |
+| View | All grids, Overview, Items & quotas, Blocks, Block settings, Production, Displays (LCD), Log, Help |
 
 The window closes with the X in its corner or with Esc. Tables update every half second. Click a column header to sort.
 
@@ -24,13 +24,18 @@ The window closes with the X in its corner or with Esc. Tables update every half
 
 | View | What it shows | Buttons |
 |---|---|---|
-| Overview | Grid settings (double-click to switch), status, cargo fill, item totals, warnings, recent actions | Change setting, GPS marker, Forget grid, Help |
+| All grids | Every grid: last sync (Live when loaded), distance, storage used, storage size, fill, kinds of item; totals under the table | Open grid, GPS marker, Remove from list, Help |
+| Overview | Grid settings (double-click to switch), status, storage used / size / free, item totals, warnings, recent actions | Change setting, GPS marker, Remove from list, Help |
 | Items & quotas | Every item on the grid with its quota, queued amount and autocraft state | Set quota, Clear quota, Autocraft on/off, Help |
-| Blocks | Every block with an inventory: role, fill, settings | Edit block, Turn on / off, Rescan, Help |
+| Blocks | Every block with an inventory: role, fill %, used / size in litres, settings | Edit block, Turn on / off, Rescan, Help |
 | Block settings | One block: role, Accepts checkboxes, and per item what's there and its min/max | Set minimum, Set maximum, Clear limits, Back; Accept item |
 | Production | Assemblers, refineries, reactors, generators: state and queue or contents | Edit block, Turn on / off, Rescan, Help |
 | Displays (LCD) | Every screen on the grid and the page it shows | Show page, Stop showing, Rescan, Help |
 | Log | What the plugin did on this grid, newest first | Clear log, Rescan, Help |
+
+**Storage** in All grids, the Overview and the LCD Overview page means blocks acting as Storage or Stock (cargo containers unless you change their role), not counting docked ships. Machines, cockpits and tools are left out so they don't inflate the totals.
+
+**Remove from list** is for grids that were deleted or destroyed. It removes the grid and its settings (block settings, quotas, LCD assignments; screens elsewhere that showed it go back to their own grid). A loaded grid can't be removed. A removed grid that still exists comes back, with default settings, the next time it's in range.
 
 In Items & quotas and Block settings, pick an item by selecting its row or from the list under the table, type an amount (`500`, `2,500`, `2.5k`, `1.2M`) and press the button. A blank amount clears a minimum or maximum.
 
