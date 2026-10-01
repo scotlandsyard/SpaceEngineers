@@ -187,7 +187,8 @@ public class MaidScreen : MyGuiScreenBase
 			Size = new Vector2(0.84f, 0.52f),
 			OriginAlign = MyGuiDrawAlignEnum.HORISONTAL_CENTER_AND_VERTICAL_TOP,
 			ColumnsCount = columns.Count,
-			VisibleRowsCount = 14
+			// Setup has a second row of buttons, so its table is shorter.
+			VisibleRowsCount = s_view == View.Setup ? 11 : 14
 		};
 		_table.SetCustomColumnWidths(columns.Select(c => c.Width).ToArray());
 		for (int i = 0; i < columns.Count; i++)
@@ -217,7 +218,7 @@ public class MaidScreen : MyGuiScreenBase
 		};
 		Controls.Add(_table);
 
-		_status =new MyGuiControlLabel(new Vector2(-0.42f, 0.285f), null, "", null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER);
+		_status = new MyGuiControlLabel(new Vector2(-0.42f, s_view == View.Setup ? 0.205f : 0.285f), null, "", null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER);
 		Controls.Add(_status);
 
 		// Four button slots per view; the window closes with the X in the corner or Esc.
@@ -235,6 +236,10 @@ public class MaidScreen : MyGuiScreenBase
 			AddButton(-0.105f, "Assign to group", AssignSelected);
 			AddButton(0.105f, "Remove from groups", RemoveSelected);
 			AddButton(0.315f, "Turn on / off", ToggleSelectedBlock);
+			// Assembler modes, shared with our other plugins.
+			AddButton(-0.315f, "Assembler: Main", () => SetAssemblerMode(AssemblerMode.Main), 0.275f);
+			AddButton(-0.105f, "Assembler: Co-op", () => SetAssemblerMode(AssemblerMode.Coop), 0.275f);
+			AddButton(0.105f, "Assembler: Manual", () => SetAssemblerMode(AssemblerMode.Manual), 0.275f);
 			break;
 		case View.Settings:
 			AddButton(-0.315f, "< Lower / Previous", () => ChangeSetting(-1));
@@ -259,9 +264,9 @@ public class MaidScreen : MyGuiScreenBase
 		RefreshAll();
 	}
 
-	private MyGuiControlButton AddButton(float x, string text, Action onClick)
+	private MyGuiControlButton AddButton(float x, string text, Action onClick, float y = 0.37f)
 	{
-		MyGuiControlButton button = new MyGuiControlButton(new Vector2(x, 0.37f), MyGuiControlButtonStyleEnum.Default, null, null, MyGuiDrawAlignEnum.HORISONTAL_CENTER_AND_VERTICAL_CENTER, null, new StringBuilder(text), 0.8f, MyGuiDrawAlignEnum.HORISONTAL_CENTER_AND_VERTICAL_CENTER, MyGuiControlHighlightType.WHEN_CURSOR_OVER, (MyGuiControlButton _) => onClick());
+		MyGuiControlButton button = new MyGuiControlButton(new Vector2(x, y), MyGuiControlButtonStyleEnum.Default, null, null, MyGuiDrawAlignEnum.HORISONTAL_CENTER_AND_VERTICAL_CENTER, null, new StringBuilder(text), 0.8f, MyGuiDrawAlignEnum.HORISONTAL_CENTER_AND_VERTICAL_CENTER, MyGuiControlHighlightType.WHEN_CURSOR_OVER, (MyGuiControlButton _) => onClick());
 		Controls.Add(button);
 		return button;
 	}
@@ -572,10 +577,11 @@ public class MaidScreen : MyGuiScreenBase
 		default:
 			return new List<Column>
 			{
-				new Column { Name = "Block", Width = 0.34f },
-				new Column { Name = "Type", Width = 0.2f },
-				new Column { Name = "Group", Width = 0.24f },
-				new Column { Name = "State", Width = 0.22f }
+				new Column { Name = "Block", Width = 0.3f },
+				new Column { Name = "Type", Width = 0.16f },
+				new Column { Name = "Group", Width = 0.19f },
+				new Column { Name = "Mode", Width = 0.15f },
+				new Column { Name = "State", Width = 0.2f }
 			};
 		}
 	}
@@ -826,14 +832,16 @@ public class MaidScreen : MyGuiScreenBase
 	{
 		List<IMyAssembler> assemblers = group.Assemblers.Where(a => !a.Closed).ToList();
 		bool canQueue = group.UsableAssemblers().Count > 0;
+		// Queued and finished amounts are counted on every assembler of the construct, as the auto-queue does.
+		List<IMyAssembler> onConstruct = group.ConstructAssemblers();
 		double now = BaRMaidSession.Now;
 		List<RowData> rows = new List<RowData>();
 		Dictionary<MyDefinitionId, int> missing = group.MissingComponents();
 		Dictionary<MyDefinitionId, int> cargo = group.StockOnConstruct(missing.Keys);
 		foreach (KeyValuePair<MyDefinitionId, int> item in missing.Where(m => m.Value > 0).OrderBy(m => MaidGroup.ComponentName(m.Key)))
 		{
-			int queued = AssemblerQueue.QueuedAmount(assemblers, item.Key);
-			int inStock = cargo[item.Key] + AssemblerQueue.OutputAmount(assemblers, item.Key);
+			int queued = AssemblerQueue.QueuedAmount(onConstruct, item.Key);
+			int inStock = cargo[item.Key] + AssemblerQueue.OutputAmount(onConstruct, item.Key);
 			string state;
 			Color? color = null;
 			if (group.Notes.TryGetValue(item.Key, out string note) && group.WaitSeconds(item.Key, now) > 0)
@@ -918,6 +926,35 @@ public class MaidScreen : MyGuiScreenBase
 		RefreshAll();
 	}
 
+	/// <summary>Sets the selected assembler's mode. The mode is shared with our other plugins.</summary>
+	private void SetAssemblerMode(AssemblerMode mode)
+	{
+		if (!(SelectedBlock() is IMyAssembler assembler))
+		{
+			ShowMessage("Select an assembler first.", WarningColor);
+			return;
+		}
+		AssemblerModes.Set(assembler, mode);
+		string text;
+		switch (mode)
+		{
+		case AssemblerMode.Main:
+			text = $"{assembler.CustomName} is a main assembler: it takes the orders and the co-op ones help it.";
+			break;
+		case AssemblerMode.Manual:
+			text = $"{assembler.CustomName} is manual: no plugin will queue on it or change it.";
+			break;
+		default:
+			text = AssemblerModes.SupportsCoop(assembler)
+				? $"{assembler.CustomName} is co-op: it helps the main assembler."
+				: $"{assembler.CustomName} can't be cooperative (the game doesn't allow it for this type), so it takes orders itself.";
+			break;
+		}
+		ShowMessage(text, mode == AssemblerMode.Manual ? (Color?)null : GoodColor);
+		_rowsSignature = null;
+		RefreshAll();
+	}
+
 	private void ToggleSelectedBlock()
 	{
 		IMyTerminalBlock block = SelectedBlock();
@@ -970,8 +1007,8 @@ public class MaidScreen : MyGuiScreenBase
 			rows.Add(new RowData
 			{
 				Key = key,
-				Texts = new[] { block.CustomName, isSystem ? "Build and Repair" : "Assembler", groupText, state },
-				Color = inThisGroup ? GoodColor : MaidConfig.IsNoGroup(name) || (!isSystem && name == null) ? MutedColor : (Color?)null
+				Texts = new[] { block.CustomName, isSystem ? "BaR" : "Assembler", groupText, isSystem ? "" : AssemblerModes.Describe(AssemblerModes.Get(block)), state },
+				Color = inThisGroup && !AssemblerModes.IsManual(block) ? GoodColor : MaidConfig.IsNoGroup(name) || (!isSystem && name == null) || AssemblerModes.IsManual(block) ? MutedColor : (Color?)null
 			});
 		}
 		return rows.OrderBy(r => r.Texts[1] == "Assembler").ThenBy(r => r.Texts[0], StringComparer.OrdinalIgnoreCase).ToList();

@@ -29,10 +29,14 @@ internal static class AssemblerQueue
 	}
 
 	/// <summary>
-	/// Makes sure <paramref name="amount"/> of the component is queued or already built in the assemblers.
-	/// Returns how many were added to queues; <paramref name="problem"/> says why nothing could be queued.
+	/// Makes sure <paramref name="amount"/> of the component is queued or already built. What's already queued or
+	/// finished is counted in <paramref name="countIn"/>: every assembler on the construct, because co-op
+	/// assemblers move work out of the main one's queue into their own. New work goes to
+	/// <paramref name="receivers"/> (the group's Main assemblers), or to <paramref name="fallback"/> when no
+	/// receiver can build the component. Returns how many were added to queues; <paramref name="problem"/> says
+	/// why nothing could be queued.
 	/// </summary>
-	public static int Ensure(List<IMyAssembler> assemblers, MyDefinitionId component, int amount, out string problem)
+	public static int Ensure(List<IMyAssembler> countIn, List<IMyAssembler> receivers, List<IMyAssembler> fallback, MyDefinitionId component, int amount, out string problem)
 	{
 		problem = null;
 		if (amount <= 0)
@@ -45,22 +49,21 @@ internal static class AssemblerQueue
 			problem = "No blueprint makes it";
 			return 0;
 		}
-		List<KeyValuePair<MyProductionBlock, int>> candidates = new List<KeyValuePair<MyProductionBlock, int>>();
-		foreach (IMyAssembler assembler in assemblers)
+		foreach (IMyAssembler assembler in countIn)
 		{
-			if (!(assembler is MyProductionBlock block))
+			if (assembler is MyProductionBlock block && !block.Closed)
 			{
-				continue;
-			}
-			amount -= AvailableAmount(block, component, blueprint, out int queueSize);
-			if (block.CanUseBlueprint(blueprint))
-			{
-				candidates.Add(new KeyValuePair<MyProductionBlock, int>(block, queueSize));
+				amount -= AvailableAmount(block, component, blueprint, out _);
 			}
 		}
 		if (amount <= 0)
 		{
 			return 0;
+		}
+		List<KeyValuePair<MyProductionBlock, int>> candidates = Candidates(receivers, blueprint);
+		if (candidates.Count == 0)
+		{
+			candidates = Candidates(fallback, blueprint);
 		}
 		if (candidates.Count == 0)
 		{
@@ -81,6 +84,25 @@ internal static class AssemblerQueue
 		return amount;
 	}
 
+	/// <summary>The assemblers that can build the blueprint, with their queue sizes.</summary>
+	private static List<KeyValuePair<MyProductionBlock, int>> Candidates(List<IMyAssembler> assemblers, MyBlueprintDefinitionBase blueprint)
+	{
+		List<KeyValuePair<MyProductionBlock, int>> candidates = new List<KeyValuePair<MyProductionBlock, int>>();
+		foreach (IMyAssembler assembler in assemblers)
+		{
+			if (assembler is MyProductionBlock block && !block.Closed && block.CanUseBlueprint(blueprint))
+			{
+				int queueSize = 0;
+				foreach (MyProductionBlock.QueueItem item in block.Queue)
+				{
+					queueSize += (int)item.Amount;
+				}
+				candidates.Add(new KeyValuePair<MyProductionBlock, int>(block, queueSize));
+			}
+		}
+		return candidates;
+	}
+
 	/// <summary>How many of the component are queued in the assemblers.</summary>
 	public static int QueuedAmount(List<IMyAssembler> assemblers, MyDefinitionId component)
 	{
@@ -92,7 +114,7 @@ internal static class AssemblerQueue
 		}
 		foreach (IMyAssembler assembler in assemblers)
 		{
-			if (assembler is MyProductionBlock block && !block.Closed)
+			if (assembler is MyProductionBlock block && !block.Closed && assembler.Mode == Sandbox.ModAPI.Ingame.MyAssemblerMode.Assembly)
 			{
 				foreach (MyProductionBlock.QueueItem item in block.Queue)
 				{
@@ -127,6 +149,11 @@ internal static class AssemblerQueue
 		if (((IMyAssembler)block).OutputInventory is VRage.Game.ModAPI.IMyInventory inventory)
 		{
 			amount += (int)inventory.GetItemAmount(component);
+		}
+		// A disassembly queue takes items apart, so it doesn't count toward what's coming.
+		if (((IMyAssembler)block).Mode != Sandbox.ModAPI.Ingame.MyAssemblerMode.Assembly)
+		{
+			return amount;
 		}
 		foreach (MyProductionBlock.QueueItem item in block.Queue)
 		{

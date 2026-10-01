@@ -9,6 +9,7 @@ using VRage.Game.Entity;
 using IngameEntity = VRage.Game.ModAPI.Ingame.IMyEntity;
 using IngameSlimBlock = VRage.Game.ModAPI.Ingame.IMySlimBlock;
 using MyAssemblerMode = Sandbox.ModAPI.Ingame.MyAssemblerMode;
+using TimShared;
 
 namespace BaRMaid;
 
@@ -62,9 +63,19 @@ internal class MaidGroup
 	public IMyShipWelder FirstSystem => LiveSystems.FirstOrDefault();
 
 	/// <summary>Assemblers that can take new work right now.</summary>
+	/// <summary>Assemblers that can take new work right now. Manual ones are never used.</summary>
 	public List<IMyAssembler> UsableAssemblers()
 	{
-		return Assemblers.Where(a => !a.Closed && a.IsFunctional && a.Enabled && a.Mode == MyAssemblerMode.Assembly && a.HasLocalPlayerAccess()).ToList();
+		return Assemblers.Where(a => !a.Closed && a.IsFunctional && a.Enabled && a.Mode == MyAssemblerMode.Assembly && a.HasLocalPlayerAccess() && !AssemblerModes.IsManual(a)).ToList();
+	}
+
+	/// <summary>
+	/// Every assembler on the construct, in any group or none. Used to count what's already queued: co-op
+	/// assemblers move work out of a main assembler's queue into their own, whichever group they're in.
+	/// </summary>
+	public List<IMyAssembler> ConstructAssemblers()
+	{
+		return ConstructBlocks.OfType<IMyAssembler>().Where(a => !a.Closed).ToList();
 	}
 
 	/// <summary>
@@ -143,6 +154,9 @@ internal class MaidGroup
 		int kinds = 0;
 		Dictionary<MyDefinitionId, int> missing = MissingComponents();
 		Dictionary<MyDefinitionId, int> stock = StockOnConstruct(missing.Keys);
+		List<IMyAssembler> countIn = ConstructAssemblers();
+		// Set up Main and Co-op only once there's really something to order, so assemblers aren't changed for nothing.
+		List<IMyAssembler> receivers = null;
 		foreach (KeyValuePair<MyDefinitionId, int> item in missing)
 		{
 			if (item.Value <= 0 || (_lastAttempt.TryGetValue(item.Key, out double last) && now < last))
@@ -158,7 +172,8 @@ internal class MaidGroup
 				Notes.Remove(item.Key);
 				continue;
 			}
-			int queued = AssemblerQueue.Ensure(assemblers, item.Key, wanted, out string problem);
+			receivers ??= AssemblerModes.PrepareForOrders(assemblers);
+			int queued = AssemblerQueue.Ensure(countIn, receivers, assemblers, item.Key, wanted, out string problem);
 			if (queued > 0)
 			{
 				_lastAttempt[item.Key] = now + RequeueDelaySeconds;

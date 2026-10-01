@@ -63,6 +63,23 @@ There are no predefined group names: any name you type creates that group once a
 
 Everything else in the block's Custom Data is left alone. Because the settings live on the blocks, they are saved with the world and synced to the server, so they are the same for everyone.
 
+### Assembler modes
+
+Every assembler has a mode, shared with our other plugins through [`Shared/AssemblerModes.cs`](../../Shared/AssemblerModes.cs), so it's set once for all of them. It shows in the Mode column of **Setup: groups** and is set with the **Assembler: Main / Co-op / Manual** buttons there. It's stored in the block's Custom Data:
+
+```
+[TIM]
+Assembler=Coop
+```
+
+| Mode | What happens |
+|---|---|
+| Co-op (default) | Kept in the game's cooperative mode. Never gets orders itself; it takes a share of a Main assembler's work. |
+| Main | Gets the orders, and is kept out of cooperative mode so co-op assemblers can help it. |
+| Manual | Left completely alone: no plugin queues on it or changes it, whatever its group. |
+
+This follows how the game works: a cooperative assembler only takes work from a conveyor-connected assembler that isn't cooperative and has a queue, so the work has to go to a Main one. When something needs queuing and none of the group's usable assemblers is Main, BaR Maid makes one Main: preferably one that's already out of cooperative mode, otherwise the one with the lowest entity id. Assemblers without a mode become Co-op at that moment. Modes are only ever filled in, never swapped, so two plugins never fight over an assembler. An assembler type the game won't let be cooperative takes orders itself.
+
 The plugin was called Needy BOB at first. A `[Needy BOB]` section from then is still read, and is renamed to `[BaR Maid]` the next time the plugin writes to that block. Toolbar slots holding the old Needy BOB actions have to be set up again.
 
 ## Auto-queuing
@@ -70,8 +87,8 @@ The plugin was called Needy BOB at first. A `[Needy BOB]` section from then is s
 While auto-queue is on, each group is checked every 3 seconds. This is based on the mod's own EnsureQueued, which the script calls, with two differences, in steps 2 and 3:
 
 1. It takes the missing components across the group's systems. Overlapping systems report the same shortfall, so each component uses the largest amount any one system reports, not the sum.
-2. It subtracts what's already on the construct (cargo, connectors, the systems themselves, finished output in assemblers) and what's already queued, and queues only the difference.
-3. It puts the whole order in one assembler: the one in the group with the shortest queue that can build the component. (The mod's EnsureQueued splits each order across every assembler, which leaves the same item queued everywhere.)
+2. It subtracts what's already on the construct (cargo, connectors, the systems themselves, finished output in assemblers) and what's already queued on any assembler of the construct, and queues only the difference.
+3. It puts the whole order in one of the group's **Main** assemblers, the one with the shortest queue that can build the component, and the **Co-op** assemblers share it out (see below). The mod's EnsureQueued splits each order across every assembler, which leaves the same item queued everywhere.
 
 Step 2 matters because the Build and Repair mod looks through at most 16 inventories each time it fetches components, carrying on from where it stopped the time before. On a base with many inventories, it reports a component as missing whenever the inventories it just checked didn't have it, even with plenty in a cargo container it hasn't reached yet. Inventory sorters make this happen more often, because they keep moving items and emptying the Build and Repair block. The original script queued on every one of those reports. BaR Maid only crafts what the construct really doesn't have.
 
