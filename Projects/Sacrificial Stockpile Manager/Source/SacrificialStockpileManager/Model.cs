@@ -215,6 +215,15 @@ public class BlockSnapshot
 	/// <summary>Owned by someone else (or nobody) and the grid doesn't include shared blocks: the plugin leaves it alone.</summary>
 	public bool NotYours;
 
+	/// <summary>
+	/// Which mechanical group (the grid itself, or one docked ship) the block is on: the lowest entity id among that
+	/// group's grids. Quotas and assemblers are worked out per group, so a docked ship keeps its own.
+	/// </summary>
+	public long Unit;
+
+	/// <summary>For assemblers: the shared assembler mode (Main, Coop, Manual), or null when not set.</summary>
+	public string AssemblerMode;
+
 	private Dictionary<string, double> _items;
 
 	private Dictionary<string, double> _output;
@@ -236,6 +245,12 @@ public class GridSnapshot
 	public string Name;
 
 	public List<long> GridIds = new List<long>();
+
+	/// <summary>
+	/// The grids of the ship or station itself (its mechanical group), without ships docked to it. Its settings are
+	/// looked up only among these, so a docked ship's settings are never applied to the station, or the other way.
+	/// </summary>
+	public List<long> CoreGridIds = new List<long>();
 
 	public bool IsStation;
 

@@ -32,7 +32,7 @@ The window closes with the X in its corner or with Esc. Tables update every half
 | Blocks | Every block with an inventory: role, fill %, used / size in litres, settings | Edit block, Turn on / off, Rescan, Help |
 | Block settings | One block: role, fill priority (0-9), Accepts checkboxes, and per item what's there and its min/max (including limits from its type) | Set minimum, Set maximum, Clear limits, Back; Accept item |
 | Block type limits | Minimums and maximums for every block of a type on the grid: reactors, O2/H2 generators, turrets and guns, cockpits and seats, ship tools, gas tanks, refineries, assemblers. Shows how many blocks it covers and how many are below or above | Set minimum, Set maximum, Clear limits, Help |
-| Production | Assemblers, refineries, reactors, generators: state and queue or contents | Details, Edit block, Turn on / off, Help |
+| Production | Assemblers, refineries, reactors, generators: assembler mode, state, and queue or contents | Details, Edit block, Turn on / off, Assembler mode |
 | Production details | One assembler: its queue (with progress) and every material the queue needs, how much the grid has and how much is missing, and whether it blocks the current item. One refinery: input in refining order, and output | Remove from queue, Turn on / off, Edit block, Back |
 | Refinery priority | Every refinable ore: its priority, amount in storage and in refineries, and which refineries are working on it | Raise priority, Lower priority, No priority, Help |
 | Displays (LCD) | Every screen on the grid and the page it shows | Show page, Stop showing, Rescan, Help |
@@ -64,7 +64,9 @@ Set in the Overview. All are off for a new grid except Clean production blocks, 
 
 **Priority** (0-9, Block settings): among storage blocks that accept an item equally well, the higher number fills first.
 
-**Disassembly.** The plugin picks one idle assembler (on, powered, nothing queued, not Manual), switches it to disassembly with the same request as the terminal's mode switch, and queues the surplus. Once that queue is done, it switches the assembler back to assembly. The game keeps the assembly queue aside meanwhile. It only switches back assemblers it switched itself, and it remembers them across restarts. The assembler pulls the items itself through conveyors, from any connected inventory. If the surplus disappears first, the plugin takes those entries out of the queue.
+**Assembler modes.** Shared with our other plugins through `Shared/AssemblerModes.cs` and stored in the assembler's Custom Data as `[TIM] Assembler=Main|Coop|Manual`. Main takes the orders. Co-op (the default) stays in the game's cooperative mode and helps a Main assembler, because in the game a cooperative assembler only takes work from a connected assembler that isn't cooperative. Manual means no plugin queues on it or changes it. Each quota shortfall is queued as one order on a Main assembler (the shortest queue if there are several). What's already queued is counted on every assembler, Main or Co-op. If none of the usable assemblers is Main, one is made Main the first time something is queued. Set a mode with the Production view's Assembler mode button. Setting an assembler's role to Manual in Block settings also sets its shared mode to Manual.
+
+**Disassembly.** The plugin picks one idle assembler (on, powered, nothing queued, not cooperating, not Manual; normally the Main one), switches it to disassembly with the same request as the terminal's mode switch, and queues the surplus. Once that queue is done, it switches the assembler back to assembly. The game keeps the assembly queue aside meanwhile. It only switches back assemblers it switched itself, and it remembers them across restarts. The assembler pulls the items itself through conveyors, from any connected inventory. If the surplus disappears first, the plugin takes those entries out of the queue.
 
 **Refinery priority.** Refineries refine their input top to bottom. With Automation on, the plugin moves the highest-priority ore a refinery holds to the front, using the same request as dragging a stack inside an inventory. If the refinery holds none of a better ore that's in storage, it brings some in, sending back its lowest-priority stack first if it's full.
 
@@ -84,7 +86,9 @@ Set in the Overview. All are off for a new grid except Clean production blocks, 
 
 **Limits** work on any block. A minimum brings the item in from intakes, production output, storage and other blocks' surplus. A maximum sends the excess to storage. On a machine, limits count its input inventory.
 
-**Docked ships.** In Space Engineers a ship docked by connector shares the station's terminal, so it shows up as part of the station while docked, and the station's settings apply. Its Auto blocks count as machines, so its cargo isn't sorted into the station and its assemblers aren't used for the station's quotas. To restock a docked ship, give its lockers the Stock role with minimums.
+**Docked ships.** In Space Engineers a ship docked by connector shares the station's terminal, so it shows up as part of the station while docked, and the station's settings apply. Its Auto blocks count as machines, so its cargo isn't sorted into the station. To restock a docked ship, give its lockers the Stock role with minimums.
+
+Quotas stay with the grid they were set on. Each mechanical group in a terminal system (the station itself, each docked ship) is handled on its own: its settings are looked up only among its own grids, and its quotas count only its own stock and queue only on its own assemblers. A docked ship's quotas keep working while it's docked, but they never drive the station's assemblers, and the station's quotas never use the ship's.
 
 ## LCD pages
 

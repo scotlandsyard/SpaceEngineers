@@ -92,10 +92,11 @@ public partial class SsmScreen
 		case View.Production:
 			return new List<Column>
 			{
-				new Column { Name = "Block", Width = 0.27f },
-				new Column { Name = "Type", Width = 0.15f },
-				new Column { Name = "State", Width = 0.11f },
-				new Column { Name = "Queue / contents", Width = 0.47f }
+				new Column { Name = "Block", Width = 0.25f },
+				new Column { Name = "Type", Width = 0.14f },
+				new Column { Name = "Mode", Width = 0.12f },
+				new Column { Name = "State", Width = 0.09f },
+				new Column { Name = "Queue / contents", Width = 0.4f }
 			};
 		case View.Displays:
 			return new List<Column>
@@ -757,8 +758,28 @@ public partial class SsmScreen
 		BlockRole role = (BlockRole)_roleCombo.GetSelectedKey();
 		Store.EditBlockRules(block.Id).Role = role;
 		Store.SaveSettings();
+		// For an assembler, Manual is also the mode shared with our other plugins, so they leave it alone too.
+		string shared = "";
+		if (LiveEntity(block.Id) is IMyAssembler assembler)
+		{
+			if (role == BlockRole.Manual && !TimShared.AssemblerModes.IsManual(assembler))
+			{
+				TimShared.AssemblerModes.Set(assembler, TimShared.AssemblerMode.Manual);
+				shared = " Our other plugins leave it alone too.";
+			}
+			else if (role != BlockRole.Manual && TimShared.AssemblerModes.IsManual(assembler))
+			{
+				TimShared.AssemblerModes.Set(assembler, TimShared.AssemblerMode.Unset);
+				shared = " Its assembler mode is back to the default (Co-op).";
+			}
+		}
+		else if (block.Kind == BlockKind.Assembler && role == BlockRole.Manual)
+		{
+			shared = " The grid isn't loaded, so the assembler mode shared with our other plugins wasn't changed.";
+		}
 		Session?.RunNow(Live);
-		ShowMessage($"{block.Name} is now {Construct.Resolve(block).ToString().ToLowerInvariant()}. {RoleHelp(Construct.Resolve(block))}", GoodColor);
+		block = CurrentBlock() ?? block;
+		ShowMessage($"{block.Name} is now {Construct.Resolve(block).ToString().ToLowerInvariant()}. {RoleHelp(Construct.Resolve(block))}{shared}", GoodColor);
 		_rowsSignature = null;
 		RefreshAll();
 	}
@@ -933,11 +954,16 @@ public partial class SsmScreen
 				string contents = string.Join(", ", block.ItemAmounts.OrderByDescending(i => i.Value).Take(3).Select(i => $"{Items.Name(i.Key)} {Items.Amount(i.Value)}"));
 				detail = block.Kind == BlockKind.Refinery && detail.Length > 0 ? $"{detail}; in: {contents}" : contents.Length > 0 ? contents : detail.Length > 0 ? detail : "Empty";
 			}
+			string mode = "";
+			if (block.Kind == BlockKind.Assembler || block.Kind == BlockKind.SurvivalKit)
+			{
+				mode = Enum.TryParse(block.AssemblerMode, out TimShared.AssemblerMode parsed) ? TimShared.AssemblerModes.Describe(parsed) : TimShared.AssemblerModes.Describe(TimShared.AssemblerMode.Unset);
+			}
 			rows.Add(new RowData
 			{
 				Key = "b:" + block.Id,
-				Texts = new[] { block.Name, block.Type, state, detail },
-				Color = state == "On" ? (Color?)null : WarningColor
+				Texts = new[] { block.Name, block.Type, mode, state, detail },
+				Color = mode == "Manual" ? MutedColor : state == "On" ? (Color?)null : WarningColor
 			});
 		}
 		return rows.OrderBy(r => r.Texts[1], StringComparer.OrdinalIgnoreCase).ThenBy(r => r.Texts[0], StringComparer.OrdinalIgnoreCase).ToList();

@@ -379,7 +379,7 @@ public partial class SsmScreen : MyGuiScreenBase
 			AddButton(-0.315f, "Details", ShowSelectedMachine);
 			AddButton(-0.105f, "Edit block", EditSelectedBlock);
 			_liveButtons.Add(AddButton(0.105f, "Turn on / off", ToggleSelectedBlock));
-			AddButton(0.315f, "Help", ShowHelp);
+			_liveButtons.Add(AddButton(0.315f, "Assembler mode", CycleAssemblerMode));
 			break;
 		case View.Machine:
 			_liveButtons.Add(AddButton(-0.315f, "Remove from queue", RemoveSelectedQueueItem));
@@ -872,7 +872,7 @@ public partial class SsmScreen : MyGuiScreenBase
 			return volume + "Pick an item, type an amount, set a minimum or maximum. Blank clears it.";
 		}
 		case View.Production:
-			return live ? "Double-click an assembler or refinery (or press Details) to see its queue and what it's missing." : "Last known state." + offline;
+			return live ? "Double-click an assembler or refinery for its queue and what it's missing. Assembler mode: Main, Co-op or Manual." : "Last known state." + offline;
 		case View.Machine:
 			return live ? "Queue first, then the materials the whole queue needs. Missing = what the grid doesn't have." : "Not loaded: queue details show while the grid is in range.";
 		case View.Refining:

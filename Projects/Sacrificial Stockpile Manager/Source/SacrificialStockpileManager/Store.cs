@@ -82,6 +82,7 @@ internal static class Store
 			foreach (GridSnapshot grid in grids.Grids)
 			{
 				grid.GridIds ??= new List<long>();
+				grid.CoreGridIds ??= new List<long>();
 				grid.Blocks ??= new List<BlockSnapshot>();
 				s_grids[grid.Key] = grid;
 			}
@@ -130,7 +131,9 @@ internal static class Store
 	/// <summary>The rules stored against any of the grid's ids (the main grid can change when ships merge or split).</summary>
 	public static GridRules GridRules(GridSnapshot grid)
 	{
-		return grid == null ? null : GridRules(grid.Key, grid.GridIds);
+		// Only the grid's own grids: GridIds also lists ships that were docked to it. Snapshots saved before
+		// CoreGridIds existed only match their own key until they're refreshed.
+		return grid == null ? null : GridRules(grid.Key, grid.CoreGridIds ?? new List<long>());
 	}
 
 	public static GridRules GridRules(long key, IEnumerable<long> gridIds)

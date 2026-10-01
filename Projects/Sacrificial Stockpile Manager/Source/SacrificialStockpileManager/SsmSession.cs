@@ -470,7 +470,7 @@ public class SsmSession : MySessionComponentBase
 			if (now >= construct.NextCraft)
 			{
 				construct.NextCraft = now + CraftSeconds;
-				AutoCraft.Run(construct, rules, now);
+				AutoCraft.Run(construct, now);
 			}
 			return;
 		}
@@ -501,7 +501,7 @@ public class SsmSession : MySessionComponentBase
 		construct.Warnings = engine.Warnings;
 		FinishOneShots(construct, engine, now);
 		construct.NextCraft = now + CraftSeconds;
-		AutoCraft.Run(construct, rules, now);
+		AutoCraft.Run(construct, now);
 	}
 
 	// ---- Sort now / Unload docked ships ----

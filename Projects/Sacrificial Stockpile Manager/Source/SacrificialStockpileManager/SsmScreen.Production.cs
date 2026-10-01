@@ -64,7 +64,8 @@ public partial class SsmScreen
 	{
 		bool disassembling = ((IMyAssembler)assembler).Mode == MyAssemblerMode.Disassembly;
 		string state = AssemblerState(assembler);
-		rows.Add(Row("info", state == "Working" ? GoodColor : state == "Idle" ? (Color?)null : WarningColor, disassembling ? "Disassembling" : "Assembling", "", "", "", "", state));
+		string mode = TimShared.AssemblerModes.Describe(TimShared.AssemblerModes.Get(assembler));
+		rows.Add(Row("info", state == "Working" ? GoodColor : state == "Idle" ? (Color?)null : WarningColor, (disassembling ? "Disassembling" : "Assembling") + $" ({mode}{(assembler.IsSlave ? ", cooperating" : "")})", "", "", "", "", state));
 
 		List<MyProductionBlock.QueueItem> queue = assembler.Queue.ToList();
 		if (queue.Count == 0)
@@ -241,6 +242,63 @@ public partial class SsmScreen
 		ShowMessage($"Removed {BlueprintLabel(queue[index].Blueprint, out _)} from the queue. In multiplayer the server confirms it in a moment.", null);
 		Live?.AddLog($"Removed {BlueprintLabel(queue[index].Blueprint, out _)} from {production.CustomName}'s queue (from the menu)");
 		_rowsSignature = null;
+	}
+
+	/// <summary>
+	/// Steps the selected assembler's mode, shared with our other plugins: Main (takes the orders), then Manual (no
+	/// plugin touches it), then Co-op (helps a Main assembler; the default), then Main again.
+	/// </summary>
+	private void CycleAssemblerMode()
+	{
+		long id = SelectedBlockId();
+		if (id == 0 || !(LiveEntity(id) is IMyAssembler assembler) || !assembler.HasLocalPlayerAccess())
+		{
+			ShowMessage("Select an assembler first (the grid has to be loaded).", WarningColor);
+			return;
+		}
+		if (Grid?.Block(id)?.NotYours == true)
+		{
+			ShowMessage($"{assembler.CustomName} isn't yours, so its mode is left alone.", WarningColor);
+			return;
+		}
+		TimShared.AssemblerMode next;
+		switch (TimShared.AssemblerModes.Get(assembler))
+		{
+		case TimShared.AssemblerMode.Main:
+			next = TimShared.AssemblerMode.Manual;
+			break;
+		case TimShared.AssemblerMode.Manual:
+			next = TimShared.AssemblerMode.Coop;
+			break;
+		default:
+			next = TimShared.AssemblerMode.Main;
+			break;
+		}
+		TimShared.AssemblerModes.Set(assembler, next);
+		// Keep the plugin's own role in step, so Manual only has to be set in one place.
+		BlockRules rules = Store.BlockRules(id);
+		if (next != TimShared.AssemblerMode.Manual && rules != null && rules.Role == BlockRole.Manual)
+		{
+			rules.Role = BlockRole.Auto;
+			Store.SaveSettings();
+		}
+		Session?.RunNow(Live);
+		string text;
+		switch (next)
+		{
+		case TimShared.AssemblerMode.Main:
+			text = "Main: takes the orders; Co-op assemblers help with them.";
+			break;
+		case TimShared.AssemblerMode.Manual:
+			text = "Manual: none of our plugins queues on it or changes it.";
+			break;
+		default:
+			text = TimShared.AssemblerModes.SupportsCoop(assembler) ? "Co-op: helps a Main assembler with its queue." : "Co-op, but this assembler can't cooperate, so it takes orders like a Main one.";
+			break;
+		}
+		ShowMessage($"{assembler.CustomName} is now {text}", next == TimShared.AssemblerMode.Manual ? (Color?)null : GoodColor);
+		_rowsSignature = null;
+		RefreshAll();
 	}
 
 	private void ToggleMachine()

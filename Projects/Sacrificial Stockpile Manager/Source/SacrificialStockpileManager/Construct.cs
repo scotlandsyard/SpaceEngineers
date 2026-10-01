@@ -31,6 +31,12 @@ internal class LiveBlock
 	/// <summary>Owned by someone else (or nobody), and the grid doesn't include shared blocks: never touched.</summary>
 	public bool NotYours;
 
+	/// <summary>The mechanical group the block is on (see <see cref="Construct.Units"/>).</summary>
+	public long Unit;
+
+	/// <summary>For assemblers: the mode shared with our other plugins (Manual means no plugin touches it).</summary>
+	public TimShared.AssemblerMode AssemblerMode;
+
 	/// <summary>The block's own limits plus the grid's limits for its type (its own win for the same item).</summary>
 	public List<ItemLimit> Limits = new List<ItemLimit>();
 
@@ -71,6 +77,15 @@ internal class Construct
 	public List<IMyCubeGrid> Grids = new List<IMyCubeGrid>();
 
 	public IMyCubeGrid MainGrid;
+
+	/// <summary>
+	/// The mechanical groups in this terminal system, by unit id (lowest grid entity id), with their grids' ids. The
+	/// main grid's is <see cref="CoreUnit"/>; the others are ships docked by connector. Quotas, the stock they count
+	/// and the assemblers they use are per unit, so docking never mixes a ship's quotas with a station's.
+	/// </summary>
+	public Dictionary<long, List<long>> Units = new Dictionary<long, List<long>>();
+
+	public long CoreUnit;
 
 	public List<LiveBlock> Blocks = new List<LiveBlock>();
 
@@ -116,17 +131,18 @@ internal class Construct
 
 	public static Effective Resolve(BlockSnapshot block)
 	{
-		return Resolve(block.Kind, Store.BlockRules(block.Id), block.Docked, block.NotYours);
+		return Resolve(block.Kind, Store.BlockRules(block.Id), block.Docked, block.NotYours, block.AssemblerMode == nameof(TimShared.AssemblerMode.Manual));
 	}
 
 	/// <summary>
-	/// The role a block acts in. A block that isn't yours (unless the grid includes shared blocks) is left alone
-	/// whatever its role. Auto blocks on a grid docked by connector count as machines: they keep their own limits
-	/// (so a docked ship's lockers restock), but a docked ship's cargo isn't sorted into the station.
+	/// The role a block acts in. A block that isn't yours (unless the grid includes shared blocks), and an
+	/// assembler set to Manual in the mode shared with our other plugins, are left alone whatever their role. Auto
+	/// blocks on a grid docked by connector count as machines: they keep their own limits (so a docked ship's
+	/// lockers restock), but a docked ship's cargo isn't sorted into the station.
 	/// </summary>
-	public static Effective Resolve(BlockKind kind, BlockRules rules, bool docked, bool notYours = false)
+	public static Effective Resolve(BlockKind kind, BlockRules rules, bool docked, bool notYours = false, bool sharedManual = false)
 	{
-		if (notYours)
+		if (notYours || sharedManual)
 		{
 			return Effective.Manual;
 		}
@@ -234,10 +250,11 @@ internal class Construct
 	}
 
 	/// <summary>Everything the ship or station itself holds, in every inventory; a docked ship's cargo isn't counted.</summary>
-	public static Dictionary<string, double> StationTotals(GridSnapshot grid)
+	/// <param name="unit">A unit (mechanical group) to count instead, for a docked ship's own quotas.</param>
+	public static Dictionary<string, double> StationTotals(GridSnapshot grid, long? unit = null)
 	{
 		Dictionary<string, double> totals = new Dictionary<string, double>();
-		foreach (BlockSnapshot block in grid.Blocks.Where(b => !b.Docked))
+		foreach (BlockSnapshot block in grid.Blocks.Where(b => unit.HasValue ? b.Unit == unit.Value : !b.Docked))
 		{
 			foreach (KeyValuePair<string, double> item in block.ItemAmounts.Concat(block.OutputAmounts))
 			{
@@ -253,6 +270,29 @@ internal class Construct
 		return kind == BlockKind.Assembler || kind == BlockKind.SurvivalKit || kind == BlockKind.Refinery;
 	}
 
+	/// <summary>The unit (mechanical group) of a grid: the lowest entity id among its grids. Fills <see cref="Units"/>.</summary>
+	private long UnitOf(IMyCubeGrid grid, Dictionary<long, long> unitOfGrid)
+	{
+		if (unitOfGrid.TryGetValue(grid.EntityId, out long unit))
+		{
+			return unit;
+		}
+		List<IMyCubeGrid> group = new List<IMyCubeGrid>();
+		MyAPIGateway.GridGroups.GetGroup(grid, GridLinkTypeEnum.Mechanical, group);
+		if (!group.Contains(grid))
+		{
+			group.Add(grid);
+		}
+		unit = group.Min(g => g.EntityId);
+		List<long> ids = group.Select(g => g.EntityId).ToList();
+		foreach (long id in ids)
+		{
+			unitOfGrid[id] = unit;
+		}
+		Units[unit] = ids;
+		return unit;
+	}
+
 	/// <summary>Reads the construct's blocks and stores a fresh snapshot.</summary>
 	public void Refresh()
 	{
@@ -262,28 +302,35 @@ internal class Construct
 		List<LiveBlock> blocks = new List<LiveBlock>(found.Count);
 		List<BlockSnapshot> snapshots = new List<BlockSnapshot>(found.Count);
 		HashSet<long> gridIds = new HashSet<long>(Grids.Select(g => g.EntityId));
-		// The terminal system also spans grids docked by connector; only the main grid's mechanical group (rotors,
-		// pistons, hinges) counts as this ship or station itself.
-		List<IMyCubeGrid> mechanical = new List<IMyCubeGrid>();
-		MyAPIGateway.GridGroups.GetGroup(MainGrid, GridLinkTypeEnum.Mechanical, mechanical);
-		HashSet<long> core = new HashSet<long>(mechanical.Select(g => g.EntityId)) { MainGrid.EntityId };
-		GridRules gridRules = Store.GridRules(Key, gridIds);
+		// The terminal system also spans grids docked by connector. Each mechanical group (grids joined by rotors,
+		// pistons, hinges) is a unit: the main grid's unit is this ship or station itself, any other is docked.
+		Dictionary<long, long> unitOfGrid = new Dictionary<long, long>();
+		Units = new Dictionary<long, List<long>>();
+		CoreUnit = UnitOf(MainGrid, unitOfGrid);
+		// Settings come from the grid's own grids only; a docked ship's settings stay with the ship.
+		GridRules gridRules = Store.GridRules(Key, Units[CoreUnit]);
 		long me = MyAPIGateway.Session?.Player?.IdentityId ?? 0;
 		bool includeShared = gridRules != null && gridRules.IncludeShared;
 		foreach (IMyTerminalBlock block in found)
 		{
+			long unit = UnitOf(block.CubeGrid, unitOfGrid);
 			LiveBlock live = new LiveBlock
 			{
 				Block = block,
 				Kind = KindOf(block),
 				Rules = Store.BlockRules(block.EntityId),
-				Docked = !core.Contains(block.CubeGrid.EntityId),
+				Unit = unit,
+				Docked = unit != CoreUnit,
 				// The game lets you use blocks shared with your faction or with everyone, and blocks nobody owns. The
 				// plugin only manages your own unless the grid's "include shared blocks" setting is on.
 				NotYours = block.OwnerId != me && !includeShared,
 				Surfaces = block is IngameSurfaceProvider provider ? provider.SurfaceCount : 0
 			};
-			live.Role = Resolve(live.Kind, live.Rules, live.Docked, live.NotYours);
+			if (block is IMyAssembler)
+			{
+				live.AssemblerMode = TimShared.AssemblerModes.Get(block);
+			}
+			live.Role = Resolve(live.Kind, live.Rules, live.Docked, live.NotYours, live.AssemblerMode == TimShared.AssemblerMode.Manual);
 			live.Limits = live.Rules?.Limits.ToList() ?? new List<ItemLimit>();
 			TypeLimits typeLimits = live.Docked ? null : gridRules?.Type(live.Kind);
 			if (typeLimits != null)
@@ -309,6 +356,7 @@ internal class Construct
 			Key = Key,
 			Name = MainGrid.CustomName,
 			GridIds = gridIds.ToList(),
+			CoreGridIds = Units[CoreUnit].ToList(),
 			IsStation = MainGrid.IsStatic,
 			X = MainGrid.WorldAABB.Center.X,
 			Y = MainGrid.WorldAABB.Center.Y,
@@ -333,7 +381,9 @@ internal class Construct
 			Functional = block.IsFunctional,
 			Surfaces = live.Surfaces,
 			Docked = live.Docked,
-			NotYours = live.NotYours
+			NotYours = live.NotYours,
+			Unit = live.Unit,
+			AssemblerMode = live.AssemblerMode == TimShared.AssemblerMode.Unset ? null : live.AssemblerMode.ToString()
 		};
 		for (int i = 0; i < block.InventoryCount; i++)
 		{
@@ -449,7 +499,8 @@ internal class Construct
 	}
 
 	/// <summary>How many of the item are in the assembler queues (blueprint runs times what one run makes).</summary>
-	public double QueuedAmount(string key)
+	/// <param name="unit">Whose assemblers to count: a unit (mechanical group); the grid itself when left out.</param>
+	public double QueuedAmount(string key, long? unit = null)
 	{
 		Sandbox.Definitions.MyBlueprintDefinitionBase blueprint = Items.Blueprint(key);
 		if (blueprint == null)
@@ -460,7 +511,8 @@ internal class Construct
 		foreach (LiveBlock live in Blocks)
 		{
 			// Disassembly queues take items away, so they don't count toward what's coming.
-			if ((live.Kind == BlockKind.Assembler || live.Kind == BlockKind.SurvivalKit) && live.Block is MyProductionBlock production && !production.Closed && ((IMyAssembler)live.Block).Mode == MyAssemblerMode.Assembly)
+			// Every assembler of the unit counts, Main or Co-op: co-op assemblers take work out of a Main one's queue.
+			if (live.Unit == (unit ?? CoreUnit) && (live.Kind == BlockKind.Assembler || live.Kind == BlockKind.SurvivalKit) && live.Block is MyProductionBlock production && !production.Closed && ((IMyAssembler)live.Block).Mode == MyAssemblerMode.Assembly)
 			{
 				foreach (MyProductionBlock.QueueItem item in production.Queue)
 				{
