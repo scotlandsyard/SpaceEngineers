@@ -11,6 +11,7 @@ using VRage.Game;
 using VRage.Game.Components;
 using VRage.Game.ModAPI.Ingame.Utilities;
 using VRage.Utils;
+using TimShared;
 using VRageMath;
 
 namespace OreScout;
@@ -103,6 +104,7 @@ public class OreScoutSession : MySessionComponentBase
 			CreateActions();
 			MyAPIGateway.TerminalControls.CustomActionGetter += CustomActionGetter;
 			MyAPIGateway.Utilities.MessageEntered += OnMessageEntered;
+			PluginSwitcher.Register("OreScout", OpenMarkerLibrary);
 		}
 		catch (Exception ex)
 		{
@@ -117,6 +119,7 @@ public class OreScoutSession : MySessionComponentBase
 		{
 			MyAPIGateway.TerminalControls.CustomActionGetter -= CustomActionGetter;
 			MyAPIGateway.Utilities.MessageEntered -= OnMessageEntered;
+			PluginSwitcher.Unregister();
 		}
 		catch
 		{

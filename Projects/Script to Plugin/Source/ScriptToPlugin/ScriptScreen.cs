@@ -15,6 +15,7 @@ using VRage.Game;
 using VRage.Game.ModAPI;
 using VRage.Utils;
 using VRageMath;
+using TimShared;
 
 namespace ScriptToPlugin;
 
@@ -108,7 +109,7 @@ public class ScriptScreen : MyGuiScreenBase
 	public override void RecreateControls(bool constructor)
 	{
 		base.RecreateControls(constructor);
-		AddCaption("Script to Plugin");
+		PluginSwitcher.AddSwitcher(this, AddCaption("Script to Plugin"));
 
 		Controls.Add(new MyGuiControlLabel(new Vector2(-0.42f, -0.355f), null, "Scripts", null, 0.8f, "White", MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER));
 		_table = new MyGuiControlTable

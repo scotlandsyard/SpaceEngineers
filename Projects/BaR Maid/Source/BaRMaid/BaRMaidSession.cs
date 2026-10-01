@@ -11,6 +11,7 @@ using VRage.Game.Components;
 using VRage.Game.ModAPI;
 using VRage.ModAPI;
 using VRage.Utils;
+using TimShared;
 using VRageMath;
 
 namespace BaRMaid;
@@ -93,6 +94,7 @@ public class BaRMaidSession : MySessionComponentBase
 			CreateActions();
 			MyAPIGateway.TerminalControls.CustomActionGetter += CustomActionGetter;
 			MyAPIGateway.Utilities.MessageEntered += OnMessageEntered;
+			PluginSwitcher.Register("BaR Maid", () => OpenMenu(null));
 			_started = true;
 		}
 		catch (Exception ex)
@@ -109,6 +111,7 @@ public class BaRMaidSession : MySessionComponentBase
 			{
 				MyAPIGateway.TerminalControls.CustomActionGetter -= CustomActionGetter;
 				MyAPIGateway.Utilities.MessageEntered -= OnMessageEntered;
+				PluginSwitcher.Unregister();
 			}
 			catch
 			{

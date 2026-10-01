@@ -8,6 +8,7 @@ using VRage.Game;
 using VRage.ModAPI;
 using VRage.Utils;
 using VRageMath;
+using TimShared;
 
 namespace SacrificialStockpileManager;
 
@@ -236,7 +237,7 @@ public partial class SsmScreen : MyGuiScreenBase
 
 	private void CreateControls()
 	{
-		AddCaption("Sacrificial Stockpile Manager");
+		PluginSwitcher.AddSwitcher(this, AddCaption("Sacrificial Stockpile Manager"));
 		_autocraftButton = null;
 		_liveButtons.Clear();
 		_acceptBoxes.Clear();

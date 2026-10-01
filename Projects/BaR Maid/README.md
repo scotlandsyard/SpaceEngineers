@@ -97,8 +97,12 @@ Everything runs on your client. Nothing is needed on the server.
 - The Status view also lists each system with what it's doing, plus the last few queue actions.
 - The script's empty "script controlled grinding" hook is left out.
 
+## Switching between our plugins
+
+If any of our other plugins are loaded too (BaR Maid, OreScout, Sacrificial Stockpile Manager, Script to Plugin), the top-left corner of the window has a dropdown with this plugin's name. Pick another plugin there to close this window and open that plugin's. Type `/tim` in chat to open whichever of these windows you used last. See [Shared/README.md](../../Shared/README.md).
+
 ## Building
 
-Set `Bin64` in `Source/BaRMaid.csproj` if Space Engineers isn't in the default Steam location. Then run `dotnet build -c Release` in `Source`. The plugin is written to `Source/bin/Release/net481/BaRMaid.dll`.
+The project also builds `Shared/PluginSwitcher.cs` from the repo's `Shared` folder, so build from a full clone of the repo. Set `Bin64` in `Source/BaRMaid.csproj` if Space Engineers isn't in the default Steam location. Then run `dotnet build -c Release` in `Source`. The plugin is written to `Source/bin/Release/net481/BaRMaid.dll`.
 
 The plugin uses its own assembly name (`BaRMaid`), action IDs (`BaRMaid_*`), chat command (`/barmaid`) and Custom Data section (`[BaR Maid]`), so it can't clash with the other plugins in this repo.

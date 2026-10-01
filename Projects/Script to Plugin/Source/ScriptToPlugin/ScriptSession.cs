@@ -24,6 +24,7 @@ using VRage.Game;
 using VRage.Game.Components;
 using VRage.Scripting;
 using VRage.Utils;
+using TimShared;
 
 namespace ScriptToPlugin;
 
@@ -98,6 +99,7 @@ public class ScriptSession : MySessionComponentBase
 			_menuAction = CreateMenuAction();
 			MyAPIGateway.TerminalControls.CustomActionGetter += CustomActionGetter;
 			MyAPIGateway.Utilities.MessageEntered += OnMessageEntered;
+			PluginSwitcher.Register("Script to Plugin", () => OpenMenu(null));
 			MySession.OnUnloading += OnSessionUnloading;
 			_started = true;
 		}
@@ -158,6 +160,7 @@ public class ScriptSession : MySessionComponentBase
 				MySession.OnUnloading -= OnSessionUnloading;
 				MyAPIGateway.TerminalControls.CustomActionGetter -= CustomActionGetter;
 				MyAPIGateway.Utilities.MessageEntered -= OnMessageEntered;
+				PluginSwitcher.Unregister();
 			}
 			catch
 			{

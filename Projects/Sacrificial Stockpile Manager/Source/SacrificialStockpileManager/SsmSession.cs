@@ -13,6 +13,7 @@ using VRage.Game.Components;
 using VRage.Game.ModAPI;
 using VRage.ModAPI;
 using VRage.Utils;
+using TimShared;
 using VRageMath;
 using IngameSurfaceProvider = Sandbox.ModAPI.Ingame.IMyTextSurfaceProvider;
 
@@ -118,6 +119,7 @@ public class SsmSession : MySessionComponentBase
 			};
 			MyAPIGateway.TerminalControls.CustomActionGetter += CustomActionGetter;
 			MyAPIGateway.Utilities.MessageEntered += OnMessageEntered;
+			PluginSwitcher.Register("Stockpile Manager", () => OpenMenu(null));
 			_started = true;
 		}
 		catch (Exception ex)
@@ -134,6 +136,7 @@ public class SsmSession : MySessionComponentBase
 			{
 				MyAPIGateway.TerminalControls.CustomActionGetter -= CustomActionGetter;
 				MyAPIGateway.Utilities.MessageEntered -= OnMessageEntered;
+				PluginSwitcher.Unregister();
 				Store.Unload();
 			}
 			catch (Exception ex)

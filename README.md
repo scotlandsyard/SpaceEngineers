@@ -24,3 +24,5 @@ You need the .NET SDK and Space Engineers installed.
 3. The plugin DLL is written to `Source/bin/Release/net481/`. Add it to Pulsar as a local plugin.
 
 The projects target .NET Framework 4.8.1 (x64) and reference the game's DLLs straight from its `Bin64` folder, without copying them.
+
+Code used by more than one project lives once in [`Shared/`](Shared/) and is linked into each project that uses it.

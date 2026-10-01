@@ -10,6 +10,7 @@ using VRage.Game.ModAPI;
 using VRage.ModAPI;
 using VRage.Utils;
 using VRageMath;
+using TimShared;
 using IngameEntity = VRage.Game.ModAPI.Ingame.IMyEntity;
 using IngameSlimBlock = VRage.Game.ModAPI.Ingame.IMySlimBlock;
 using MyAssemblerMode = Sandbox.ModAPI.Ingame.MyAssemblerMode;
@@ -141,7 +142,7 @@ public class MaidScreen : MyGuiScreenBase
 	public override void RecreateControls(bool constructor)
 	{
 		base.RecreateControls(constructor);
-		AddCaption("BaR Maid");
+		PluginSwitcher.AddSwitcher(this, AddCaption("BaR Maid"));
 
 		Controls.Add(new MyGuiControlLabel(new Vector2(-0.42f, -0.325f), null, "Group", null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER));
 		_groupCombo = new MyGuiControlCombobox(new Vector2(-0.35f, -0.325f), new Vector2(0.43f, 0.04f), null, null, 12, null, false, null, MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER);

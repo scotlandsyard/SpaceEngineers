@@ -6,6 +6,7 @@ using Sandbox.ModAPI;
 using VRage.Game;
 using VRage.Utils;
 using VRageMath;
+using TimShared;
 
 namespace OreScout;
 
@@ -50,7 +51,7 @@ public class MarkerLibraryScreen : MyGuiScreenBase
 	public override void RecreateControls(bool constructor)
 	{
 		base.RecreateControls(constructor);
-		AddCaption("OreScout Marker Library");
+		PluginSwitcher.AddSwitcher(this, AddCaption("OreScout Marker Library"));
 
 		_table = new MyGuiControlTable
 		{

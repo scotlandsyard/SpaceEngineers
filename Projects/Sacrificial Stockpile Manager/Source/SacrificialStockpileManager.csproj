@@ -44,4 +44,9 @@
     <Reference Include="SpaceEngineers.ObjectBuilders"><HintPath>$(Bin64)\SpaceEngineers.ObjectBuilders.dll</HintPath><Private>False</Private></Reference>
     <Reference Include="ProtoBuf.Net.Core"><HintPath>$(Bin64)\ProtoBuf.Net.Core.dll</HintPath><Private>False</Private></Reference>
   </ItemGroup>
+
+  <!-- Shared with our other plugins: one copy in the repo's Shared folder, compiled into each plugin. -->
+  <ItemGroup>
+    <Compile Include="../../../Shared/PluginSwitcher.cs" Link="Shared/PluginSwitcher.cs" />
+  </ItemGroup>
 </Project>

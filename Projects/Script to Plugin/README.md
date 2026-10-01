@@ -75,8 +75,12 @@ Everything runs on your client. Nothing is needed on the server.
 
 Code, Custom Data, Storage, the default argument and the on/off state are saved in the plugin's local storage (under `%AppData%\SpaceEngineers\Storage`), one file per world, named after the world. They're saved a second after a change, every minute while scripts run, when you save the world, and when you leave. Nothing is stored in the world itself, so the scripts are yours and aren't shared with other players.
 
+## Switching between our plugins
+
+If any of our other plugins are loaded too (BaR Maid, OreScout, Sacrificial Stockpile Manager, Script to Plugin), the top-left corner of the window has a dropdown with this plugin's name. Pick another plugin there to close this window and open that plugin's. Type `/tim` in chat to open whichever of these windows you used last. See [Shared/README.md](../../Shared/README.md).
+
 ## Building
 
-Set `Bin64` in `Source/ScriptToPlugin.csproj` if Space Engineers isn't in the default Steam location. Then run `dotnet build -c Release` in `Source`. The plugin is written to `Source/bin/Release/net481/ScriptToPlugin.dll`.
+The project also builds `Shared/PluginSwitcher.cs` from the repo's `Shared` folder, so build from a full clone of the repo. Set `Bin64` in `Source/ScriptToPlugin.csproj` if Space Engineers isn't in the default Steam location. Then run `dotnet build -c Release` in `Source`. The plugin is written to `Source/bin/Release/net481/ScriptToPlugin.dll`.
 
 The plugin uses its own assembly name (`ScriptToPlugin`), namespace, action IDs (`ScriptToPlugin_*`), chat command (`/stp`) and storage file (`ScriptToPlugin_<world>.xml`), so it can't clash with the other plugins in this repo. It has no Custom Data section or GPS markers.

@@ -35,7 +35,11 @@ Amounts are what a vanilla ship drill would collect, times the world's harvest m
 
 **Export from GPS** moves Scout Ore markers out of the GPS list into the library (deposit markers stay in GPS), **Import to GPS** or a double-click puts one back, and **Delete** removes one. Click a column header to sort. The library is saved per world name as `OreScout_Markers_<world>.xml` in `%AppData%\SpaceEngineers\Storage\`.
 
+## Switching between our plugins
+
+If any of our other plugins are loaded too (BaR Maid, OreScout, Sacrificial Stockpile Manager, Script to Plugin), the top-left corner of the window has a dropdown with this plugin's name. Pick another plugin there to close this window and open that plugin's. Type `/tim` in chat to open whichever of these windows you used last. See [Shared/README.md](../../Shared/README.md).
+
 ## Building
 
-Set `Bin64` in `Source/OreScout.csproj` if Space Engineers isn't in the default Steam location, then run `dotnet build -c Release` in `Source`. The plugin is written to `Source/bin/Release/net481/OreScout.dll`.
+The project also builds `Shared/PluginSwitcher.cs` from the repo's `Shared` folder, so build from a full clone of the repo. Set `Bin64` in `Source/OreScout.csproj` if Space Engineers isn't in the default Steam location, then run `dotnet build -c Release` in `Source`. The plugin is written to `Source/bin/Release/net481/OreScout.dll`.
 
