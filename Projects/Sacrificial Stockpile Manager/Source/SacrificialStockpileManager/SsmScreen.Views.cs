@@ -42,6 +42,15 @@ public partial class SsmScreen
 				new Column { Name = "Queued", Width = 0.1f, RightAligned = true },
 				new Column { Name = "Autocraft", Width = 0.22f }
 			};
+		case View.Types:
+			return new List<Column>
+			{
+				new Column { Name = "Item", Width = 0.3f },
+				new Column { Name = "Minimum", Width = 0.13f, RightAligned = true },
+				new Column { Name = "Maximum", Width = 0.13f, RightAligned = true },
+				new Column { Name = "Blocks", Width = 0.1f, RightAligned = true },
+				new Column { Name = "State", Width = 0.34f }
+			};
 		case View.Machine:
 			return new List<Column>
 			{
@@ -114,6 +123,8 @@ public partial class SsmScreen
 			return "No blocks with an inventory that you can access.";
 		case View.Block:
 			return "Empty, and no limits set. Pick an item below to add one.";
+		case View.Types:
+			return "No limits for this type yet. Pick an item below, type an amount and set a minimum or maximum.";
 		case View.Production:
 			return "No production blocks.";
 		case View.Machine:
@@ -143,6 +154,8 @@ public partial class SsmScreen
 			return ProductionRows(grid);
 		case View.Machine:
 			return MachineRows(grid);
+		case View.Types:
+			return TypeRows(grid);
 		case View.Refining:
 			return RefiningRows(grid);
 		case View.Displays:
@@ -169,6 +182,9 @@ public partial class SsmScreen
 		rows.Add(Row("set:kits", rules != null && rules.UseSurvivalKits ? GoodColor : (Color?)null, "Survival kits autocraft", rules != null && rules.UseSurvivalKits ? "On" : "Off"));
 		rows.Add(Row("set:disassemble", rules != null && rules.Disassemble ? GoodColor : (Color?)null, "Disassemble surplus", rules != null && rules.Disassemble ? "On: items above their maximum are disassembled" : "Off"));
 		rows.Add(Row("set:bottles", rules != null && rules.FillBottles ? GoodColor : (Color?)null, "Keep bottles filled", rules != null && rules.FillBottles ? "On: bottles go to a tank to refill (needs Automation)" : "Off"));
+		bool shared = rules != null && rules.IncludeShared;
+		int notYours = grid.Blocks.Count(b => b.NotYours);
+		rows.Add(Row("set:shared", shared ? WarningColor : (Color?)null, "Blocks shared with me", shared ? "Included: faction-shared, shared-with-all and unowned blocks are managed too" : notYours > 0 ? $"Left alone: only your own blocks are touched ({notYours} aren't yours)" : "Left alone: only your own blocks are touched"));
 
 		Vector3D player = MyAPIGateway.Session?.Player?.GetPosition() ?? Vector3D.Zero;
 		string distance = FormatDistance(Vector3D.Distance(player, grid.Position));
@@ -261,6 +277,10 @@ public partial class SsmScreen
 		case "bottles":
 			on = rules.FillBottles = !rules.FillBottles;
 			text = "Keeping bottles filled";
+			break;
+		case "shared":
+			on = rules.IncludeShared = !rules.IncludeShared;
+			text = "Managing blocks shared with you";
 			break;
 		default:
 			return;
@@ -541,7 +561,7 @@ public partial class SsmScreen
 			rows.Add(new RowData
 			{
 				Key = "b:" + block.Id,
-				Texts = new[] { block.Name, block.Type, RoleText(rules, role) + (block.Docked ? " (docked)" : ""), block.MaxVolume > 0.0 ? $"{block.Fill:P0}" : "", block.MaxVolume > 0.0 ? $"{Items.Litres(block.Volume)} / {Items.Litres(block.MaxVolume)}" : "", SettingsText(rules) },
+				Texts = new[] { block.Name, block.Type, (block.NotYours ? "not yours" : RoleText(rules, role)) + (block.Docked ? " (docked)" : ""), block.MaxVolume > 0.0 ? $"{block.Fill:P0}" : "", block.MaxVolume > 0.0 ? $"{Items.Litres(block.Volume)} / {Items.Litres(block.MaxVolume)}" : "", SettingsText(rules) },
 				SortValues = new object[] { null, null, null, block.Fill, block.MaxVolume, null },
 				Color = role == Effective.Manual ? MutedColor : rules != null && !rules.IsEmpty ? GoodColor : (Color?)null
 			});
@@ -568,6 +588,10 @@ public partial class SsmScreen
 		if (rules.Limits.Count > 0)
 		{
 			parts.Add($"{rules.Limits.Count} limit(s)");
+		}
+		if (rules.Priority > 0)
+		{
+			parts.Add($"priority {rules.Priority}");
 		}
 		return string.Join("; ", parts);
 	}
@@ -635,19 +659,36 @@ public partial class SsmScreen
 		}
 		BlockRules rules = Store.BlockRules(block.Id);
 		Effective role = Construct.Resolve(block);
+		// Limits set for the block's whole type apply where the block has none of its own (not on docked ships).
+		TypeLimits typeLimits = block.Docked ? null : Store.GridRules(grid)?.Type(block.Kind);
 		IEnumerable<string> keys = block.ItemAmounts.Keys.Union(block.OutputAmounts.Keys);
 		if (rules != null)
 		{
 			keys = keys.Union(rules.Limits.Select(l => l.Item)).Union(rules.Accept.Where(a => a.Contains("/")));
+		}
+		if (typeLimits != null)
+		{
+			keys = keys.Union(typeLimits.Limits.Select(l => l.Item).Where(k => CanHold(block, k)));
 		}
 		foreach (string key in keys.OrderBy(k => (int)Items.Category(k)).ThenBy(k => Items.Name(k), StringComparer.OrdinalIgnoreCase))
 		{
 			block.ItemAmounts.TryGetValue(key, out double have);
 			block.OutputAmounts.TryGetValue(key, out double output);
 			ItemLimit limit = rules?.Limit(key);
+			string from = "";
+			if (limit == null && typeLimits?.Limit(key) is ItemLimit typeLimit)
+			{
+				limit = typeLimit;
+				from = $" (all {TypeName(block.Kind).ToLowerInvariant()})";
+			}
 			string state = "";
 			Color? color = null;
-			if (role == Effective.Manual)
+			if (block.NotYours)
+			{
+				state = "Not yours: left alone";
+				color = MutedColor;
+			}
+			else if (role == Effective.Manual)
 			{
 				state = "Manual: left alone";
 				color = MutedColor;
@@ -684,6 +725,7 @@ public partial class SsmScreen
 			{
 				state = "In output";
 			}
+			state += from;
 			string here = Items.Amount(have) + (output > 0.0 ? $" (+{Items.Amount(output)} out)" : "");
 			rows.Add(new RowData
 			{

@@ -68,6 +68,11 @@ internal static class Store
 		{
 			rules.Quotas ??= new List<ItemLimit>();
 			rules.OrePriority ??= new List<string>();
+			rules.TypeLimits ??= new List<TypeLimits>();
+			foreach (TypeLimits type in rules.TypeLimits)
+			{
+				type.Limits ??= new List<ItemLimit>();
+			}
 			s_gridRules[rules.GridId] = rules;
 		}
 		s_grids.Clear();
@@ -125,15 +130,16 @@ internal static class Store
 	/// <summary>The rules stored against any of the grid's ids (the main grid can change when ships merge or split).</summary>
 	public static GridRules GridRules(GridSnapshot grid)
 	{
-		if (grid == null)
-		{
-			return null;
-		}
-		if (s_gridRules.TryGetValue(grid.Key, out GridRules rules))
+		return grid == null ? null : GridRules(grid.Key, grid.GridIds);
+	}
+
+	public static GridRules GridRules(long key, IEnumerable<long> gridIds)
+	{
+		if (s_gridRules.TryGetValue(key, out GridRules rules))
 		{
 			return rules;
 		}
-		foreach (long id in grid.GridIds)
+		foreach (long id in gridIds)
 		{
 			if (s_gridRules.TryGetValue(id, out rules))
 			{

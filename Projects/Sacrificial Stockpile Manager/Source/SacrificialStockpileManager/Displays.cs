@@ -17,7 +17,7 @@ namespace SacrificialStockpileManager;
 /// </summary>
 internal static class Displays
 {
-	public static readonly string[] Pages = { "Overview", "Ores", "Ingots", "Components", "Ammo", "Tools & bottles", "All items", "Stock limits", "Quotas", "Warnings", "Log" };
+	public static readonly string[] Pages = { "Overview", "Ores", "Ingots", "Components", "Ammo", "Tools & bottles", "All items", "Containers", "Stock limits", "Quotas", "Warnings", "Log" };
 
 	private const string DefaultFont = "Monospace";
 
@@ -75,6 +75,11 @@ internal static class Displays
 				continue;
 			}
 			Construct construct = session.ConstructOf(block);
+			// Like everything else, only your own screens are written to unless the grid includes shared blocks.
+			if (construct == null || construct.Find(block.EntityId)?.NotYours != false)
+			{
+				continue;
+			}
 			GridSnapshot grid = rule.SourceGrid != 0 ? Store.Grid(rule.SourceGrid) : construct?.Snapshot;
 			Construct live = rule.SourceGrid != 0 ? session.FindConstruct(rule.SourceGrid) : construct;
 			string text = Render(rule.Page, grid, live, Columns(surface));
@@ -140,6 +145,9 @@ internal static class Displays
 					ItemList(text, grid, rules, columns, k => Items.Category(k) == category);
 				}
 			}
+			break;
+		case "Containers":
+			ContainerList(text, grid, columns);
 			break;
 		case "Stock limits":
 			StockList(text, grid, columns);
@@ -209,6 +217,29 @@ internal static class Displays
 			ItemLimit quota = rules?.Quota(key);
 			string value = quota != null && quota.HasMin ? $"{Items.Amount(amount)}/{Items.Amount(quota.Min)}" : Items.Amount(amount);
 			text.Append(Row(Items.Name(key), value, columns)).Append('\n');
+		}
+	}
+
+	/// <summary>Each storage and stock block with its fill: name and percentage, then a bar.</summary>
+	private static void ContainerList(StringBuilder text, GridSnapshot grid, int columns)
+	{
+		Construct.StorageVolume(grid, out double used, out double max);
+		text.Append(Row("All storage", max > 0.0 ? $"{used / max:P0}" : "-", columns)).Append('\n');
+		text.Append(Bar(max > 0.0 ? used / max : 0.0, columns)).Append('\n');
+		List<BlockSnapshot> blocks = grid.Blocks
+			.Where(b => !b.Docked && b.MaxVolume > 0.0)
+			.Where(b => Construct.Resolve(b) == Effective.Storage || Construct.Resolve(b) == Effective.Stock)
+			.OrderBy(b => b.Name, StringComparer.OrdinalIgnoreCase)
+			.ToList();
+		if (blocks.Count == 0)
+		{
+			text.Append("No storage blocks.\n");
+			return;
+		}
+		foreach (BlockSnapshot block in blocks)
+		{
+			text.Append(Row(block.Name, $"{block.Fill:P0}", columns)).Append('\n');
+			text.Append(Bar(block.Fill, columns)).Append('\n');
 		}
 	}
 

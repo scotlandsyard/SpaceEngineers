@@ -13,10 +13,12 @@ A client-side Pulsar plugin for inventory management and auto-restocking. It tak
 - Type `/ssm` in chat, or
 - Drag any block with an inventory or a screen onto a toolbar and pick **Stockpile Manager**. The menu opens on that block.
 
+The same blocks also get the toolbar actions **Stockpile Manager: Sort now** and **Stockpile Manager: Unload docked ships**, and the chat has `/ssm sort` and `/ssm unload` (they act on the grid you're on or nearest to).
+
 | Control | What it does |
 |---|---|
 | Grid | Your ships and stations: loaded ones first, then the rest with when they were last seen |
-| View | All grids, Overview, Items & quotas, Blocks, Block settings, Production, Production details, Refinery priority, Displays (LCD), Log, Help |
+| View | All grids, Overview, Items & quotas, Blocks, Block settings, Block type limits, Production, Production details, Refinery priority, Displays (LCD), Log, Help |
 
 The window closes with the X in its corner or with Esc. Tables update every half second. Click a column header to sort.
 
@@ -25,10 +27,11 @@ The window closes with the X in its corner or with Esc. Tables update every half
 | View | What it shows | Buttons |
 |---|---|---|
 | All grids | Every grid: last sync (Live when loaded), distance, storage used, storage size, fill, kinds of item; totals under the table | Open grid, GPS marker, Remove from list, Help |
-| Overview | Grid settings (double-click to switch), status, storage used / size / free, item totals, warnings, recent actions | Change setting, GPS marker, Remove from list, Help |
+| Overview | Grid settings (double-click to switch), status, storage used / size / free, item totals, warnings, recent actions | Change setting, Sort now, Unload docked ships, GPS marker |
 | Items & quotas | Every item on the grid with its quota, maximum, queued amount and autocraft / disassembly state | Set quota, Set maximum, Clear quota, Autocraft on/off; Find box |
 | Blocks | Every block with an inventory: role, fill %, used / size in litres, settings | Edit block, Turn on / off, Rescan, Help |
-| Block settings | One block: role, Accepts checkboxes, and per item what's there and its min/max | Set minimum, Set maximum, Clear limits, Back; Accept item |
+| Block settings | One block: role, fill priority (0-9), Accepts checkboxes, and per item what's there and its min/max (including limits from its type) | Set minimum, Set maximum, Clear limits, Back; Accept item |
+| Block type limits | Minimums and maximums for every block of a type on the grid: reactors, O2/H2 generators, turrets and guns, cockpits and seats, ship tools, gas tanks, refineries, assemblers. Shows how many blocks it covers and how many are below or above | Set minimum, Set maximum, Clear limits, Help |
 | Production | Assemblers, refineries, reactors, generators: state and queue or contents | Details, Edit block, Turn on / off, Help |
 | Production details | One assembler: its queue (with progress) and every material the queue needs, how much the grid has and how much is missing, and whether it blocks the current item. One refinery: input in refining order, and output | Remove from queue, Turn on / off, Edit block, Back |
 | Refinery priority | Every refinable ore: its priority, amount in storage and in refineries, and which refineries are working on it | Raise priority, Lower priority, No priority, Help |
@@ -53,6 +56,13 @@ Set in the Overview. All are off for a new grid except Clean production blocks, 
 | Survival kits autocraft | Let autocraft use survival kits too |
 | Disassemble surplus | Disassemble what's above an item's maximum (Items & quotas) |
 | Keep bottles filled | Take bottles that aren't full to a gas tank to refill, and put them back when full (needs Automation) |
+| Blocks shared with me | Off: only blocks you own are managed. On: blocks shared with your faction or everyone, and unowned blocks, are managed too |
+
+**Whose blocks.** The game lets a player use blocks shared with their faction, blocks shared with everyone, and blocks nobody owns. By default the plugin only manages blocks the player owns. It never takes from, puts into or queues on anyone else's block, and never writes to their screens. The server checks every move and queue request against the player's access either way, so the plugin can't do more than the player could by hand.
+
+**Sort now** runs everything Automation would do, once, until a pass has nothing to move (at most 2 minutes), even while Automation is off. **Unload docked ships** moves the cargo of the player's ships docked to the grid (cargo containers, connectors, collectors; not Stock or Manual blocks, and above any minimum) into the grid's storage. A grid's main grid is a station if it has one, so unloading always goes ship to station.
+
+**Priority** (0-9, Block settings): among storage blocks that accept an item equally well, the higher number fills first.
 
 **Disassembly.** The plugin picks one idle assembler (on, powered, nothing queued, not Manual), switches it to disassembly with the same request as the terminal's mode switch, and queues the surplus. Once that queue is done, it switches the assembler back to assembly. The game keeps the assembly queue aside meanwhile. It only switches back assemblers it switched itself, and it remembers them across restarts. The assembler pulls the items itself through conveyors, from any connected inventory. If the surplus disappears first, the plugin takes those entries out of the queue.
 
@@ -78,7 +88,7 @@ Set in the Overview. All are off for a new grid except Clean production blocks, 
 
 ## LCD pages
 
-Overview, Ores, Ingots, Components, Ammo, Tools & bottles, All items, Stock limits, Quotas, Warnings, Log. A screen can show the grid it's on or any other known grid. When a page is first assigned, the screen is switched to text mode with a monospace font. After that, font and size are left as you set them.
+Overview, Ores, Ingots, Components, Ammo, Tools & bottles, All items, Containers (each storage block's fill), Stock limits, Quotas, Warnings, Log. A screen can show the grid it's on or any other known grid. When a page is first assigned, the screen is switched to text mode with a monospace font. After that, font and size are left as you set them.
 
 ## Where settings are stored
 

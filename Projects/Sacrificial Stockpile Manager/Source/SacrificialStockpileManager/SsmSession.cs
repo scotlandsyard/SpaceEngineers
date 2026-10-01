@@ -82,6 +82,14 @@ public class SsmSession : MySessionComponentBase
 
 	private IMyTerminalAction _menuAction;
 
+	private const string SortActionId = "SacrificialStockpileManager_SortNow";
+
+	private const string UnloadActionId = "SacrificialStockpileManager_UnloadDocked";
+
+	private IMyTerminalAction _sortAction;
+
+	private IMyTerminalAction _unloadAction;
+
 	private bool _started;
 
 	internal IReadOnlyList<Construct> Constructs => _list;
@@ -97,6 +105,14 @@ public class SsmSession : MySessionComponentBase
 			Instance = this;
 			Store.Load();
 			_menuAction = new MyTerminalAction<MyTerminalBlock>(MenuActionId, new StringBuilder("Stockpile Manager"), block => OpenMenu(block), "Textures\\GUI\\Icons\\Actions\\Start.dds")
+			{
+				ValidForGroups = false
+			};
+			_sortAction = new MyTerminalAction<MyTerminalBlock>(SortActionId, new StringBuilder("Stockpile Manager: Sort now"), block => SortFromToolbar(block, unload: false), "Textures\\GUI\\Icons\\Actions\\Start.dds")
+			{
+				ValidForGroups = false
+			};
+			_unloadAction = new MyTerminalAction<MyTerminalBlock>(UnloadActionId, new StringBuilder("Stockpile Manager: Unload docked ships"), block => SortFromToolbar(block, unload: true), "Textures\\GUI\\Icons\\Actions\\Start.dds")
 			{
 				ValidForGroups = false
 			};
@@ -167,6 +183,8 @@ public class SsmSession : MySessionComponentBase
 			if ((block.HasInventory || (block is IngameSurfaceProvider provider && provider.SurfaceCount > 0)) && block.HasLocalPlayerAccess() && !actions.Contains(_menuAction))
 			{
 				actions.Add(_menuAction);
+				actions.Add(_sortAction);
+				actions.Add(_unloadAction);
 			}
 		}
 		catch (Exception ex)
@@ -177,10 +195,72 @@ public class SsmSession : MySessionComponentBase
 
 	private void OnMessageEntered(string messageText, ref bool sendToOthers)
 	{
-		if (messageText != null && messageText.Trim().Equals(ChatCommand, StringComparison.OrdinalIgnoreCase))
+		string[] words = (messageText ?? "").Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+		if (words.Length == 0 || !words[0].Equals(ChatCommand, StringComparison.OrdinalIgnoreCase))
 		{
-			sendToOthers = false;
+			return;
+		}
+		sendToOthers = false;
+		string command = words.Length > 1 ? words[1].ToLowerInvariant() : "";
+		switch (command)
+		{
+		case "":
 			OpenMenu(null);
+			break;
+		case "sort":
+		case "unload":
+			RefreshNow();
+			Construct construct = CurrentConstruct();
+			if (construct == null)
+			{
+				MyAPIGateway.Utilities.ShowMessage(ChatSender, "None of your grids is loaded near you.");
+				break;
+			}
+			StartOneShot(construct, command == "unload");
+			break;
+		default:
+			MyAPIGateway.Utilities.ShowMessage(ChatSender, "/ssm opens the menu. /ssm sort sorts the grid you're on now. /ssm unload empties ships docked to it into its storage.");
+			break;
+		}
+	}
+
+	private void SortFromToolbar(IMyTerminalBlock block, bool unload)
+	{
+		if (MyAPIGateway.Session?.Player == null)
+		{
+			return;
+		}
+		Construct construct = ConstructOf(block);
+		if (construct == null)
+		{
+			RefreshNow();
+			construct = ConstructOf(block);
+		}
+		if (construct == null)
+		{
+			MyAPIGateway.Utilities.ShowNotification("Stockpile Manager: this grid isn't one of yours.", 3000, MyFontEnum.Red);
+			return;
+		}
+		StartOneShot(construct, unload);
+	}
+
+	internal void StartOneShot(Construct construct, bool unload)
+	{
+		string name = construct.MainGrid?.CustomName ?? "grid";
+		if (unload)
+		{
+			if (!construct.Blocks.Any(b => b.Docked && !b.NotYours))
+			{
+				MyAPIGateway.Utilities.ShowNotification($"Stockpile Manager: no ship of yours is docked to {name}.", 3000, MyFontEnum.Red);
+				return;
+			}
+			UnloadDocked(construct);
+			MyAPIGateway.Utilities.ShowNotification($"Stockpile Manager: unloading docked ships into {name}", 3000);
+		}
+		else
+		{
+			SortNow(construct);
+			MyAPIGateway.Utilities.ShowNotification($"Stockpile Manager: sorting {name}", 3000);
 		}
 	}
 
@@ -327,8 +407,9 @@ public class SsmSession : MySessionComponentBase
 			{
 				continue;
 			}
-			// Named after and keyed by the biggest grid, so the key stays the same from pass to pass.
-			IMyCubeGrid main = grids.OrderByDescending(g => ((MyCubeGrid)g).BlocksCount).ThenBy(g => g.EntityId).First();
+			// Named after and keyed by a station if there is one (so a ship docked to a station is the docked one, and
+			// "unload docked ships" always goes ship to station), else the biggest grid. Stable from pass to pass.
+			IMyCubeGrid main = grids.OrderByDescending(g => g.IsStatic).ThenByDescending(g => ((MyCubeGrid)g).BlocksCount).ThenBy(g => g.EntityId).First();
 			if (!_constructs.TryGetValue(entry.Key, out Construct construct))
 			{
 				construct = new Construct { Terminal = entry.Key };
@@ -381,6 +462,7 @@ public class SsmSession : MySessionComponentBase
 				construct.NextEngine = now + EngineSeconds;
 				StockEngine engine = StockEngine.Run(construct, rules, now);
 				construct.Warnings = engine.Warnings;
+				FinishOneShots(construct, engine, now);
 			}
 			if (now >= construct.NextCraft)
 			{
@@ -412,8 +494,60 @@ public class SsmSession : MySessionComponentBase
 		RefreshConstruct(construct, now);
 		GridRules rules = Store.GridRules(construct.Snapshot);
 		construct.NextEngine = now + EngineSeconds;
-		construct.Warnings = StockEngine.Run(construct, rules, now).Warnings;
+		StockEngine engine = StockEngine.Run(construct, rules, now);
+		construct.Warnings = engine.Warnings;
+		FinishOneShots(construct, engine, now);
 		construct.NextCraft = now + CraftSeconds;
 		AutoCraft.Run(construct, rules, now);
+	}
+
+	// ---- Sort now / Unload docked ships ----
+
+	/// <summary>How long a Sort now or an unload may keep going before it's stopped.</summary>
+	private const double OneShotSeconds = 120.0;
+
+	/// <summary>Runs everything Automation would do on this grid until there's nothing left to move, even with Automation off.</summary>
+	internal void SortNow(Construct construct)
+	{
+		if (construct == null)
+		{
+			return;
+		}
+		construct.RunOnceUntil = Now + OneShotSeconds;
+		construct.AddLog("Sort now: started");
+		RunNow(construct);
+	}
+
+	/// <summary>Moves the cargo of ships docked to this grid into its storage, until there's nothing left to move.</summary>
+	internal void UnloadDocked(Construct construct)
+	{
+		if (construct == null)
+		{
+			return;
+		}
+		construct.UnloadUntil = Now + OneShotSeconds;
+		construct.AddLog("Unload docked ships: started");
+		RunNow(construct);
+	}
+
+	/// <summary>Ends a Sort now or an unload once a pass had nothing to move, or when its time is up.</summary>
+	private static void FinishOneShots(Construct construct, StockEngine engine, double now)
+	{
+		if (construct.RunOnceUntil > 0.0 && (now >= construct.RunOnceUntil || engine.Transfers == 0))
+		{
+			construct.AddLog(now >= construct.RunOnceUntil ? "Sort now: stopped after 2 minutes; run it again to continue" : "Sort now: finished, nothing left to move");
+			construct.RunOnceUntil = 0.0;
+		}
+		if (construct.UnloadUntil > 0.0 && (now >= construct.UnloadUntil || engine.UnloadTransfers == 0))
+		{
+			construct.AddLog(now >= construct.UnloadUntil ? "Unload docked ships: stopped after 2 minutes; run it again to continue" : "Unload docked ships: finished");
+			construct.UnloadUntil = 0.0;
+		}
+	}
+
+	/// <summary>The loaded grid the player is controlling or standing nearest to.</summary>
+	internal Construct CurrentConstruct()
+	{
+		return MyAPIGateway.Session?.Player == null ? null : FindConstruct(PickGrid(null));
 	}
 }

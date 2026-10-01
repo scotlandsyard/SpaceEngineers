@@ -90,7 +90,8 @@ internal class StockEngine
 
 	private readonly Construct _construct;
 
-	private readonly bool _move;
+	// Not readonly: the docked-ship unload switches moving on for itself.
+	private bool _move;
 
 	private readonly double _now;
 
@@ -144,19 +145,33 @@ internal class StockEngine
 		}
 	}
 
-	/// <summary>Runs one pass. With <paramref name="move"/> false it only works out the warnings.</summary>
+	/// <summary>Transfers sent by this pass's docked-ship unload.</summary>
+	public int UnloadTransfers { get; private set; }
+
+	/// <summary>
+	/// Runs one pass. Items only move when the grid's Automation is on or a Sort now is running; otherwise the pass
+	/// only works out the warnings. An Unload docked ships request moves the docked cargo either way.
+	/// </summary>
 	public static StockEngine Run(Construct construct, GridRules rules, double now)
 	{
 		ExpirePending(now);
-		StockEngine engine = new StockEngine(construct, rules != null && rules.Automation, now);
+		bool runOnce = now < construct.RunOnceUntil;
+		StockEngine engine = new StockEngine(construct, (rules != null && rules.Automation) || runOnce, now);
+		// Settings a grid hasn't saved yet have their defaults (Clean production blocks is on by default).
+		rules ??= new GridRules();
+		if (now < construct.UnloadUntil)
+		{
+			// Asked for by the player, so it goes first.
+			engine.UnloadDocked();
+		}
 		engine.FillMinimums();
 		engine.TrimMaximums();
-		if (rules != null && rules.OrePriority.Count > 0)
+		if (rules.OrePriority.Count > 0)
 		{
 			engine.PrioritizeOres(rules.OrePriority);
 		}
 		// A clogged production block stops work, so it comes before routine sorting.
-		if (rules != null && rules.DrainOutputs)
+		if (rules.DrainOutputs)
 		{
 			engine.CleanAssemblerInputs();
 			engine.DrainOutputs();
@@ -164,11 +179,42 @@ internal class StockEngine
 		engine.ClearStockBlocks();
 		engine.DrainIntakes();
 		engine.SortStorage();
-		if (rules != null && rules.FillBottles)
+		if (rules.FillBottles)
 		{
 			engine.FillBottles();
 		}
 		return engine;
+	}
+
+	/// <summary>
+	/// Moves the cargo of docked ships (their cargo containers, connectors and collectors with role Auto, Storage or
+	/// Intake) into this grid's storage. Stock and Manual blocks keep theirs, a block's minimum stays, and blocks that
+	/// aren't yours aren't touched (they aren't in the pass at all).
+	/// </summary>
+	private void UnloadDocked()
+	{
+		bool move = _move;
+		_move = true;
+		int before = _transfers;
+		foreach (Inv source in _inventories.Where(i => !i.IsOutput && i.Block.Docked && (i.Block.Kind == BlockKind.Cargo || i.Block.Kind == BlockKind.Connector || i.Block.Kind == BlockKind.Collector)).ToList())
+		{
+			BlockRole role = source.Block.Rules?.Role ?? BlockRole.Auto;
+			if (role == BlockRole.Stock || role == BlockRole.Manual)
+			{
+				continue;
+			}
+			foreach (string key in source.Amounts.Keys.ToList())
+			{
+				if (!Budget)
+				{
+					break;
+				}
+				ItemLimit limit = source.Block.Limit(key);
+				Put(source, key, Have(source, key) - (limit != null && limit.HasMin ? limit.Min : 0.0), 1);
+			}
+		}
+		UnloadTransfers = _transfers - before;
+		_move = move;
 	}
 
 	private static void ExpirePending(double now)
@@ -285,7 +331,7 @@ internal class StockEngine
 			// A disassembling assembler's output: items waiting to be taken apart.
 			return 0.0;
 		}
-		ItemLimit limit = inv.Block.Rules?.Limit(key);
+		ItemLimit limit = inv.Block.Limit(key);
 		switch (inv.Block.Role)
 		{
 		case Effective.Intake:
@@ -305,7 +351,7 @@ internal class StockEngine
 	/// <summary>Order to take from sources: things that should leave anyway first, other blocks' surplus last.</summary>
 	private static int SourceRank(Inv inv, string key)
 	{
-		if (inv.Finished || inv.Block.Role == Effective.Intake || (inv.Block.Role == Effective.Stock && inv.Block.Rules?.Limit(key) == null))
+		if (inv.Finished || inv.Block.Role == Effective.Intake || (inv.Block.Role == Effective.Stock && inv.Block.Limit(key) == null))
 		{
 			return 0;
 		}
@@ -356,7 +402,7 @@ internal class StockEngine
 
 	private IEnumerable<ItemLimit> LimitsOf(Inv inv)
 	{
-		return inv.Block.Rules?.Limits ?? Enumerable.Empty<ItemLimit>();
+		return inv.Block.Limits;
 	}
 
 	// ---- Passes ----
@@ -372,6 +418,11 @@ internal class StockEngine
 			foreach (ItemLimit limit in LimitsOf(destination))
 			{
 				if (!limit.HasMin || Have(destination, limit.Item) >= limit.Min - Epsilon)
+				{
+					continue;
+				}
+				// A limit for a whole type quietly skips the blocks that can't hold the item (turrets of another calibre).
+				if (!destination.Block.IsOwnLimit(limit) && (!Items.TryParse(limit.Item, out MyDefinitionId typeItem) || !destination.Inventory.CheckConstraint(typeItem)))
 				{
 					continue;
 				}
@@ -476,7 +527,7 @@ internal class StockEngine
 			{
 				foreach (string key in source.Amounts.Keys.ToList())
 				{
-					if (source.Block.Rules?.Limit(key) == null)
+					if (source.Block.Limit(key) == null)
 					{
 						Put(source, key, Have(source, key), 1);
 					}
@@ -556,7 +607,7 @@ internal class StockEngine
 			}
 			foreach (string key in input.Amounts.Keys.ToList())
 			{
-				if (needed.Contains(key) || input.Block.Rules?.Limit(key) != null)
+				if (needed.Contains(key) || input.Block.Limit(key) != null)
 				{
 					continue;
 				}
@@ -743,10 +794,12 @@ internal class StockEngine
 		}
 		double sent = 0.0;
 		IEnumerable<Inv> destinations = _storage
-			.Where(d => d.Block != source.Block)
+			// Items leaving a docked ship go to this grid's own storage, not to another docked ship.
+			.Where(d => d.Block != source.Block && !(source.Block.Docked && d.Block.Docked))
 			.Select(d => new KeyValuePair<Inv, int>(d, Tier(d.Block, key)))
 			.Where(d => d.Value >= minTier)
 			.OrderByDescending(d => d.Value)
+			.ThenByDescending(d => d.Key.Block.Rules?.Priority ?? 0)
 			.ThenByDescending(d => Have(d.Key, key) > 0.0)
 			.ThenByDescending(d => Free(d.Key))
 			.Select(d => d.Key)
@@ -762,7 +815,7 @@ internal class StockEngine
 				continue;
 			}
 			double room = amount - sent;
-			ItemLimit limit = destination.Block.Rules?.Limit(key);
+			ItemLimit limit = destination.Block.Limit(key);
 			if (limit != null && limit.HasMax)
 			{
 				room = Math.Min(room, limit.Max - Have(destination, key));

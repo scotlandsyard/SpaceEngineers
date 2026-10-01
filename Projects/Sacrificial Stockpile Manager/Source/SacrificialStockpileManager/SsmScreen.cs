@@ -24,6 +24,7 @@ public partial class SsmScreen : MyGuiScreenBase
 		Items,
 		Blocks,
 		Block,
+		Types,
 		Production,
 		Machine,
 		Refining,
@@ -33,7 +34,7 @@ public partial class SsmScreen : MyGuiScreenBase
 	}
 
 	// In the same order as View.
-	private static readonly string[] ViewNames = { "All grids", "Overview", "Items & quotas", "Blocks", "Block settings", "Production", "Production details", "Refinery priority", "Displays (LCD)", "Log", "Help" };
+	private static readonly string[] ViewNames = { "All grids", "Overview", "Items & quotas", "Blocks", "Block settings", "Block type limits", "Production","Production details", "Refinery priority", "Displays (LCD)", "Log", "Help" };
 
 	// In the same order as BlockRole.
 	private static readonly string[] RoleNames = { "Auto", "Storage", "Intake", "Stock", "Manual" };
@@ -96,6 +97,9 @@ public partial class SsmScreen : MyGuiScreenBase
 	/// <summary>The assembler or refinery shown in Production details.</summary>
 	private static long s_machineId;
 
+	/// <summary>The block type shown in Block type limits.</summary>
+	private static BlockKind s_typeKind = BlockKind.Reactor;
+
 	private static int s_page;
 
 	private static long s_source;
@@ -107,6 +111,8 @@ public partial class SsmScreen : MyGuiScreenBase
 	private MyGuiControlCombobox _blockCombo;
 
 	private MyGuiControlCombobox _roleCombo;
+
+	private MyGuiControlCombobox _priorityCombo;
 
 	private MyGuiControlCombobox _itemCombo;
 
@@ -133,8 +139,6 @@ public partial class SsmScreen : MyGuiScreenBase
 	private readonly List<long> _sourceKeys = new List<long>();
 
 	private MyGuiControlButton _autocraftButton;
-
-	private MyGuiControlButton _forgetButton;
 
 	/// <summary>Buttons that need the grid to be loaded.</summary>
 	private readonly List<MyGuiControlButton> _liveButtons = new List<MyGuiControlButton>();
@@ -234,11 +238,11 @@ public partial class SsmScreen : MyGuiScreenBase
 	{
 		AddCaption("Sacrificial Stockpile Manager");
 		_autocraftButton = null;
-		_forgetButton = null;
 		_liveButtons.Clear();
 		_acceptBoxes.Clear();
 		_blockCombo = null;
 		_roleCombo = null;
+		_priorityCombo = null;
 		_itemCombo = null;
 		_amountBox = null;
 		_pageCombo = null;
@@ -272,6 +276,12 @@ public partial class SsmScreen : MyGuiScreenBase
 			CreateMachineControls();
 			tableTop = -0.29f;
 			rows = 14;
+		}
+		else if (s_view == View.Types)
+		{
+			CreateTypeControls();
+			tableTop = -0.29f;
+			rows = 12;
 		}
 
 		if (s_view == View.Help)
@@ -318,7 +328,7 @@ public partial class SsmScreen : MyGuiScreenBase
 		_table.ItemDoubleClicked += (MyGuiControlTable table, MyGuiControlTable.EventArgs args) => OnRowDoubleClicked();
 		Controls.Add(_table);
 
-		if (s_view == View.Items || s_view == View.Block)
+		if (s_view == View.Items || s_view == View.Block || s_view == View.Types)
 		{
 			CreateItemEditor();
 		}
@@ -340,9 +350,16 @@ public partial class SsmScreen : MyGuiScreenBase
 			AddButton(0.315f, "Help", ShowHelp);
 			break;
 		case View.Overview:
+			// Remove from list lives in All grids; Help is in the View list.
 			AddButton(-0.315f, "Change setting", ChangeSelectedSetting);
-			AddButton(-0.105f, "GPS marker", MarkGps);
-			_forgetButton = AddButton(0.105f, "Remove from list", ForgetGrid);
+			_liveButtons.Add(AddButton(-0.105f, "Sort now", () => StartOneShot(unload: false)));
+			_liveButtons.Add(AddButton(0.105f, "Unload docked ships", () => StartOneShot(unload: true)));
+			AddButton(0.315f, "GPS marker", MarkGps);
+			break;
+		case View.Types:
+			AddButton(-0.315f, "Set minimum", () => SetTypeLimit(minimum: true));
+			AddButton(-0.105f, "Set maximum", () => SetTypeLimit(minimum: false));
+			AddButton(0.105f, "Clear limits", ClearTypeLimits);
 			AddButton(0.315f, "Help", ShowHelp);
 			break;
 		case View.Items:
@@ -404,7 +421,7 @@ public partial class SsmScreen : MyGuiScreenBase
 
 	private static bool HasEditorRow(View view)
 	{
-		return view == View.Items || view == View.Block || view == View.Displays;
+		return view == View.Items || view == View.Block || view == View.Types || view == View.Displays;
 	}
 
 	/// <summary>Block, role and accepts rows at the top of the Block settings view.</summary>
@@ -420,7 +437,7 @@ public partial class SsmScreen : MyGuiScreenBase
 		BlockRules rules = block == null ? null : Store.BlockRules(block.Id);
 
 		AddLabel(Left, Row2Y, "Block");
-		_blockCombo = AddCombo(-0.36f, Row2Y, 0.43f, 14);
+		_blockCombo = AddCombo(-0.36f, Row2Y, 0.33f, 14);
 		_blockKeys.Clear();
 		foreach (BlockSnapshot entry in blocks)
 		{
@@ -433,8 +450,8 @@ public partial class SsmScreen : MyGuiScreenBase
 		}
 		_blockCombo.ItemSelected += OnBlockSelected;
 
-		AddLabel(0.1f, Row2Y, "Role");
-		_roleCombo = AddCombo(0.16f, Row2Y, 0.26f, RoleNames.Length);
+		AddLabel(0.0f, Row2Y, "Role");
+		_roleCombo = AddCombo(0.055f, Row2Y, 0.2f, RoleNames.Length);
 		for (int i = 0; i < RoleNames.Length; i++)
 		{
 			string name = RoleNames[i];
@@ -447,6 +464,16 @@ public partial class SsmScreen : MyGuiScreenBase
 		_roleCombo.SelectItemByKey((long)(rules?.Role ?? BlockRole.Auto), sendEvent: false);
 		_roleCombo.ItemSelected += OnRoleSelected;
 		_roleCombo.Enabled = block != null;
+
+		AddLabel(0.265f, Row2Y, "Priority");
+		_priorityCombo = AddCombo(0.345f, Row2Y, 0.075f, 10, "Fill priority: among storage that accepts an item equally well, a higher number fills first");
+		for (int i = 0; i <= 9; i++)
+		{
+			_priorityCombo.AddItem(i, i.ToString(), i, null, sort: false);
+		}
+		_priorityCombo.SelectItemByKey(Math.Max(0, Math.Min(9, rules?.Priority ?? 0)), sendEvent: false);
+		_priorityCombo.ItemSelected += OnPrioritySelected;
+		_priorityCombo.Enabled = block != null;
 
 		AddLabel(Left, Row3Y, "Accepts");
 		for (int i = 0; i < Items.Categories.Length; i++)
@@ -621,9 +648,9 @@ public partial class SsmScreen : MyGuiScreenBase
 		Controls.Add(new MyGuiControlLabel(new Vector2(x, y), null, text, null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER));
 	}
 
-	private MyGuiControlCombobox AddCombo(float x, float y, float width, int openItems)
+	private MyGuiControlCombobox AddCombo(float x, float y, float width, int openItems, string toolTip = null)
 	{
-		MyGuiControlCombobox combo = new MyGuiControlCombobox(new Vector2(x, y), new Vector2(width, 0.04f), null, null, openItems, null, false, null, MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER);
+		MyGuiControlCombobox combo = new MyGuiControlCombobox(new Vector2(x, y), new Vector2(width, 0.04f), null, null, openItems, null, false, toolTip, MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER);
 		Controls.Add(combo);
 		return combo;
 	}
@@ -809,10 +836,6 @@ public partial class SsmScreen : MyGuiScreenBase
 		{
 			_autocraftButton.Text = rules != null && rules.Autocraft ? "Autocraft: ON" : "Autocraft: OFF";
 		}
-		if (_forgetButton != null)
-		{
-			_forgetButton.Enabled = !live && Grid != null;
-		}
 		foreach (MyGuiControlButton button in _liveButtons)
 		{
 			button.Enabled = live;
@@ -834,7 +857,9 @@ public partial class SsmScreen : MyGuiScreenBase
 		switch (s_view)
 		{
 		case View.Overview:
-			return "Double-click a setting (or select it and press Change setting) to switch it." + offline;
+			return "Double-click a setting to switch it. Sort now runs everything once, even with Automation off." + offline;
+		case View.Types:
+			return "Limits for every block of this type on the grid (not docked ships). A block's own limit for the item wins." + offline;
 		case View.Items:
 			return "Pick an item, type an amount: Set quota to keep at least that many (autocraft), Set maximum to disassemble above it." + offline;
 		case View.Blocks:
@@ -879,7 +904,7 @@ public partial class SsmScreen : MyGuiScreenBase
 	{
 		GridSnapshot grid = Grid;
 		List<RowData> rows = s_view == View.AllGrids ? AllGridRows() : grid == null ? new List<RowData>() : BuildRows(grid);
-		if ((s_view == View.Items || s_view == View.Block) && s_search.Trim().Length > 0)
+		if ((s_view == View.Items || s_view == View.Block || s_view == View.Types) && s_search.Trim().Length > 0)
 		{
 			rows = rows.Where(r => !r.Key.StartsWith("i:", StringComparison.Ordinal) || MatchesSearch(r.Key.Substring(2))).ToList();
 		}

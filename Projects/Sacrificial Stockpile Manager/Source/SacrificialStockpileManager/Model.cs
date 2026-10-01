@@ -74,7 +74,23 @@ public class BlockRules
 
 	public List<ItemLimit> Limits = new List<ItemLimit>();
 
-	public bool IsEmpty => Role == BlockRole.Auto && Accept.Count == 0 && Limits.Count == 0;
+	/// <summary>Fill priority for storage: among blocks that accept an item equally well, a higher number fills first.</summary>
+	public int Priority;
+
+	public bool IsEmpty => Role == BlockRole.Auto && Accept.Count == 0 && Limits.Count == 0 && Priority == 0;
+
+	public ItemLimit Limit(string item)
+	{
+		return Limits.FirstOrDefault(l => l.Item == item);
+	}
+}
+
+/// <summary>Limits that apply to every block of one type on a grid.</summary>
+public class TypeLimits
+{
+	public BlockKind Kind;
+
+	public List<ItemLimit> Limits = new List<ItemLimit>();
 
 	public ItemLimit Limit(string item)
 	{
@@ -121,6 +137,20 @@ public class GridRules
 
 	/// <summary>Ore keys refineries work on first, highest priority first.</summary>
 	public List<string> OrePriority = new List<string>();
+
+	/// <summary>
+	/// Also manage blocks that someone else owns (or nobody owns) but that are shared with this player. Off by
+	/// default, so the plugin never takes from or fills a faction-mate's block on a shared grid.
+	/// </summary>
+	public bool IncludeShared;
+
+	/// <summary>Limits for every block of a type on the grid (all reactors, all turrets...). A block's own limit for an item wins.</summary>
+	public List<TypeLimits> TypeLimits = new List<TypeLimits>();
+
+	public TypeLimits Type(BlockKind kind)
+	{
+		return TypeLimits.FirstOrDefault(t => t.Kind == kind);
+	}
 
 	public List<ItemLimit> Quotas = new List<ItemLimit>();
 
@@ -181,6 +211,9 @@ public class BlockSnapshot
 
 	/// <summary>On a grid docked by connector rather than part of the ship or station itself.</summary>
 	public bool Docked;
+
+	/// <summary>Owned by someone else (or nobody) and the grid doesn't include shared blocks: the plugin leaves it alone.</summary>
+	public bool NotYours;
 
 	private Dictionary<string, double> _items;
 

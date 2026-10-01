@@ -28,6 +28,23 @@ internal class LiveBlock
 	/// <summary>On a grid joined to the main grid only through connectors (a docked ship, or the station it docked to).</summary>
 	public bool Docked;
 
+	/// <summary>Owned by someone else (or nobody), and the grid doesn't include shared blocks: never touched.</summary>
+	public bool NotYours;
+
+	/// <summary>The block's own limits plus the grid's limits for its type (its own win for the same item).</summary>
+	public List<ItemLimit> Limits = new List<ItemLimit>();
+
+	public ItemLimit Limit(string item)
+	{
+		return Limits.FirstOrDefault(l => l.Item == item);
+	}
+
+	/// <summary>True when the limit was set on this block itself rather than for its whole type.</summary>
+	public bool IsOwnLimit(ItemLimit limit)
+	{
+		return Rules != null && Rules.Limits.Contains(limit);
+	}
+
 	/// <summary>The main inventory (a machine's input), or null for blocks without one.</summary>
 	public MyInventory Input;
 
@@ -77,6 +94,12 @@ internal class Construct
 	/// <summary>Per item key: game time before which autocraft won't queue it again (waits for the server).</summary>
 	public readonly Dictionary<string, double> CraftCooldown = new Dictionary<string, double>();
 
+	/// <summary>Sort now: the engine runs as if Automation were on until a pass moves nothing, or until this time.</summary>
+	public double RunOnceUntil;
+
+	/// <summary>Unload docked ships: their cargo is moved into storage until a pass moves nothing, or until this time.</summary>
+	public double UnloadUntil;
+
 	public LiveBlock Find(long blockId)
 	{
 		return Blocks.FirstOrDefault(b => b.Block.EntityId == blockId);
@@ -93,15 +116,20 @@ internal class Construct
 
 	public static Effective Resolve(BlockSnapshot block)
 	{
-		return Resolve(block.Kind, Store.BlockRules(block.Id), block.Docked);
+		return Resolve(block.Kind, Store.BlockRules(block.Id), block.Docked, block.NotYours);
 	}
 
 	/// <summary>
-	/// The role a block acts in. Auto blocks on a grid docked by connector count as machines: they keep their own
-	/// limits (so a docked ship's lockers restock), but a docked ship's cargo isn't sorted into the station.
+	/// The role a block acts in. A block that isn't yours (unless the grid includes shared blocks) is left alone
+	/// whatever its role. Auto blocks on a grid docked by connector count as machines: they keep their own limits
+	/// (so a docked ship's lockers restock), but a docked ship's cargo isn't sorted into the station.
 	/// </summary>
-	public static Effective Resolve(BlockKind kind, BlockRules rules, bool docked)
+	public static Effective Resolve(BlockKind kind, BlockRules rules, bool docked, bool notYours = false)
 	{
+		if (notYours)
+		{
+			return Effective.Manual;
+		}
 		switch (rules?.Role ?? BlockRole.Auto)
 		{
 		case BlockRole.Storage:
@@ -239,6 +267,9 @@ internal class Construct
 		List<IMyCubeGrid> mechanical = new List<IMyCubeGrid>();
 		MyAPIGateway.GridGroups.GetGroup(MainGrid, GridLinkTypeEnum.Mechanical, mechanical);
 		HashSet<long> core = new HashSet<long>(mechanical.Select(g => g.EntityId)) { MainGrid.EntityId };
+		GridRules gridRules = Store.GridRules(Key, gridIds);
+		long me = MyAPIGateway.Session?.Player?.IdentityId ?? 0;
+		bool includeShared = gridRules != null && gridRules.IncludeShared;
 		foreach (IMyTerminalBlock block in found)
 		{
 			LiveBlock live = new LiveBlock
@@ -247,9 +278,18 @@ internal class Construct
 				Kind = KindOf(block),
 				Rules = Store.BlockRules(block.EntityId),
 				Docked = !core.Contains(block.CubeGrid.EntityId),
+				// The game lets you use blocks shared with your faction or with everyone, and blocks nobody owns. The
+				// plugin only manages your own unless the grid's "include shared blocks" setting is on.
+				NotYours = block.OwnerId != me && !includeShared,
 				Surfaces = block is IngameSurfaceProvider provider ? provider.SurfaceCount : 0
 			};
-			live.Role = Resolve(live.Kind, live.Rules, live.Docked);
+			live.Role = Resolve(live.Kind, live.Rules, live.Docked, live.NotYours);
+			live.Limits = live.Rules?.Limits.ToList() ?? new List<ItemLimit>();
+			TypeLimits typeLimits = live.Docked ? null : gridRules?.Type(live.Kind);
+			if (typeLimits != null)
+			{
+				live.Limits.AddRange(typeLimits.Limits.Where(t => !live.Limits.Any(l => l.Item == t.Item)));
+			}
 			if (block.HasInventory)
 			{
 				live.Input = block.GetInventory(0) as MyInventory;
@@ -292,7 +332,8 @@ internal class Construct
 			Enabled = !(block is IMyFunctionalBlock functional) || functional.Enabled,
 			Functional = block.IsFunctional,
 			Surfaces = live.Surfaces,
-			Docked = live.Docked
+			Docked = live.Docked,
+			NotYours = live.NotYours
 		};
 		for (int i = 0; i < block.InventoryCount; i++)
 		{
