@@ -556,9 +556,9 @@ public class MaidScreen : MyGuiScreenBase
 			{
 				new Column { Name = "Component", Width = 0.25f },
 				new Column { Name = "Missing", Width = 0.11f, RightAligned = true },
+				new Column { Name = "In stock", Width = 0.14f, RightAligned = true },
 				new Column { Name = "Queued", Width = 0.11f, RightAligned = true },
-				new Column { Name = "Built", Width = 0.11f, RightAligned = true },
-				new Column { Name = "Auto-queue", Width = 0.42f }
+				new Column { Name = "Auto-queue", Width = 0.39f }
 			};
 		case View.WeldPriority:
 		case View.GrindPriority:
@@ -827,10 +827,12 @@ public class MaidScreen : MyGuiScreenBase
 		bool canQueue = group.UsableAssemblers().Count > 0;
 		double now = BaRMaidSession.Now;
 		List<RowData> rows = new List<RowData>();
-		foreach (KeyValuePair<MyDefinitionId, int> item in group.MissingComponents().Where(m => m.Value > 0).OrderBy(m => MaidGroup.ComponentName(m.Key)))
+		Dictionary<MyDefinitionId, int> missing = group.MissingComponents();
+		Dictionary<MyDefinitionId, int> cargo = group.StockOnConstruct(missing.Keys);
+		foreach (KeyValuePair<MyDefinitionId, int> item in missing.Where(m => m.Value > 0).OrderBy(m => MaidGroup.ComponentName(m.Key)))
 		{
 			int queued = AssemblerQueue.QueuedAmount(assemblers, item.Key);
-			int built = AssemblerQueue.OutputAmount(assemblers, item.Key);
+			int inStock = cargo[item.Key] + AssemblerQueue.OutputAmount(assemblers, item.Key);
 			string state;
 			Color? color = null;
 			if (group.Notes.TryGetValue(item.Key, out string note) && group.WaitSeconds(item.Key, now) > 0)
@@ -838,7 +840,13 @@ public class MaidScreen : MyGuiScreenBase
 				state = note;
 				color = note.StartsWith("Queued") ? GoodColor : WarningColor;
 			}
-			else if (queued + built >= item.Value)
+			else if (inStock >= item.Value)
+			{
+				// The mod hasn't found it yet: it only searches a few inventories at a time.
+				state = "In stock, not crafted (BaR still fetching it)";
+				color = GoodColor;
+			}
+			else if (queued + inStock >= item.Value)
 			{
 				state = "Enough queued";
 				color = GoodColor;
@@ -855,8 +863,8 @@ public class MaidScreen : MyGuiScreenBase
 			rows.Add(new RowData
 			{
 				Key = "m" + item.Key,
-				Texts = new[] { MaidGroup.ComponentName(item.Key), item.Value.ToString("N0"), queued.ToString("N0"), built.ToString("N0"), state },
-				SortValues = new object[] { null, (double)item.Value, (double)queued, (double)built, null },
+				Texts = new[] { MaidGroup.ComponentName(item.Key), item.Value.ToString("N0"), inStock.ToString("N0"), queued.ToString("N0"), state },
+				SortValues = new object[] { null, (double)item.Value, (double)inStock, (double)queued, null },
 				Color = color
 			});
 		}

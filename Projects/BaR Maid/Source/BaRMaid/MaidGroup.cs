@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Sandbox.Definitions;
+using Sandbox.Game;
 using Sandbox.ModAPI;
 using VRage.Game;
+using VRage.Game.Entity;
 using IngameEntity = VRage.Game.ModAPI.Ingame.IMyEntity;
 using IngameSlimBlock = VRage.Game.ModAPI.Ingame.IMySlimBlock;
 using MyAssemblerMode = Sandbox.ModAPI.Ingame.MyAssemblerMode;
@@ -139,13 +141,24 @@ internal class MaidGroup
 			return 0;
 		}
 		int kinds = 0;
-		foreach (KeyValuePair<MyDefinitionId, int> item in MissingComponents())
+		Dictionary<MyDefinitionId, int> missing = MissingComponents();
+		Dictionary<MyDefinitionId, int> stock = StockOnConstruct(missing.Keys);
+		foreach (KeyValuePair<MyDefinitionId, int> item in missing)
 		{
 			if (item.Value <= 0 || (_lastAttempt.TryGetValue(item.Key, out double last) && now < last))
 			{
 				continue;
 			}
-			int queued = AssemblerQueue.Ensure(assemblers, item.Key, item.Value, out string problem);
+			// The mod reports a component missing whenever its last look through the conveyor network came up short.
+			// It only checks a few inventories per look, so a big stock elsewhere still counts as missing for a while.
+			// Only craft what the construct really doesn't have.
+			int wanted = item.Value - stock[item.Key];
+			if (wanted <= 0)
+			{
+				Notes.Remove(item.Key);
+				continue;
+			}
+			int queued = AssemblerQueue.Ensure(assemblers, item.Key, wanted, out string problem);
 			if (queued > 0)
 			{
 				_lastAttempt[item.Key] = now + RequeueDelaySeconds;
@@ -164,6 +177,44 @@ internal class MaidGroup
 			}
 		}
 		return kinds;
+	}
+
+	/// <summary>
+	/// How many of each component sit in the construct's inventories: cargo, connectors, the systems themselves and
+	/// so on. Assemblers are left out because AssemblerQueue already counts their finished output.
+	/// </summary>
+	public Dictionary<MyDefinitionId, int> StockOnConstruct(IEnumerable<MyDefinitionId> components)
+	{
+		Dictionary<MyDefinitionId, int> stock = new Dictionary<MyDefinitionId, int>();
+		foreach (MyDefinitionId id in components)
+		{
+			stock[id] = 0;
+		}
+		if (stock.Count == 0 || TerminalSystem == null)
+		{
+			return stock;
+		}
+		List<IMyTerminalBlock> blocks = new List<IMyTerminalBlock>();
+		TerminalSystem.GetBlocksOfType(blocks, b => b.HasInventory && !b.Closed && !(b is IMyAssembler));
+		foreach (IMyTerminalBlock block in blocks)
+		{
+			for (int i = 0; i < block.InventoryCount; i++)
+			{
+				if (!(block.GetInventory(i) is MyInventory inventory))
+				{
+					continue;
+				}
+				foreach (MyPhysicalInventoryItem item in inventory.GetItems())
+				{
+					MyDefinitionId id = item.Content.GetId();
+					if (stock.TryGetValue(id, out int amount))
+					{
+						stock[id] = amount + (int)item.Amount;
+					}
+				}
+			}
+		}
+		return stock;
 	}
 
 	/// <summary>Seconds until the component may be queued again, or 0.</summary>

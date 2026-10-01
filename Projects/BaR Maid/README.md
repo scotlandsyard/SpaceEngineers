@@ -67,13 +67,17 @@ The plugin was called Needy BOB at first. A `[Needy BOB]` section from then is s
 
 ## Auto-queuing
 
-While auto-queue is on, each group is checked every 3 seconds. This works the same way as the mod's own EnsureQueued, which the script calls:
+While auto-queue is on, each group is checked every 3 seconds. This is based on the mod's own EnsureQueued, which the script calls, with one difference in step 2:
 
 1. It takes the missing components across the group's systems. Overlapping systems report the same shortfall, so each component uses the largest amount any one system reports, not the sum.
-2. It counts what's already queued or finished in the group's assemblers, and queues only the difference.
+2. It subtracts what's already on the construct (cargo, connectors, the systems themselves, finished output in assemblers) and what's already queued, and queues only the difference.
 3. It spreads the new work over the assemblers that can build the component, starting with the shortest queues.
 
-It only uses assemblers that are switched on, intact, in assembly mode and accessible to you. **Missing components** shows, for each component, the amount missing, the amount queued, the amount already built, and whether it was queued or why it couldn't be.
+Step 2 matters because the Build and Repair mod looks through at most 16 inventories each time it fetches components, carrying on from where it stopped the time before. On a base with many inventories, it reports a component as missing whenever the inventories it just checked didn't have it, even with plenty in a cargo container it hasn't reached yet. Inventory sorters make this happen more often, because they keep moving items and emptying the Build and Repair block. The original script queued on every one of those reports. BaR Maid only crafts what the construct really doesn't have.
+
+It only uses assemblers that are switched on, intact, in assembly mode and accessible to you. **Missing components** shows, for each component, the amount missing, the amount in stock, the amount queued, and whether it was queued or why it couldn't be. "In stock, not crafted" means the system just hasn't found it yet.
+
+**Inventory sorters:** a sorter that empties every block with items it isn't asking for will keep pulling components back out of the Build and Repair blocks. For the GV Inventory Sorter, put `Locked` in the Build and Repair block's name (its other ignore words are `Hidden` and `!manual`) and the sorter leaves it alone.
 
 ## Multiplayer
 
