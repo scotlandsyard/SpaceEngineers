@@ -1,6 +1,6 @@
 # Sacrificial Stockpile Manager
 
-A client-side Pulsar plugin for inventory management and auto-restocking. It takes ideas from inventory scripts such as Isy's Inventory Manager, Mamba Inventory Manager, GOAT Sorter, iBex and SHEPHERD, but everything is set up in an in-game menu instead of block names or Custom Data:
+A client-side Pulsar plugin for inventory management and auto-restocking. It takes ideas from inventory scripts such as Isy's Inventory Manager, Mamba Inventory Manager, GOAT Sorter and iBex, but everything is set up in an in-game menu instead of block names or Custom Data:
 
 - Shows the inventory of every ship and station you own, including ones that aren't loaded right now (as they were when last in range).
 - Sorts items into the storage blocks you choose (by category or by single item).
@@ -99,4 +99,4 @@ Everything runs on your client. Nothing is needed on the server.
 
 Set `Bin64` in `Source/SacrificialStockpileManager.csproj` if Space Engineers isn't in the default Steam location. Then run `dotnet build -c Release` in `Source`. The plugin is written to `Source/bin/Release/net481/SacrificialStockpileManager.dll`.
 
-The plugin uses its own assembly name (`SacrificialStockpileManager`), action ID (`SacrificialStockpileManager_OpenMenu`), chat command (`/ssm`), storage files (`SacrificialStockpileManager_*`) and GPS key line (`SSM:grid:`), so it can't clash with the other plugins in this repo.
+The plugin uses its own assembly name (`SacrificialStockpileManager`), action ID (`SacrificialStockpileManager_OpenMenu`), chat command (`/ssm`), storage files (`SacrificialStockpileManager_*`) and GPS key line (`SSM:grid:`), so it can't clash with other plugins or mods.

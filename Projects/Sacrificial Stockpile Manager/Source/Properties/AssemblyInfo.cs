@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 
 [assembly: AssemblyTitle("SacrificialStockpileManager")]
-[assembly: AssemblyDescription("")]
+[assembly: AssemblyDescription("Inventory management, sorting, restocking and autocrafting for Space Engineers, set up in an in-game menu")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("SacrificialStockpileManager")]
