@@ -10,6 +10,7 @@ using Sandbox.Game.GameSystems;
 using Sandbox.Game.Gui;
 using Sandbox.Game.Localization;
 using Sandbox.Game.Screens;
+using Sandbox.Game.World;
 using Sandbox.Game.Screens.Helpers;
 using Sandbox.Game.Screens.Terminal.Controls;
 using Sandbox.Graphics.GUI;
@@ -77,6 +78,9 @@ public class ScriptSession : MySessionComponentBase
 
 	private bool _started;
 
+	/// <summary>Set once the scripts have saved at the start of unloading, so they aren't asked again too late.</summary>
+	private bool _savedOnUnload;
+
 	public override void BeforeStart()
 	{
 		try
@@ -94,6 +98,7 @@ public class ScriptSession : MySessionComponentBase
 			_menuAction = CreateMenuAction();
 			MyAPIGateway.TerminalControls.CustomActionGetter += CustomActionGetter;
 			MyAPIGateway.Utilities.MessageEntered += OnMessageEntered;
+			MySession.OnUnloading += OnSessionUnloading;
 			_started = true;
 		}
 		catch (Exception ex)
@@ -106,6 +111,21 @@ public class ScriptSession : MySessionComponentBase
 	{
 		// Called when this game saves the world (single player or hosting): like the programmable block, ask every
 		// script to save its state.
+		SaveAllScripts();
+	}
+
+	/// <summary>
+	/// The game is leaving the world. This runs before any grid is unloaded (UnloadData runs after), so it's the
+	/// last moment the scripts' Save() can still use their blocks.
+	/// </summary>
+	private void OnSessionUnloading()
+	{
+		SaveAllScripts();
+		_savedOnUnload = true;
+	}
+
+	private void SaveAllScripts()
+	{
 		if (!_started)
 		{
 			return;
@@ -130,11 +150,12 @@ public class ScriptSession : MySessionComponentBase
 		{
 			foreach (VirtualProgram program in _programs)
 			{
-				program.Shutdown();
+				program.Shutdown(callSave: !_savedOnUnload);
 			}
 			SaveNow();
 			try
 			{
+				MySession.OnUnloading -= OnSessionUnloading;
 				MyAPIGateway.TerminalControls.CustomActionGetter -= CustomActionGetter;
 				MyAPIGateway.Utilities.MessageEntered -= OnMessageEntered;
 			}

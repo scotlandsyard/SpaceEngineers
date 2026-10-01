@@ -670,16 +670,22 @@ internal class VirtualProgram
 		}
 	}
 
-	/// <summary>Stops the script for good (deleted, or the world is unloading).</summary>
-	public void Shutdown()
+	/// <summary>
+	/// Stops the script for good (deleted, or the world is unloading). callSave is false when the world is unloading:
+	/// Save() already ran while the grids still existed, and by now they are being torn down.
+	/// </summary>
+	public void Shutdown(bool callSave = true)
 	{
-		try
+		if (callSave)
 		{
-			CallSave();
-		}
-		catch (Exception e)
-		{
-			MyLog.Default.WriteLineAndConsole($"[ScriptToPlugin] Saving {Entry.Name}: {e.Message}");
+			try
+			{
+				CallSave();
+			}
+			catch (Exception e)
+			{
+				MyLog.Default.WriteLineAndConsole($"[ScriptToPlugin] Saving {Entry.Name}: {e.Message}");
+			}
 		}
 		Unload();
 		ReplaceAssembly(null, null);
