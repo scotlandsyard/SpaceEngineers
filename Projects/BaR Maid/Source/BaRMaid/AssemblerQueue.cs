@@ -9,8 +9,8 @@ using VRage.Game;
 namespace BaRMaid;
 
 /// <summary>
-/// Puts components into assembler queues the same way the Build and Repair mod's EnsureQueued does: count
-/// what is already queued or sitting in the assemblers' output, then top up the shortest queues. On a
+/// Puts components into assembler queues, based on the Build and Repair mod's EnsureQueued: count
+/// what is already queued or sitting in the assemblers' output, then queue the rest in the shortest queue. On a
 /// client, AddQueueItemRequest sends the same request as the terminal's production screen, and the server
 /// checks the player's access before adding it.
 /// </summary>
@@ -46,7 +46,6 @@ internal static class AssemblerQueue
 			return 0;
 		}
 		List<KeyValuePair<MyProductionBlock, int>> candidates = new List<KeyValuePair<MyProductionBlock, int>>();
-		int totalQueue = 0;
 		foreach (IMyAssembler assembler in assemblers)
 		{
 			if (!(assembler is MyProductionBlock block))
@@ -57,7 +56,6 @@ internal static class AssemblerQueue
 			if (block.CanUseBlueprint(blueprint))
 			{
 				candidates.Add(new KeyValuePair<MyProductionBlock, int>(block, queueSize));
-				totalQueue += queueSize;
 			}
 		}
 		if (amount <= 0)
@@ -69,38 +67,18 @@ internal static class AssemblerQueue
 			problem = "No assembler in the group can build it";
 			return 0;
 		}
-		int wanted = amount;
-		candidates.Sort((a, b) => a.Value.CompareTo(b.Value));
-		// First bring the shorter queues up to the average, then spread what's left evenly.
-		int average = totalQueue / candidates.Count;
-		if (average > 0)
-		{
-			foreach (KeyValuePair<MyProductionBlock, int> candidate in candidates)
-			{
-				int space = Math.Min(average - candidate.Value, amount);
-				if (space > 0)
-				{
-					candidate.Key.AddQueueItemRequest(blueprint, space);
-					amount -= space;
-					if (amount <= 0)
-					{
-						return wanted;
-					}
-				}
-			}
-		}
-		int perBlock = (int)Math.Ceiling((double)amount / candidates.Count);
+		// The whole order goes to one assembler, the one with the shortest queue, rather than a slice to every
+		// assembler (which the mod's EnsureQueued does, filling every queue with the same item).
+		KeyValuePair<MyProductionBlock, int> shortest = candidates[0];
 		foreach (KeyValuePair<MyProductionBlock, int> candidate in candidates)
 		{
-			int space = Math.Min(perBlock, amount);
-			candidate.Key.AddQueueItemRequest(blueprint, space);
-			amount -= space;
-			if (amount <= 0)
+			if (candidate.Value < shortest.Value)
 			{
-				break;
+				shortest = candidate;
 			}
 		}
-		return wanted;
+		shortest.Key.AddQueueItemRequest(blueprint, amount);
+		return amount;
 	}
 
 	/// <summary>How many of the component are queued in the assemblers.</summary>

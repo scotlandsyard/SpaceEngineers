@@ -732,7 +732,7 @@ public class MaidScreen : MyGuiScreenBase
 		int assemblers = group.Assemblers.Count(a => !a.Closed);
 		if (assemblers == 0)
 		{
-			return group.IsDefault ? "No assemblers on this construct" : $"No assemblers in group {group.Name}";
+			return $"No assemblers assigned to {group.Name} (use Setup: groups)";
 		}
 		int usable = group.UsableAssemblers().Count;
 		string count = usable == assemblers ? $"{assemblers} assembler(s)" : $"{usable} of {assemblers} assembler(s) usable";
@@ -958,7 +958,7 @@ public class MaidScreen : MyGuiScreenBase
 		{
 			bool isSystem = block is IMyShipWelder;
 			string name = MaidConfig.GetGroup(block);
-			string groupText = MaidConfig.IsNoGroup(name) ? "(none)" : MaidConfig.IsDefaultGroup(name) ? (isSystem ? MaidConfig.DefaultGroup : "Default (unassigned)") : name;
+			string groupText = MaidConfig.IsNoGroup(name) ? "(none)" : name == null ? (isSystem ? MaidConfig.DefaultGroup : "(not used)") : MaidConfig.IsDefaultGroup(name) ? MaidConfig.DefaultGroup : name;
 			string state = !block.IsFunctional ? "Damaged" : block is IMyFunctionalBlock functional && !functional.Enabled ? "Off" : !block.IsWorking ? "No power" : "Working";
 			if (block is IMyAssembler assembler && assembler.Mode != MyAssemblerMode.Assembly)
 			{
@@ -971,7 +971,7 @@ public class MaidScreen : MyGuiScreenBase
 			{
 				Key = key,
 				Texts = new[] { block.CustomName, isSystem ? "Build and Repair" : "Assembler", groupText, state },
-				Color = inThisGroup ? GoodColor : MaidConfig.IsNoGroup(name) ? MutedColor : (Color?)null
+				Color = inThisGroup ? GoodColor : MaidConfig.IsNoGroup(name) || (!isSystem && name == null) ? MutedColor : (Color?)null
 			});
 		}
 		return rows.OrderBy(r => r.Texts[1] == "Assembler").ThenBy(r => r.Texts[0], StringComparer.OrdinalIgnoreCase).ToList();

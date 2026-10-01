@@ -363,30 +363,40 @@ public class BaRMaidSession : MySessionComponentBase
 
 	private void RebuildGroups()
 	{
-		Dictionary<IMyGridTerminalSystem, List<IMyShipWelder>> byTerminal = new Dictionary<IMyGridTerminalSystem, List<IMyShipWelder>>();
+		// A construct is the grids joined by rotors, pistons and hinges. Ships docked by connector share the terminal
+		// system but are constructs of their own, so their assemblers are never used for this one's systems.
+		Dictionary<long, Construct> constructs = new Dictionary<long, Construct>();
+		List<IMyCubeGrid> linked = new List<IMyCubeGrid>();
 		foreach (IMyShipWelder system in _foundSystems)
 		{
 			if (system.Closed || !system.HasLocalPlayerAccess())
 			{
 				continue;
 			}
-			IMyGridTerminalSystem terminal = MyAPIGateway.TerminalActionsHelper.GetTerminalSystemForGrid(system.CubeGrid);
-			if (terminal == null)
+			linked.Clear();
+			MyAPIGateway.GridGroups.GetGroup(system.CubeGrid, GridLinkTypeEnum.Mechanical, linked);
+			if (linked.Count == 0)
 			{
-				continue;
+				linked.Add(system.CubeGrid);
 			}
-			if (!byTerminal.TryGetValue(terminal, out List<IMyShipWelder> list))
+			long id = linked.Min(g => g.EntityId);
+			if (!constructs.TryGetValue(id, out Construct construct))
 			{
-				list = new List<IMyShipWelder>();
-				byTerminal[terminal] = list;
+				IMyGridTerminalSystem terminal = MyAPIGateway.TerminalActionsHelper.GetTerminalSystemForGrid(system.CubeGrid);
+				if (terminal == null)
+				{
+					continue;
+				}
+				construct = new Construct { Terminal = terminal, Grids = new HashSet<IMyCubeGrid>(linked) };
+				constructs[id] = construct;
 			}
-			list.Add(system);
+			construct.Systems.Add(system);
 		}
 
 		Dictionary<string, MaidGroup> rebuilt = new Dictionary<string, MaidGroup>(StringComparer.Ordinal);
-		foreach (KeyValuePair<IMyGridTerminalSystem, List<IMyShipWelder>> entry in byTerminal)
+		foreach (Construct construct in constructs.Values)
 		{
-			BuildConstructGroups(entry.Key, entry.Value, rebuilt);
+			BuildConstructGroups(construct, rebuilt);
 		}
 
 		_groups.Clear();
@@ -419,13 +429,24 @@ public class BaRMaidSession : MySessionComponentBase
 	}
 
 	/// <summary>Sorts one construct's systems and assemblers into groups by their Custom Data.</summary>
-	private void BuildConstructGroups(IMyGridTerminalSystem terminal, List<IMyShipWelder> systems, Dictionary<string, MaidGroup> rebuilt)
+	private class Construct
 	{
+		public IMyGridTerminalSystem Terminal;
+
+		public HashSet<IMyCubeGrid> Grids;
+
+		public readonly List<IMyShipWelder> Systems = new List<IMyShipWelder>();
+	}
+
+	private void BuildConstructGroups(Construct construct, Dictionary<string, MaidGroup> rebuilt)
+	{
+		IMyGridTerminalSystem terminal = construct.Terminal;
+		List<IMyShipWelder> systems = construct.Systems;
 		// Name groups after the biggest grid of the construct and key them by its entity id, so the key survives
 		// renaming and stays the same from pass to pass.
 		IMyCubeGrid mainGrid = systems.Select(s => s.CubeGrid).OrderByDescending(g => ((MyCubeGrid)g).BlocksCount).ThenBy(g => g.EntityId).First();
 		List<IMyAssembler> assemblers = new List<IMyAssembler>();
-		terminal.GetBlocksOfType(assemblers, a => !a.Closed && a.HasLocalPlayerAccess() && !a.BlockDefinition.TypeIdString.Contains("SurvivalKit"));
+		terminal.GetBlocksOfType(assemblers, a => !a.Closed && construct.Grids.Contains(a.CubeGrid) && a.HasLocalPlayerAccess() && !a.BlockDefinition.TypeIdString.Contains("SurvivalKit"));
 		List<IMyTerminalBlock> constructBlocks = new List<IMyTerminalBlock>();
 		constructBlocks.AddRange(systems);
 		constructBlocks.AddRange(assemblers);
@@ -467,12 +488,12 @@ public class BaRMaidSession : MySessionComponentBase
 
 		foreach (IMyAssembler assembler in assemblers)
 		{
+			// Assemblers are opt-in: only ones assigned to a group (Default included) ever get work.
 			string name = MaidConfig.GetGroup(assembler);
-			if (MaidConfig.IsNoGroup(name))
+			if (name == null || MaidConfig.IsNoGroup(name))
 			{
 				continue;
 			}
-			// Assemblers with no group of their own work for the Default group.
 			if (local.TryGetValue(MaidConfig.IsDefaultGroup(name) ? MaidConfig.DefaultGroup : name, out MaidGroup group))
 			{
 				group.Assemblers.Add(assembler);
@@ -501,7 +522,13 @@ public class BaRMaidSession : MySessionComponentBase
 	internal void AssignBlock(IMyTerminalBlock block, string groupName)
 	{
 		string name = string.IsNullOrWhiteSpace(groupName) ? null : groupName.Trim();
-		MaidConfig.Set(block, MaidConfig.GroupKey, MaidConfig.IsDefaultGroup(name) ? null : name);
+		// A system with no Group line is in Default and needs Group=None to leave; an assembler is the other way
+		// round, unused until it has a Group line, so Default is written out for it.
+		bool isSystem = block is IMyShipWelder;
+		string value = MaidConfig.IsNoGroup(name) ? (isSystem ? MaidConfig.NoGroup : null)
+			: MaidConfig.IsDefaultGroup(name) ? (isSystem ? null : MaidConfig.DefaultGroup)
+			: name;
+		MaidConfig.Set(block, MaidConfig.GroupKey, value);
 		if (block is IMyShipWelder system)
 		{
 			// A moved system takes on its new group's auto-queue setting instead of switching the group's.
