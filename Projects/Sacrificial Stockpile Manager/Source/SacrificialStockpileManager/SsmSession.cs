@@ -314,9 +314,10 @@ public class SsmSession : MySessionComponentBase
 		return terminal != null && _constructs.TryGetValue(terminal, out Construct construct) ? construct : null;
 	}
 
+	/// <summary>The loaded construct with this key, or the one a ship with this key is docked to.</summary>
 	internal Construct FindConstruct(long key)
 	{
-		return key == 0 ? null : _list.FirstOrDefault(c => c.Key == key);
+		return key == 0 ? null : _list.FirstOrDefault(c => c.Key == key) ?? _list.FirstOrDefault(c => c.Snapshot?.DockedShips?.Any(d => d.Key == key) == true);
 	}
 
 	// ---- Discovery ----
@@ -483,7 +484,8 @@ public class SsmSession : MySessionComponentBase
 			return;
 		}
 		construct.Refresh();
-		construct.NextRefresh = now + (construct.Key == ViewedKey ? ViewedRefreshSeconds : RefreshSeconds);
+		bool viewed = construct.Key == ViewedKey || construct.Snapshot?.DockedShips?.Any(d => d.Key == ViewedKey) == true;
+		construct.NextRefresh = now + (viewed ? ViewedRefreshSeconds : RefreshSeconds);
 	}
 
 	/// <summary>Runs the engine on a construct straight away (after a settings change in the menu).</summary>

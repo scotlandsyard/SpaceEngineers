@@ -18,6 +18,7 @@ internal static class SsmHelp
 		"",
 		"# Grids",
 		"The Grid list shows every ship and station you own a part of: loaded ones first, then the ones you've seen before with how long ago. A grid that isn't loaded shows what it held then. You can still change its settings; they apply when it's back in range.",
+		"Ships docked by connector are listed under the grid they're docked to, marked '> ... (docked)'. Pick one to see only that ship: its blocks, its items, and its own settings and quotas. While it's docked, items move by the settings of the grid it's docked to; its quotas and autocraft still run on its own assemblers, and its other settings apply once it undocks.",
 		"- All grids (the first view) lists every grid at once: when it was last synced (Live if it's loaded now), distance, storage used, storage size, fill and how many kinds of item it holds. The line under the table adds them up. Double-click a grid, or select it and press Open grid, to go to its Overview.",
 		"- Storage means blocks acting as Storage or Stock (cargo containers unless you change their role), not counting docked ships. Machines, cockpits and tools are left out so they don't inflate the totals. The Blocks view shows every block's used and total size.",
 		"- GPS marker adds a marker where the grid was last seen (it moves the existing one if you press it again).",

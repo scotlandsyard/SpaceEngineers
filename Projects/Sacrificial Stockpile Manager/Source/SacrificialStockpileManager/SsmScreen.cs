@@ -674,9 +674,9 @@ public partial class SsmScreen : MyGuiScreenBase
 		_sourceKeys.Clear();
 		_sourceCombo.AddItem(0, "The grid the display is on", 0, null, sort: false);
 		_sourceKeys.Add(0);
-		foreach (GridSnapshot grid in SortedGrids())
+		foreach (GridSnapshot grid in SortedGridsWithDocked())
 		{
-			_sourceCombo.AddItem(_sourceKeys.Count, grid.Name, _sourceKeys.Count, null, sort: false);
+			_sourceCombo.AddItem(_sourceKeys.Count, grid.DockedTo != null ? $"      > {grid.Name}  (docked)" : grid.Name, _sourceKeys.Count, null, sort: false);
 			_sourceKeys.Add(grid.Key);
 		}
 		_sourceCombo.SelectItemByKey(Math.Max(0, _sourceKeys.IndexOf(s_source)), sendEvent: false);
@@ -753,8 +753,24 @@ public partial class SsmScreen : MyGuiScreenBase
 			.ToList();
 	}
 
+	/// <summary>Every grid as in <see cref="SortedGrids"/>, each followed by the ships docked to it.</summary>
+	private static List<GridSnapshot> SortedGridsWithDocked()
+	{
+		List<GridSnapshot> grids = new List<GridSnapshot>();
+		foreach (GridSnapshot grid in SortedGrids())
+		{
+			grids.Add(grid);
+			grids.AddRange(Store.DockedShips(grid));
+		}
+		return grids;
+	}
+
 	private static string GridLabel(GridSnapshot grid)
 	{
+		if (grid.DockedTo != null)
+		{
+			return $"      > {grid.Name}  (docked)";
+		}
 		bool live = Session?.FindConstruct(grid.Key) != null;
 		string kind = grid.IsStation ? "station" : "ship";
 		return live ? $"{grid.Name}  ({kind})" : $"{grid.Name}  ({kind}, seen {Displays.Ago(grid.LastSeenUtc)})";
@@ -762,7 +778,7 @@ public partial class SsmScreen : MyGuiScreenBase
 
 	private void FillGridCombo()
 	{
-		List<GridSnapshot> grids = SortedGrids();
+		List<GridSnapshot> grids = SortedGridsWithDocked();
 		string signature = string.Join("|", grids.Select(g => g.Key + ":" + GridLabel(g)));
 		if (signature == _gridsSignature)
 		{
@@ -903,6 +919,10 @@ public partial class SsmScreen : MyGuiScreenBase
 		case View.Overview:
 			return "Double-click a setting to switch it. Sort now runs everything once, even with Automation off." + offline;
 		case View.Types:
+			if (grid.DockedTo != null)
+			{
+				return $"Docked to {grid.DockedTo.Name}: type limits set here apply once this ship undocks.";
+			}
 			return "Limits for every block of this type on the grid (not docked ships). A block's own limit for the item wins." + offline;
 		case View.Items:
 			return "Pick an item, type an amount: Set quota to keep at least that many (autocraft), Set maximum to disassemble above it." + offline;

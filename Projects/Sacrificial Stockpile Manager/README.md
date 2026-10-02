@@ -17,7 +17,7 @@ The same blocks also get the toolbar actions **Stockpile Manager: Sort now** and
 
 | Control | What it does |
 |---|---|
-| Grid | Your ships and stations: loaded ones first, then the rest with when they were last seen |
+| Grid | Your ships and stations: loaded ones first, then the rest with when they were last seen. Ships docked by connector are listed under the grid they're docked to; pick one to see only that ship |
 | View | All grids, Overview, Items & quotas, Blocks, Block settings, Block type limits, Production, Production details, Refinery priority, Displays (LCD), Log, Help |
 
 The window closes with the X in its corner or with Esc. Tables update every half second. Click a column header to sort.
@@ -89,6 +89,8 @@ Set in the Overview. All are off for a new grid except Clean production blocks, 
 **Docked ships.** In Space Engineers a ship docked by connector shares the station's terminal, so it shows up as part of the station while docked, and the station's settings apply. Its Auto blocks count as machines, so its cargo isn't sorted into the station. To restock a docked ship, give its lockers the Stock role with minimums.
 
 Quotas stay with the grid they were set on. Each mechanical group in a terminal system (the station itself, each docked ship) is handled on its own: its settings are looked up only among its own grids, and its quotas count only its own stock and queue only on its own assemblers. A docked ship's quotas keep working while it's docked, but they never drive the station's assemblers, and the station's quotas never use the ship's.
+
+A docked ship has its own entry in the Grid list, under the grid it's docked to. Picking it shows only the ship's blocks and items, and its own settings, quotas and notes. The entry uses the ship's main grid as its key, so it's the same entry the ship has once it undocks, and settings made there carry over. Type limits and the other grid settings set there apply once it undocks.
 
 ## LCD pages
 

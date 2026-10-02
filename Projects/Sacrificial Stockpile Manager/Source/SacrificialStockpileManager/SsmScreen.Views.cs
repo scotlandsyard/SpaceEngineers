@@ -175,6 +175,11 @@ public partial class SsmScreen
 		GridRules rules = Store.GridRules(grid);
 		Construct live = Live;
 		List<RowData> rows = new List<RowData>();
+		if (grid.DockedTo != null)
+		{
+			// While docked, the ship's blocks are part of the grid it's docked to and items move by that grid's settings.
+			rows.Add(Row("docked", WarningColor, "Docked to", $"{grid.DockedTo.Name}. Its settings move items; this ship's quotas and autocraft still run"));
+		}
 		bool automation = rules != null && rules.Automation;
 		rows.Add(Row("set:automation", automation ? GoodColor : WarningColor, "Automation", automation ? "On: limits, sorting and draining are applied" : "Off: nothing is moved (settings are kept)"));
 		rows.Add(Row("set:autocraft", rules != null && rules.Autocraft ? GoodColor : (Color?)null, "Autocraft", rules != null && rules.Autocraft ? "On: quotas are queued in assemblers" : "Off"));
@@ -325,6 +330,11 @@ public partial class SsmScreen
 			ShowMessage("Select a grid first.", WarningColor);
 			return;
 		}
+		if (grid.DockedTo != null)
+		{
+			ShowMessage($"{grid.Name} is docked to {grid.DockedTo.Name}, so it's listed with it. Remove {grid.DockedTo.Name} instead.", WarningColor);
+			return;
+		}
 		if (Session?.FindConstruct(grid.Key) != null)
 		{
 			ShowMessage($"{grid.Name} is loaded right now, so it would come straight back.", WarningColor);
@@ -416,8 +426,8 @@ public partial class SsmScreen
 		{
 			grid.Totals.TryGetValue(key, out double amount);
 			ItemLimit quota = rules?.Quota(key);
-			double queued = live?.QueuedAmount(key) ?? 0.0;
-			string note = live != null && live.QuotaNotes.TryGetValue(key, out string text) ? text : "";
+			double queued = live?.QueuedAmount(key, live.UnitFor(grid.Key)) ?? 0.0;
+			string note = live != null && live.QuotaNotesFor(grid.Key).TryGetValue(key, out string text) ? text : "";
 			Color? color = null;
 			if (quota != null && ((quota.HasMin && amount < quota.Min) || (quota.HasMax && amount > quota.Max)))
 			{

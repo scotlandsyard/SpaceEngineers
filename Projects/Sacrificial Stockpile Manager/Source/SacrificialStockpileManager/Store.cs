@@ -25,6 +25,8 @@ internal static class Store
 
 	private static readonly Dictionary<long, GridSnapshot> s_grids = new Dictionary<long, GridSnapshot>();
 
+	private static readonly Dictionary<long, GridSnapshot> s_dockedViews = new Dictionary<long, GridSnapshot>();
+
 	private static string s_world;
 
 	private static bool s_gridsDirty;
@@ -76,6 +78,7 @@ internal static class Store
 			s_gridRules[rules.GridId] = rules;
 		}
 		s_grids.Clear();
+		s_dockedViews.Clear();
 		GridsFile grids = Read<GridsFile>(GridsFileName());
 		if (grids?.Grids != null)
 		{
@@ -104,6 +107,7 @@ internal static class Store
 		s_blockRules.Clear();
 		s_gridRules.Clear();
 		s_grids.Clear();
+		s_dockedViews.Clear();
 		s_settings = new SettingsFile();
 	}
 
@@ -183,9 +187,39 @@ internal static class Store
 
 	// ---- Grid snapshots ----
 
+	/// <summary>A grid's snapshot, or the view of a ship docked to one (see <see cref="GridSnapshot.ForDockedShip"/>).</summary>
 	public static GridSnapshot Grid(long key)
 	{
-		return s_grids.TryGetValue(key, out GridSnapshot grid) ? grid : null;
+		if (key == 0)
+		{
+			return null;
+		}
+		if (s_grids.TryGetValue(key, out GridSnapshot grid))
+		{
+			return grid;
+		}
+		foreach (GridSnapshot parent in s_grids.Values)
+		{
+			DockedShip ship = parent.DockedShips?.FirstOrDefault(d => d.Key == key);
+			if (ship == null)
+			{
+				continue;
+			}
+			// Made once per snapshot of the grid it's docked to, so a view keeps its parsed item totals.
+			if (!s_dockedViews.TryGetValue(key, out GridSnapshot view) || view.DockedTo != parent)
+			{
+				view = parent.ForDockedShip(ship);
+				s_dockedViews[key] = view;
+			}
+			return view;
+		}
+		return null;
+	}
+
+	/// <summary>The ships docked to a grid, as views like <see cref="Grid"/> returns.</summary>
+	public static List<GridSnapshot> DockedShips(GridSnapshot grid)
+	{
+		return grid?.DockedShips == null ? new List<GridSnapshot>() : grid.DockedShips.Select(d => Grid(d.Key)).Where(v => v != null && v.DockedTo == grid).ToList();
 	}
 
 	/// <summary>Stores a fresh snapshot and drops older ones that covered any of the same grids (docked, merged or renamed ships).</summary>

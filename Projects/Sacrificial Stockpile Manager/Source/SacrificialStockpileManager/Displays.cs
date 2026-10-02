@@ -281,7 +281,7 @@ internal static class Displays
 		{
 			grid.Totals.TryGetValue(quota.Item, out double have);
 			text.Append(Row(Items.Name(quota.Item), $"{Items.Amount(have)}/{Items.Amount(quota.Min)}", columns)).Append('\n');
-			if (live != null && live.QuotaNotes.TryGetValue(quota.Item, out string note) && note != "Stocked")
+			if (live != null && live.QuotaNotesFor(grid.Key).TryGetValue(quota.Item, out string note) && note != "Stocked")
 			{
 				text.Append(Fit("   " + note, columns)).Append('\n');
 			}

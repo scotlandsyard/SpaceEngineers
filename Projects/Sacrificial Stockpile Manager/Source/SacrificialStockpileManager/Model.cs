@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Xml.Serialization;
 using VRageMath;
 
 namespace SacrificialStockpileManager;
@@ -266,9 +267,44 @@ public class GridSnapshot
 
 	public List<BlockSnapshot> Blocks = new List<BlockSnapshot>();
 
+	/// <summary>Ships docked to it by connector when it was last seen. Their blocks are in <see cref="Blocks"/> too.</summary>
+	public List<DockedShip> DockedShips = new List<DockedShip>();
+
+	/// <summary>
+	/// Set on the view of one docked ship (see <see cref="ForDockedShip"/>): the snapshot of the grid it's docked to.
+	/// Such a view isn't stored; it's made from that snapshot whenever it's needed.
+	/// </summary>
+	[XmlIgnore]
+	public GridSnapshot DockedTo;
+
+	/// <summary>For the view of a docked ship: its unit (see <see cref="BlockSnapshot.Unit"/>).</summary>
+	[XmlIgnore]
+	public long Unit;
+
 	private Dictionary<string, double> _totals;
 
 	public Vector3D Position => new Vector3D(X, Y, Z);
+
+	/// <summary>A view of one docked ship: only its own blocks, keyed by its main grid like the ship is when undocked.</summary>
+	public GridSnapshot ForDockedShip(DockedShip ship)
+	{
+		return new GridSnapshot
+		{
+			Key = ship.Key,
+			Name = ship.Name,
+			GridIds = ship.GridIds.ToList(),
+			CoreGridIds = ship.GridIds.ToList(),
+			IsStation = false,
+			X = X,
+			Y = Y,
+			Z = Z,
+			LastSeenUtc = LastSeenUtc,
+			BlockCount = ship.BlockCount,
+			Blocks = Blocks.Where(b => b.Unit == ship.Unit).ToList(),
+			DockedTo = this,
+			Unit = ship.Unit
+		};
+	}
 
 	/// <summary>Every item on the grid, all inventories included.</summary>
 	public Dictionary<string, double> Totals
@@ -301,6 +337,22 @@ public class GridSnapshot
 			totals[entry.Key] = existing + entry.Value;
 		}
 	}
+}
+
+/// <summary>A ship docked by connector to a grid, as part of that grid's snapshot.</summary>
+public class DockedShip
+{
+	/// <summary>The ship's main grid: the key its own snapshot has once it undocks.</summary>
+	public long Key;
+
+	/// <summary>Its unit (see <see cref="BlockSnapshot.Unit"/>).</summary>
+	public long Unit;
+
+	public string Name;
+
+	public List<long> GridIds = new List<long>();
+
+	public int BlockCount;
 }
 
 public class GridsFile

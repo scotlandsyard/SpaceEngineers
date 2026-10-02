@@ -106,6 +106,9 @@ internal class Construct
 	/// <summary>Autocraft state per item key, from the last autocraft pass.</summary>
 	public Dictionary<string, string> QuotaNotes = new Dictionary<string, string>();
 
+	/// <summary>The same for each docked ship, by unit.</summary>
+	public Dictionary<long, Dictionary<string, string>> UnitNotes = new Dictionary<long, Dictionary<string, string>>();
+
 	/// <summary>Per item key: game time before which autocraft won't queue it again (waits for the server).</summary>
 	public readonly Dictionary<string, double> CraftCooldown = new Dictionary<string, double>();
 
@@ -235,13 +238,15 @@ internal class Construct
 	{
 		used = 0.0;
 		max = 0.0;
+		// The view of a docked ship holds only that ship's blocks, so its storage is counted as if it were undocked.
+		bool dockedView = grid.DockedTo != null;
 		foreach (BlockSnapshot block in grid.Blocks)
 		{
-			if (block.Docked || !block.HasInventory)
+			if ((block.Docked && !dockedView) || !block.HasInventory)
 			{
 				continue;
 			}
-			Effective role = Resolve(block);
+			Effective role = dockedView ? Resolve(block.Kind, Store.BlockRules(block.Id), false, block.NotYours) : Resolve(block);
 			if (role == Effective.Storage || role == Effective.Stock)
 			{
 				used += block.Volume;
@@ -364,9 +369,51 @@ internal class Construct
 			Z = MainGrid.WorldAABB.Center.Z,
 			LastSeenUtc = DateTime.UtcNow,
 			BlockCount = Grids.Sum(g => ((MyCubeGrid)g).BlocksCount),
-			Blocks = snapshots
+			Blocks = snapshots,
+			DockedShips = DockedShipsNow()
 		};
 		Store.PutGrid(Snapshot);
+	}
+
+	/// <summary>The units other than the grid itself, each named after its main grid (static first, then the biggest).</summary>
+	private List<DockedShip> DockedShipsNow()
+	{
+		List<DockedShip> ships = new List<DockedShip>();
+		foreach (KeyValuePair<long, List<long>> unit in Units)
+		{
+			if (unit.Key == CoreUnit)
+			{
+				continue;
+			}
+			List<MyCubeGrid> grids = unit.Value.Select(id => MyAPIGateway.Entities.GetEntityById(id) as MyCubeGrid).Where(g => g != null).ToList();
+			MyCubeGrid main = grids.OrderByDescending(g => g.IsStatic).ThenByDescending(g => g.BlocksCount).ThenBy(g => g.EntityId).FirstOrDefault();
+			if (main == null)
+			{
+				continue;
+			}
+			ships.Add(new DockedShip
+			{
+				Key = main.EntityId,
+				Unit = unit.Key,
+				Name = ((IMyCubeGrid)main).CustomName,
+				GridIds = unit.Value.ToList(),
+				BlockCount = grids.Sum(g => g.BlocksCount)
+			});
+		}
+		return ships.OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase).ToList();
+	}
+
+	/// <summary>The unit a grid key shown in the menu stands for: this grid's own, or a docked ship's.</summary>
+	public long UnitFor(long gridKey)
+	{
+		return Snapshot?.DockedShips?.FirstOrDefault(d => d.Key == gridKey)?.Unit ?? CoreUnit;
+	}
+
+	/// <summary>The latest autocraft notes (per item) for this grid or a ship docked to it.</summary>
+	public Dictionary<string, string> QuotaNotesFor(long gridKey)
+	{
+		long unit = UnitFor(gridKey);
+		return unit == CoreUnit ? QuotaNotes : UnitNotes.TryGetValue(unit, out Dictionary<string, string> notes) ? notes : new Dictionary<string, string>();
 	}
 
 	private static BlockSnapshot Snap(LiveBlock live)

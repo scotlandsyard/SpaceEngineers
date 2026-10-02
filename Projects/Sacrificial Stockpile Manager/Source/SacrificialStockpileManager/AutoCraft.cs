@@ -67,6 +67,7 @@ internal static class AutoCraft
 	public static void Run(Construct construct, double now)
 	{
 		construct.QuotaNotes = new Dictionary<string, string>();
+		construct.UnitNotes = new Dictionary<long, Dictionary<string, string>>();
 		if (construct.Snapshot == null)
 		{
 			return;
@@ -88,8 +89,8 @@ internal static class AutoCraft
 					// Assemblers are Manual until the player makes them Main or Co-op.
 					.Where(b => b != null && !b.Closed && !AssemblerModes.IsManual(b))
 					.ToList(),
-				// The Items view shows the grid's own notes; a docked ship's show when it's undocked again.
-				Notes = core ? construct.QuotaNotes : new Dictionary<string, string>()
+				// A docked ship's notes show when it's picked in the Grid list.
+				Notes = core ? construct.QuotaNotes : construct.UnitNotes[entry.Key] = new Dictionary<string, string>()
 			};
 			if (rules != null && rules.Quotas.Count > 0)
 			{
