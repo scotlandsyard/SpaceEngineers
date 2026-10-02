@@ -398,7 +398,7 @@ public class MaidScreen : MyGuiScreenBase
 		case View.MissingComponents:
 			return group.AutoQueue ? "Auto-queue is on: missing components are queued in the group's assemblers every few seconds." : "Auto-queue is off. Queue now queues everything listed once.";
 		case View.Setup:
-			return "Group names are yours to choose. Select a block, type a name (blank = Default), then Assign. See Help for more.";
+			return "Select a block, type a group name (blank = Default), Assign. Assemblers start Manual: set them to Main or Co-op. See Help.";
 		case View.WeldTargets:
 		case View.GrindTargets:
 		case View.CollectTargets:
@@ -443,7 +443,7 @@ public class MaidScreen : MyGuiScreenBase
 		}
 		if (group.UsableAssemblers().Count == 0)
 		{
-			ShowMessage("This group has no assembler that is on, working, in assembly mode and accessible to you.", WarningColor);
+			ShowMessage(NoAssemblerReason(group) + ".", WarningColor);
 			return;
 		}
 		int kinds = group.QueueMissing(BaRMaidSession.Now);
@@ -741,8 +741,27 @@ public class MaidScreen : MyGuiScreenBase
 			return $"No assemblers assigned to {group.Name} (use Setup: groups)";
 		}
 		int usable = group.UsableAssemblers().Count;
+		if (usable == 0)
+		{
+			return (group.AutoQueue ? "On, but " : "Off; ") + char.ToLowerInvariant(NoAssemblerReason(group)[0]) + NoAssemblerReason(group).Substring(1);
+		}
 		string count = usable == assemblers ? $"{assemblers} assembler(s)" : $"{usable} of {assemblers} assembler(s) usable";
 		return (group.AutoQueue ? "On, " : "Off, ") + count;
+	}
+
+	/// <summary>Why a group has no assembler it can queue on. Assemblers start out Manual, so that's the usual reason.</summary>
+	private static string NoAssemblerReason(MaidGroup group)
+	{
+		List<IMyAssembler> assigned = group.Assemblers.Where(a => !a.Closed).ToList();
+		if (assigned.Count == 0)
+		{
+			return $"No assemblers assigned to {group.Name} (use Setup: groups)";
+		}
+		if (assigned.All(a => AssemblerModes.IsManual(a)))
+		{
+			return "Its assemblers are Manual: set one to Main or Co-op in Setup: groups";
+		}
+		return "Its Main and Co-op assemblers are off, damaged, disassembling or not accessible to you";
 	}
 
 	private static string SystemState(IMyShipWelder system)
@@ -862,7 +881,7 @@ public class MaidScreen : MyGuiScreenBase
 			}
 			else if (!canQueue)
 			{
-				state = assemblers.Count == 0 ? "No assemblers in this group" : "No usable assembler (off, damaged or disassembling)";
+				state = NoAssemblerReason(group);
 				color = WarningColor;
 			}
 			else

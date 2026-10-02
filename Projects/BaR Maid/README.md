@@ -56,7 +56,7 @@ You don't have to type this yourself. In **Setup: groups**, select a block, type
 There are no predefined group names: any name you type creates that group once a Build and Repair system is in it. The script's group settings (`BuildAndRepairGroup1`, `AssemblerGroup1`) and terminal block groups are not used.
 
 - A Build and Repair block with no group joins **Default**.
-- Assemblers are opt-in: one with no group is never used and shows as **(not used)**. Assign it to a group to use it, Default included (that writes `Group=Default`). Survival kits are never used.
+- Assemblers are opt-in: one with no group is never used and shows as **(not used)**. Assign it to a group to use it, Default included (that writes `Group=Default`), and set it to Main or Co-op (see Assembler modes below). Survival kits are never used.
 - An assembler assigned to a group only works for that group.
 - **Remove from groups** writes `Group=None` on a system and removes the group from an assembler. Either way the block is out of every group.
 - `AutoQueue` is stored on the group's Build and Repair blocks. It's off until you switch it on. A system moved into another group takes on that group's setting.
@@ -74,11 +74,13 @@ Assembler=Coop
 
 | Mode | What happens |
 |---|---|
-| Co-op (default) | Kept in the game's cooperative mode. Never gets orders itself; it takes a share of a Main assembler's work. |
+| Manual (default) | Left completely alone: no plugin queues on it or changes it, whatever its group. An assembler with no mode set counts as Manual. |
 | Main | Gets the orders, and is kept out of cooperative mode so co-op assemblers can help it. |
-| Manual | Left completely alone: no plugin queues on it or changes it, whatever its group. |
+| Co-op | Kept in the game's cooperative mode. Never gets orders itself; it takes a share of a Main assembler's work. |
 
-This follows how the game works: a cooperative assembler only takes work from a conveyor-connected assembler that isn't cooperative and has a queue, so the work has to go to a Main one. When something needs queuing and none of the group's usable assemblers is Main, BaR Maid makes one Main: preferably one that's already out of cooperative mode, otherwise the one with the lowest entity id. Assemblers without a mode become Co-op at that moment. Modes are only ever filled in, never swapped, so two plugins never fight over an assembler. An assembler type the game won't let be cooperative takes orders itself.
+So an assembler is only used once it's both assigned to a group and set to Main or Co-op. When a group can't queue, the Status and Missing components views say why (no assemblers assigned, all of them Manual, or the rest off or damaged).
+
+This follows how the game works: a cooperative assembler only takes work from a conveyor-connected assembler that isn't cooperative and has a queue, so the work has to go to a Main one. When something needs queuing and the group has Co-op assemblers but no usable Main one, BaR Maid makes one of them Main: preferably one that's already out of cooperative mode, otherwise the one with the lowest entity id. Modes are only ever filled in, never swapped, so two plugins never fight over an assembler. An assembler type the game won't let be cooperative takes orders itself.
 
 The plugin was called Needy BOB at first. A `[Needy BOB]` section from then is still read, and is renamed to `[BaR Maid]` the next time the plugin writes to that block. Toolbar slots holding the old Needy BOB actions have to be set up again.
 
