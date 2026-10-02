@@ -16,6 +16,12 @@ public class Marker
 	public Vector3D Position;
 
 	public Color Color;
+
+	/// <summary>
+	/// What this marker is of, e.g. the ore name; must be the last ":"-separated part of <see cref="Key"/>.
+	/// Used to tell when a kept marker has been replaced by a newer one nearby.
+	/// </summary>
+	public string Group;
 }
 
 /// <summary>
@@ -47,7 +53,12 @@ public static class GpsMarkers
 	/// range but were not found again (mined out, harvested, moved away) are removed, as are markers
 	/// of this kind left by older versions of the plugin (<paramref name="legacyNamePrefix"/>).
 	/// </summary>
-	public static Summary Apply(string kind, string legacyNamePrefix, List<Marker> markers, string detectedBy, Vector3D origin, double minDistance, double maxDistance)
+	/// <param name="keepMissingUnlessWithin">
+	/// When set, markers that weren't found again are kept (asteroids get reset, so mined-out ore comes
+	/// back) unless this scan has a marker of the same <see cref="Marker.Group"/> within this many metres,
+	/// which means the old one has been replaced (for example when a merged group's biggest asteroid changes).
+	/// </param>
+	public static Summary Apply(string kind, string legacyNamePrefix, List<Marker> markers, string detectedBy, Vector3D origin, double minDistance, double maxDistance, double? keepMissingUnlessWithin = null)
 	{
 		Summary summary = default;
 		IMyGpsCollection gpsCollection = MyAPIGateway.Session?.GPS;
@@ -105,13 +116,19 @@ public static class GpsMarkers
 				summary.Added++;
 			}
 		}
-		foreach (IMyGps gps in existing.Values)
+		foreach (KeyValuePair<string, IMyGps> leftover in existing)
 		{
+			IMyGps gps = leftover.Value;
 			double distance = Vector3D.Distance(origin, gps.Coords);
-			if (distance >= minDistance && distance <= maxDistance)
+			if (distance < minDistance || distance > maxDistance)
 			{
-				toRemove.Add(gps);
+				continue;
 			}
+			if (keepMissingUnlessWithin.HasValue && !IsReplaced(leftover.Key, gps.Coords, markers, keepMissingUnlessWithin.Value))
+			{
+				continue;
+			}
+			toRemove.Add(gps);
 		}
 		foreach (IMyGps gps in toRemove)
 		{
@@ -119,6 +136,20 @@ public static class GpsMarkers
 			summary.Removed++;
 		}
 		return summary;
+	}
+
+	/// <summary>True if this scan has a marker of the same group as <paramref name="key"/> within <paramref name="radius"/> of it.</summary>
+	private static bool IsReplaced(string key, Vector3D position, List<Marker> markers, double radius)
+	{
+		string group = key.Substring(key.LastIndexOf(':') + 1);
+		foreach (Marker marker in markers)
+		{
+			if (string.Equals(marker.Group, group, StringComparison.OrdinalIgnoreCase) && Vector3D.DistanceSquared(marker.Position, position) <= radius * radius)
+			{
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/// <summary>Removes every marker of one kind that this plugin created. Returns how many were removed.</summary>

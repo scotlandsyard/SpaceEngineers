@@ -342,10 +342,15 @@ public class OreScoutSession : MySessionComponentBase
 						: $"{main.VoxelEntityId}:{main.OreName}",
 					Name = $"{prefix} - {main.OreName} ({distance}, ~{group.MassKg:N0} kg{extra})",
 					Position = main.Position,
-					Color = separateDeposits ? DepositColor : OreColor
+					Color = separateDeposits ? DepositColor : OreColor,
+					Group = main.OreName
 				});
 			}
-			GpsMarkers.Summary summary = GpsMarkers.Apply(type.MarkerKind, null, markers, detectedBy, origin, 0.0, radius);
+			// Asteroids get reset, so ore markers aren't dropped when their ore is mined out; they're only
+			// removed once a marker of the same ore within MergeRadius replaces them. Deposit markers are
+			// local scouting aids, so those are still removed as soon as the deposit is gone.
+			double? keepMissingUnlessWithin = separateDeposits ? null : settings.MergeRadius;
+			GpsMarkers.Summary summary = GpsMarkers.Apply(type.MarkerKind, null, markers, detectedBy, origin, 0.0, radius, keepMissingUnlessWithin);
 			if (settings.ShowChat && (summary.Added + summary.Updated + summary.Removed) > 0)
 			{
 				MyAPIGateway.Utilities.ShowMessage(ChatSender, "GPS: " + summary);

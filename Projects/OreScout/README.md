@@ -31,6 +31,8 @@ The detector's Custom Data gets two sections, `OreScout` and `OreScout Deposits`
 
 Amounts are what a vanilla ship drill would collect, times the world's harvest multiplier and `YieldBonusPercent`.
 
+Rescanning updates markers in place. Scout Ore markers are kept when their ore is mined out, because asteroids get reset; one is only removed when a marker for the same ore within `MergeRadius` replaces it. Scout Deposits markers in range whose deposit is gone are removed.
+
 ## Marker library
 
 **Export from GPS** moves Scout Ore markers out of the GPS list into the library (deposit markers stay in GPS), and **Delete** removes the selected one. **Show** (top right) filters to one ore, **From you** gives each marker's distance from you, and **Measure From Row** fills the **From marker** column (renamed after that marker, e.g. **From Ice**) with distances from the selected marker (**Measure From Me** clears it). Tick markers with **Mark / Unmark** or a double-click, then **Import Marked**, or use **Import All Shown** to import everything the filter shows. Click a column header to sort. The library is saved per world name as `OreScout_Markers_<world>.xml` in `%AppData%\SpaceEngineers\Storage\`.
