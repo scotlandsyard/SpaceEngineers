@@ -182,7 +182,7 @@ public partial class SsmScreen
 		}
 		bool automation = rules != null && rules.Automation;
 		rows.Add(Row("set:automation", automation ? GoodColor : WarningColor, "Automation", automation ? "On: limits, sorting and draining are applied" : "Off: nothing is moved (settings are kept)"));
-		rows.Add(Row("set:autocraft", rules != null && rules.Autocraft ? GoodColor : (Color?)null, "Autocraft", rules != null && rules.Autocraft ? "On: quotas are queued in assemblers" : "Off"));
+		rows.Add(Row("set:autocraft", rules != null && rules.Autocraft ? GoodColor : (Color?)null, "Autocraft", rules != null && rules.Autocraft ? AutoCraft.YieldsToBaRMaid ? "On: queued in batches when assemblers are free (BaR Maid first)" : "On: quotas are queued in assemblers" : "Off"));
 		bool clean = rules?.DrainOutputs ?? new GridRules().DrainOutputs;
 		rows.Add(Row("set:drain", clean ? GoodColor : (Color?)null, "Clean production blocks", clean ? "On: output emptied, assembler inputs keep only what their queue needs" : "Off"));
 		rows.Add(Row("set:kits", rules != null && rules.UseSurvivalKits ? GoodColor : (Color?)null, "Survival kits autocraft", rules != null && rules.UseSurvivalKits ? "On" : "Off"));

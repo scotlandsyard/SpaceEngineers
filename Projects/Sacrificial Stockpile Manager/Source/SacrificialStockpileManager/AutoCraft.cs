@@ -22,6 +22,10 @@ namespace SacrificialStockpileManager;
 /// Orders follow the assembler modes shared with our other plugins (Shared/AssemblerModes.cs): each order goes to
 /// one Main assembler and the Co-op ones share it out; Manual assemblers, and ones with no mode yet, are never used.
 ///
+/// When BaR Maid (our repair plugin) is loaded too, its orders go first: quotas are only queued while the unit's
+/// Main and Co-op assemblers are all idle, and only about a minute of work at a time. Anything BaR Maid queues then
+/// waits at most for that batch, and no more stockpile work is added until its queue is done.
+///
 /// Queuing uses AddQueueItemRequest and mode changes RequestDisassembleEnabled, the same requests as the
 /// production screen. On a client the server checks access and the local state only updates after its reply,
 /// hence the cooldowns.
@@ -32,6 +36,14 @@ internal static class AutoCraft
 	private const double ClientCooldownSeconds = 15.0;
 
 	private const double ServerCooldownSeconds = 2.0;
+
+	/// <summary>With BaR Maid loaded: about how long one batch of quota work keeps the assemblers busy.</summary>
+	private const double YieldBatchSeconds = 60.0;
+
+	private static bool? s_barMaidLoaded;
+
+	/// <summary>True when the BaR Maid plugin is loaded in this game, so its repair orders go before quotas.</summary>
+	public static bool YieldsToBaRMaid => s_barMaidLoaded ??= AppDomain.CurrentDomain.GetAssemblies().Any(a => a.GetName().Name == "BaRMaid");
 
 	/// <summary>Seconds to wait for a mode switch before deciding the assembler can't disassemble.</summary>
 	private const double ModeSwitchTimeoutSeconds = 20.0;
@@ -62,6 +74,9 @@ internal static class AutoCraft
 
 		/// <summary>The assemblers orders go to, worked out the first time something needs queuing.</summary>
 		public List<MyAssembler> Receivers;
+
+		/// <summary>A batch was queued this pass (the local queues only show it after the server's reply).</summary>
+		public bool QueuedThisPass;
 	}
 
 	public static void Run(Construct construct, double now)
@@ -155,6 +170,14 @@ internal static class AutoCraft
 				unit.Notes[key] = unit.Assemblers.Count == 0 ? "No Main or Co-op assembler: set one in Production" : "Assemblers are off, disassembling or unpowered";
 				continue;
 			}
+			// BaR Maid's repair orders go first: only queue on idle assemblers, one batch at a time.
+			string batchKey = unit.Id + ":batch";
+			bool batchPending = unit.QueuedThisPass || (construct.CraftCooldown.TryGetValue(batchKey, out double batchUntil) && now < batchUntil);
+			if (YieldsToBaRMaid && (batchPending || unit.Assemblers.Any(a => ((IMyAssembler)a).Mode == MyAssemblerMode.Assembly && !a.IsQueueEmpty)))
+			{
+				unit.Notes[key] = $"Short {Items.Amount(quota.Min - have - queued)}, waits for free assemblers (BaR Maid first)";
+				continue;
+			}
 			// Makes sure one is Main and turns the game's cooperative switch to match.
 			unit.Receivers ??= AssemblerModes.PrepareForOrders(usable.Cast<IMyAssembler>().ToList()).OfType<MyAssembler>().ToList();
 			MyAssembler receiver = unit.Receivers.Where(a => a.CanUseBlueprint(blueprint)).OrderBy(a => a.Queue.Sum(q => (double)q.Amount)).FirstOrDefault();
@@ -169,12 +192,45 @@ internal static class AutoCraft
 			{
 				continue;
 			}
+			string batch = "";
+			if (YieldsToBaRMaid)
+			{
+				int batchRuns = BatchRuns(blueprint, usable);
+				if (batchRuns < runs)
+				{
+					runs = batchRuns;
+					batch = " (a batch; BaR Maid first)";
+				}
+				unit.QueuedThisPass = true;
+				// Until the server's reply shows the batch in the queue, it would look idle.
+				construct.CraftCooldown[batchKey] = now + (MyAPIGateway.Multiplayer?.IsServer ?? true ? 0.0 : 5.0);
+			}
 			// One order on one Main assembler; its Co-op assemblers take their share from its queue.
 			receiver.AddQueueItemRequest(blueprint, (MyFixedPoint)runs);
 			construct.CraftCooldown[cooldownKey] = now + cooldown;
-			unit.Notes[key] = $"Queued {Items.Amount(runs * perRun)}";
+			unit.Notes[key] = $"Queued {Items.Amount(runs * perRun)}{batch}";
 			construct.AddLog($"Queued {Items.Amount(runs * perRun)} {Items.Name(key)} on {receiver.CustomName} (quota {Items.Amount(quota.Min)})");
 		}
+	}
+
+	/// <summary>
+	/// How many runs of the blueprint the usable assemblers get through in about <see cref="YieldBatchSeconds"/>, at
+	/// the game's speed (world assembler speed, block speed and speed modules), at least one.
+	/// </summary>
+	private static int BatchRuns(MyBlueprintDefinitionBase blueprint, List<MyAssembler> usable)
+	{
+		float world = Sandbox.Game.World.MySession.Static?.AssemblerSpeedMultiplier ?? 1f;
+		double runsPerSecond = 0.0;
+		foreach (MyAssembler assembler in usable)
+		{
+			float speed = assembler.BlockDefinition is MyAssemblerDefinition definition ? definition.AssemblySpeed : 1f;
+			if (assembler.UpgradeValues.TryGetValue("Productivity", out float productivity))
+			{
+				speed += productivity;
+			}
+			runsPerSecond += world * speed / Math.Max(0.01f, blueprint.BaseProductionTimeInSeconds);
+		}
+		return Math.Max(1, (int)Math.Floor(runsPerSecond * YieldBatchSeconds));
 	}
 
 	/// <summary>Queues the surplus for disassembly. Returns the note shown in the Items view.</summary>
