@@ -915,7 +915,7 @@ public partial class SsmScreen : MyGuiScreenBase
 			return volume + "Pick an item, type an amount, set a minimum or maximum. Blank clears it.";
 		}
 		case View.Production:
-			return live ? "Double-click an assembler or refinery for its queue and what it's missing. Assembler mode steps Manual (default) > Main > Co-op; autocraft only uses Main and Co-op." : "Last known state." + offline;
+			return live ? "Double-click for queue details. Autocraft only uses Main and Co-op assemblers (default: Manual)." : "Last known state." + offline;
 		case View.Machine:
 			return live ? "Queue first, then the materials the whole queue needs. Missing = what the grid doesn't have." : "Not loaded: queue details show while the grid is in range.";
 		case View.Refining:
