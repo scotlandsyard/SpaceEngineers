@@ -31,6 +31,16 @@ It reads the ship (thrusters, mass, tanks, batteries, reactors, engines) and the
 | Thrusters | Each kind of thruster (modded too): count, direction, fuel, thrust each, effectiveness at the start of the climb, how many are off |
 | Fuel & power | Gas tanks, batteries, reactors, engines, solar/wind: stored, output, used on the trip, left after |
 | All planets | Every planet and moon: distance, surface gravity, air density, climb out, thrust-to-weight on the ground, YES/NO, and mass to spare (or too much). The planet you're on is checked from where you are; the others as visits |
+| Planet names (setup) | Your names for the planets: name, game's name, distance, gravity, where the name came from. **Paste GPS list** names planets from GPS on the clipboard; pick a row, type a name and **Set name**, or **Game's name** to undo |
+
+## Planet names
+
+Servers often name planets differently from the game (which only knows the planet type, such as `EarthLike` or `Moon`). In **Planet names (setup)**:
+
+- **Paste GPS list**: copy the server's planet GPS from anywhere, in the game's usual `GPS:Name:X:Y:Z:` format (colour and anything after it are ignored, any number of GPS at once). It reads the clipboard the same way the game's GPS screen does and uses the game's own GPS pattern. Each GPS names the planet whose gravity it's inside, nearest that planet's surface first, so a moon's GPS goes to the moon even inside a planet's gravity. Coordinates only need to be roughly right (surface, orbit or centre). A GPS outside every planet's gravity is reported and skipped. If two GPS land on the same planet, the one nearer its centre wins.
+- **Set name / Game's name**: type a name for the planet picked in the table, or put the original back.
+
+Names are stored per world in local storage (`FatAlbert_<world>_PlanetNames.txt`, by planet entity id) and show in the Planet dropdown, the All planets view and the answers. Planets of the same type that have no name of yours are numbered (`Moon 1`, `Moon 2`) in a fixed order.
 
 ## Visiting another planet
 
@@ -64,6 +74,7 @@ Not counted: power used by the rest of the ship, ice in O2/H2 generators, ships 
 | Chat commands | `/fat`, `/fatalbert` |
 | Toolbar action | `FatAlbert_OpenMenu` |
 | Settings file (local storage) | `FatAlbert_Settings.txt` |
+| Planet names (local storage) | `FatAlbert_<world>_PlanetNames.txt` |
 | Custom Data, GPS markers | none |
 
 ## Building

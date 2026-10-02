@@ -230,14 +230,19 @@ internal static class ShipReader
 			.Where(p => p != null)
 			.OrderBy(p => Vector3D.Distance(position, p.Center))
 			.ToList();
-		// Two planets of the same type (two moons, say) get a number so they can be told apart.
-		foreach (IGrouping<string, PlanetInfo> same in planets.GroupBy(p => p.Name).Where(g => g.Count() > 1))
+		// Two planets of the same type (two moons, say) get a number so they can be told apart. Numbered by entity id
+		// so the numbers don't swap as you fly around.
+		foreach (IGrouping<string, PlanetInfo> same in planets.GroupBy(p => p.GameName).Where(g => g.Count() > 1))
 		{
 			int number = 1;
-			foreach (PlanetInfo planet in same)
+			foreach (PlanetInfo planet in same.OrderBy(p => p.Id))
 			{
-				planet.Name += " " + number++;
+				planet.GameName += " " + number++;
 			}
+		}
+		foreach (PlanetInfo planet in planets)
+		{
+			planet.Name = PlanetNames.Get(planet.Id) ?? planet.GameName;
 		}
 		return planets;
 	}
@@ -252,7 +257,8 @@ internal static class ShipReader
 		return new PlanetInfo
 		{
 			Id = planet.EntityId,
-			Name = planet.Generator?.Id.SubtypeName ?? planet.StorageName ?? "Planet",
+			GameName = planet.Generator?.Id.SubtypeName ?? planet.StorageName ?? "Planet",
+			Name = PlanetNames.Get(planet.EntityId) ?? planet.Generator?.Id.SubtypeName ?? planet.StorageName ?? "Planet",
 			Center = planet.PositionComp.GetPosition(),
 			MinRadius = sphere.MinRadius,
 			MaxRadius = sphere.MaxRadius,

@@ -135,7 +135,11 @@ public class PlanetInfo
 {
 	public long Id;
 
+	/// <summary>The player's name for it if they set one (Planet names view), else the game's.</summary>
 	public string Name;
+
+	/// <summary>The game's name: the planet type, numbered when a world has more than one.</summary>
+	public string GameName;
 
 	public Vector3D Center;
 

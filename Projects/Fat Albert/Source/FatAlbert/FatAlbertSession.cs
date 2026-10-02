@@ -44,6 +44,7 @@ public class FatAlbertSession : MySessionComponentBase
 			}
 			Instance = this;
 			Settings.Load();
+			PlanetNames.Load();
 			_menuAction = new MyTerminalAction<MyTerminalBlock>(MenuActionId, new StringBuilder("Fat Albert: lift-off check"), block => OpenMenu(block), "Textures\\GUI\\Icons\\Actions\\Start.dds")
 			{
 				ValidForGroups = false
@@ -76,6 +77,7 @@ public class FatAlbertSession : MySessionComponentBase
 			}
 		}
 		ShipReader.Clear();
+		PlanetNames.Unload();
 		_started = false;
 		Instance = null;
 	}
