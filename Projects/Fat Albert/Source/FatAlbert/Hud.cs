@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Sandbox.Graphics;
 using Sandbox.Graphics.GUI;
 using Sandbox.ModAPI;
 using VRage.Input;
@@ -33,6 +34,8 @@ internal static class Hud
 
 	private static string s_keyText;
 
+	private static bool s_moveRequested;
+
 	private static MyKeys s_key;
 
 	private static bool s_ctrl;
@@ -52,8 +55,32 @@ internal static class Hud
 	public static string KeyName => Settings.HudKey;
 
 	/// <summary>Called every tick from the session.</summary>
+	/// <summary>
+	/// Starts placing the HUD with the mouse. The placing screen opens once the Fat Albert window has closed:
+	/// opening a screen in the same click that closes another leaves it without proper focus.
+	/// </summary>
+	public static void RequestMove()
+	{
+		if (!Settings.Hud)
+		{
+			Settings.Hud = true;
+			Settings.Save();
+		}
+		s_moveRequested = true;
+	}
+
 	public static void Update()
 	{
+		if (s_moveRequested && !FatAlbertScreen.IsOpen)
+		{
+			s_moveRequested = false;
+			if (s_screen == null || s_screen.State == MyGuiScreenState.CLOSED)
+			{
+				s_screen = new HudScreen();
+				MyGuiSandbox.AddScreen(s_screen);
+			}
+			MyGuiSandbox.AddScreen(new MoveScreen(s_screen));
+		}
 		CheckHotkey();
 		if (!Settings.Hud)
 		{
@@ -228,15 +255,28 @@ internal static class Hud
 	/// </summary>
 	private class HudScreen : MyGuiScreenBase
 	{
-		private const float X = -0.48f;
-
-		private const float Y = -0.32f;
-
 		private const float LineHeight = 0.03f;
 
 		private readonly MyGuiControlLabel[] _lines = new MyGuiControlLabel[3];
 
 		private bool _hidden;
+
+		/// <summary>Controls sit relative to the screen's centre (0.5, 0.5); the settings hold the top-left in screen coordinates.</summary>
+		private static Vector2 LinePosition(float x, float y, int line)
+		{
+			return new Vector2(x - 0.5f, y - 0.5f + line * LineHeight);
+		}
+
+		public void MoveTo(Vector2 topLeft)
+		{
+			for (int i = 0; i < _lines.Length; i++)
+			{
+				if (_lines[i] != null)
+				{
+					_lines[i].Position = LinePosition(topLeft.X, topLeft.Y, i);
+				}
+			}
+		}
 
 		public HudScreen()
 			: base(new Vector2(0.5f, 0.5f))
@@ -259,7 +299,7 @@ internal static class Hud
 			base.RecreateControls(constructor);
 			for (int i = 0; i < _lines.Length; i++)
 			{
-				_lines[i] = new MyGuiControlLabel(new Vector2(X, Y + i * LineHeight), null, "", null, 0.75f, "White", MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_TOP);
+				_lines[i] = new MyGuiControlLabel(LinePosition(Settings.HudX, Settings.HudY, i), null, "", null, 0.75f, "White", MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_TOP);
 				Controls.Add(_lines[i]);
 			}
 			SetLines(("Fat Albert: working it out...", MutedColor));
@@ -289,6 +329,74 @@ internal static class Hud
 				_lines[i].ColorMask = (i < lines.Length ? lines[i].Color : Color.White).ToVector4();
 				_lines[i].Visible = !_hidden;
 			}
+		}
+	}
+
+	/// <summary>
+	/// Placing the HUD: the HUD follows the mouse; a left click puts it there and saves the spot, Esc or a right click
+	/// puts it back where it was.
+	/// </summary>
+	private class MoveScreen : MyGuiScreenBase
+	{
+		private readonly HudScreen _hud;
+
+		private readonly Vector2 _start;
+
+		private bool _placed;
+
+		public MoveScreen(HudScreen hud)
+			: base(new Vector2(0.5f, 0.5f), null, new Vector2(1f, 1f))
+		{
+			_hud = hud;
+			_start = new Vector2(Settings.HudX, Settings.HudY);
+			CanHideOthers = false;
+			EnabledBackgroundFade = false;
+			m_closeOnEsc = true;
+			RecreateControls(constructor: true);
+		}
+
+		public override string GetFriendlyName()
+		{
+			return "FatAlbertHudMove";
+		}
+
+		public override void RecreateControls(bool constructor)
+		{
+			base.RecreateControls(constructor);
+			Controls.Add(new MyGuiControlLabel(new Vector2(0f, -0.4f), null, "Fat Albert HUD: move the mouse to place it, left click to keep it there. Esc or right click puts it back.", null, 0.9f, "White", MyGuiDrawAlignEnum.HORISONTAL_CENTER_AND_VERTICAL_CENTER));
+		}
+
+		public override void HandleInput(bool receivedFocusInThisUpdate)
+		{
+			base.HandleInput(receivedFocusInThisUpdate);
+			Vector2 mouse = MyGuiManager.MouseCursorPosition;
+			Vector2 topLeft = new Vector2(MathHelper.Clamp(mouse.X, 0f, 0.95f), MathHelper.Clamp(mouse.Y, 0f, 0.95f));
+			_hud?.MoveTo(topLeft);
+			if (receivedFocusInThisUpdate)
+			{
+				return;
+			}
+			if (MyInput.Static.IsNewLeftMousePressed())
+			{
+				_placed = true;
+				Settings.HudX = topLeft.X;
+				Settings.HudY = topLeft.Y;
+				Settings.Save();
+				CloseScreen();
+			}
+			else if (MyInput.Static.IsNewRightMousePressed())
+			{
+				CloseScreen();
+			}
+		}
+
+		protected override void OnClosed()
+		{
+			if (!_placed)
+			{
+				_hud?.MoveTo(_start);
+			}
+			base.OnClosed();
 		}
 	}
 }

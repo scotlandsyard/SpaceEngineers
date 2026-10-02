@@ -67,6 +67,7 @@ With **Parachutes** ticked, a visit to a planet with air opens every parachute t
 Three lines at the left of the screen: the ship and trip, YES/NO with the reason, and thrust/weight, spare mass and what's left in the tanks and batteries. It uses the ship you're sitting in (else the one picked last in the window) and the trip picked under **Planet**, rechecked every two seconds on a background thread.
 
 - Toggle: **Ctrl+Alt+F**, `/fat hud`, or the **HUD** button in the window. Remembered between sessions.
+- Move: **Move HUD** in the window (the window closes first). The HUD follows the mouse; left click keeps it there (saved as `HudX`/`HudY`), Esc or right click puts it back. **Reset inputs** moved to the Help page to make room.
 - Other hotkey: set `HudKey` in `FatAlbert_Settings.txt` (local storage) while the game is closed, e.g. `HudKey=Ctrl+Shift+H` (key names are `VRage.Input.MyKeys`).
 - It's a draw-only screen set up like the game's own HUD screen: it never takes focus or input, and it hides when the game's HUD is hidden.
 
@@ -81,6 +82,7 @@ All formulas are copied from the game's code:
 - **Power**: electric thrusters draw from solar/wind first, then batteries, then reactors and hydrogen engines (the game's resource group priorities). If they want more power than the ship can make, they push less.
 - **Flight**: full thrust until the speed limit (or the speed you set), then just enough thrust to hold that speed. Half-second steps; gives up after 4 hours.
 - **Heaviest mass to reach space**: a search over the ship's mass with the same climb.
+- **Ship mass**: `MyCubeGrid.GetCurrentMass` (physical mass, as the cockpit shows it, from the grids' collision shapes), over the grids joined by rotors, pistons and hinges. Not `Physics.Mass`, which reads 0 on multiplayer clients. If that comes back 0 too, the blocks and their cargo are added up instead; if the mass is still 0 the answer says so rather than guessing.
 
 Not counted: power used by the rest of the ship, ice in O2/H2 generators, ships docked by connector, conveyor connections (all tanks and thrusters are assumed connected), other planets' or moons' gravity. Solar and wind count their current output for the whole climb. Gas has no mass in the game, so the ship's mass stays the same.
 

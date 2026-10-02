@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using Sandbox.ModAPI;
 using VRage.Utils;
+using VRageMath;
 
 namespace FatAlbert;
 
@@ -34,6 +35,11 @@ internal static class Settings
 
 	/// <summary>Key that turns the HUD overlay on and off, as modifiers and a key name, e.g. "Ctrl+Alt+F".</summary>
 	public static string HudKey = "Ctrl+Alt+F";
+
+	/// <summary>Top-left corner of the HUD overlay in screen GUI coordinates (0..1 across, 0..1 down).</summary>
+	public static float HudX = 0.02f;
+
+	public static float HudY = 0.18f;
 
 	public static double? Distance
 	{
@@ -105,6 +111,14 @@ internal static class Settings
 			{
 				HudKey = hudKey;
 			}
+			if (values.TryGetValue("HudX", out string hudX) && Parse(hudX) is double x)
+			{
+				HudX = (float)MathHelper.Clamp(x, 0.0, 0.95);
+			}
+			if (values.TryGetValue("HudY", out string hudY) && Parse(hudY) is double y)
+			{
+				HudY = (float)MathHelper.Clamp(y, 0.0, 0.95);
+			}
 			if (values.TryGetValue("View", out string view) && int.TryParse(view, out int index))
 			{
 				View = index;
@@ -130,6 +144,8 @@ internal static class Settings
 				writer.WriteLine("UseChutes=" + (UseChutes ? "1" : "0"));
 				writer.WriteLine("Hud=" + (Hud ? "1" : "0"));
 				writer.WriteLine("HudKey=" + HudKey);
+				writer.WriteLine("HudX=" + HudX.ToString(CultureInfo.InvariantCulture));
+				writer.WriteLine("HudY=" + HudY.ToString(CultureInfo.InvariantCulture));
 			}
 		}
 		catch (Exception ex)

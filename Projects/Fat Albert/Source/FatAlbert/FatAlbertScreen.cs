@@ -80,7 +80,7 @@ public class FatAlbertScreen : MyGuiScreenBase
 	private const float GpsY = 0.205f;
 
 	/// <summary>All planets view: top of the planet summary under the table.</summary>
-	private const float SummaryY = 0.1f;
+	private const float SummaryY = 0.045f;
 
 	private const float StatusY = 0.315f;
 
@@ -195,6 +195,7 @@ public class FatAlbertScreen : MyGuiScreenBase
 		m_closeOnEsc = true;
 		CanHideOthers = true;
 		CloseButtonEnabled = true;
+		IsOpen = true;
 		RecreateControls(constructor: true);
 	}
 
@@ -206,6 +207,7 @@ public class FatAlbertScreen : MyGuiScreenBase
 	protected override void OnClosed()
 	{
 		_closed = true;
+		IsOpen = false;
 		Settings.Save();
 		base.OnClosed();
 	}
@@ -326,7 +328,7 @@ public class FatAlbertScreen : MyGuiScreenBase
 		if (CurrentView == View.Planets)
 		{
 			// Under the table: the full answer for the planet picked in it.
-			_summary = new MyGuiControlMultilineText(new Vector2(0f, SummaryY), new Vector2(0.84f, StatusY - 0.03f - SummaryY), null, "Blue", 0.75f, MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_TOP, null, drawScrollbarV: true, drawScrollbarH: false, MyGuiDrawAlignEnum.HORISONTAL_CENTER_AND_VERTICAL_TOP)
+			_summary = new MyGuiControlMultilineText(new Vector2(0f, SummaryY), new Vector2(0.84f, StatusY - 0.03f - SummaryY), null, "Blue", 0.75f, MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_TOP, null, drawScrollbarV: true, drawScrollbarH: false, MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_TOP)
 			{
 				OriginAlign = MyGuiDrawAlignEnum.HORISONTAL_CENTER_AND_VERTICAL_TOP
 			};
@@ -371,9 +373,17 @@ public class FatAlbertScreen : MyGuiScreenBase
 		{
 			AddButton(-0.105f, "Paste GPS list", PasteGps);
 		}
-		else
+		else if (CurrentView == View.Help)
 		{
 			AddButton(-0.105f, "Reset inputs", ResetInputs);
+		}
+		else
+		{
+			AddButton(-0.105f, "Move HUD", () =>
+			{
+				Hud.RequestMove();
+				CloseScreen();
+			}).SetToolTip("Closes this window; then move the mouse to place the HUD and left click. Reset inputs is on the Help page.");
 		}
 		AddButton(0.105f, Settings.Hud ? "HUD: on" : "HUD: off", () =>
 		{
@@ -851,6 +861,9 @@ public class FatAlbertScreen : MyGuiScreenBase
 
 	internal static long LastShipKey => s_shipKey;
 
+	/// <summary>True while the window is open, so the HUD placing screen waits for it to close.</summary>
+	internal static bool IsOpen { get; private set; }
+
 	private void OnShipSelected()
 	{
 		int index = (int)_shipCombo.GetSelectedKey();
@@ -1205,6 +1218,8 @@ public class FatAlbertScreen : MyGuiScreenBase
 			return Row(GoodColor, "Answer", plan.Land
 				? $"YES: it can land on {where} and climb back out of its gravity in {Format.Time(result.Seconds)}"
 				: $"YES: it lifts off and gets out of the gravity well in {Format.Time(result.Seconds)}");
+		case AscentOutcome.NoMass:
+			return Row(BadColor, "Answer", "Couldn't read the ship's mass (it came back as 0 kg). Press Rescan; if it stays at 0, please report it");
 		case AscentOutcome.NoGravity:
 			return Row(GoodColor, "Answer", "You're not in any gravity: nothing to climb out of. Pick a planet to visit under Planet");
 		case AscentOutcome.NoThrusters:
@@ -1229,6 +1244,8 @@ public class FatAlbertScreen : MyGuiScreenBase
 		{
 		case AscentOutcome.Made:
 			return "YES";
+		case AscentOutcome.NoMass:
+			return "? ship mass reads 0 kg";
 		case AscentOutcome.NoThrusters:
 			return "NO: no thrusters that way";
 		case AscentOutcome.CantLand:
@@ -1267,7 +1284,7 @@ public class FatAlbertScreen : MyGuiScreenBase
 				Format.Gravity(planet.Intensity * 9.81),
 				result == null ? "..." : result.Outcome == AscentOutcome.NoThrusters ? "none" : Format.Ratio(result.StartTwr),
 				result == null ? "working it out..." : ShortVerdict(result),
-				result == null || result.Outcome == AscentOutcome.NoThrusters ? "-" : SignedMass(result.MaxMass - ship.Mass));
+				result == null || result.Outcome == AscentOutcome.NoThrusters || result.Outcome == AscentOutcome.NoMass ? "-" : SignedMass(result.MaxMass - ship.Mass));
 			row.Key = planet.Id;
 			rows.Add(row);
 		}
@@ -1494,5 +1511,5 @@ public class FatAlbertScreen : MyGuiScreenBase
 		"PARACHUTES\n" +
 		"With Parachutes ticked, a landing on a planet with air opens every parachute that has its canopy material (canvas) on board, using the game's own drag formula at sea level. The ship comes down at the parachutes' speed instead of the speed limit, so the braking burn is shorter, and the parachutes keep pulling while it brakes. If they alone get it down to 5 m/s or less, it lands even when the thrusters couldn't hold it up (lifting off again is another matter). Parachutes need air at least as thick as their opening level (0.2 for vanilla ones).\n\n" +
 		"HUD OVERLAY\n" +
-		"Three lines at the left of your screen with the answer for the ship you're flying (or the one picked last here) and the trip picked under Planet, rechecked every two seconds. Turn it on and off with Ctrl+Alt+F, /fat hud in chat, or the HUD button below. It hides when you hide the game's HUD. To use another key, change HudKey in FatAlbert_Settings.txt (for example HudKey=Ctrl+Shift+H) while the game is closed.";
+		"Three lines at the left of your screen with the answer for the ship you're flying (or the one picked last here) and the trip picked under Planet, rechecked every two seconds. Turn it on and off with Ctrl+Alt+F, /fat hud in chat, or the HUD button below. It hides when you hide the game's HUD. To move it, press Move HUD: the window closes, the HUD follows your mouse, and a left click puts it there (Esc or a right click puts it back). Reset inputs is on this Help page. To use another key, change HudKey in FatAlbert_Settings.txt (for example HudKey=Ctrl+Shift+H) while the game is closed.";
 }

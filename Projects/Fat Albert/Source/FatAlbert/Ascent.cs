@@ -9,6 +9,7 @@ public enum AscentOutcome
 {
 	Made,
 	NoGravity,
+	NoMass,
 	NoThrusters,
 	CantLand,
 	TooHeavy,
@@ -385,7 +386,7 @@ internal static class Ascent
 	public static AscentResult Solve(ShipSnapshot ship, AscentPlan plan)
 	{
 		AscentResult result = Run(ship, plan, ship.Mass);
-		if (result.Outcome == AscentOutcome.NoGravity || result.Outcome == AscentOutcome.NoThrusters || result.StartGravity <= 0)
+		if (result.Outcome == AscentOutcome.NoGravity || result.Outcome == AscentOutcome.NoMass || result.Outcome == AscentOutcome.NoThrusters || result.StartGravity <= 0)
 		{
 			return result;
 		}
@@ -420,6 +421,12 @@ internal static class Ascent
 		PlanetInfo planet = plan.Planet;
 		double r0 = plan.StartRadius;
 		result.StartRadius = r0;
+		if (mass <= 0.0)
+		{
+			// A mass of 0 means the ship couldn't be read properly; every number after this would be nonsense.
+			result.Outcome = AscentOutcome.NoMass;
+			return result;
+		}
 		if (planet == null || planet.GravityAt(r0) <= 0.0)
 		{
 			result.Outcome = AscentOutcome.NoGravity;

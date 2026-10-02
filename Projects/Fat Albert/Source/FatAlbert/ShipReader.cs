@@ -13,6 +13,7 @@ using VRage.Game;
 using VRage.Game.Entity;
 using VRage.Game.ModAPI;
 using VRage.ModAPI;
+using VRage.Utils;
 using VRageMath;
 using IngameChargeMode = Sandbox.ModAPI.Ingame.ChargeMode;
 
@@ -150,13 +151,7 @@ internal static class ShipReader
 			IsStatic = cache.Grids.Any(g => g.IsStatic),
 			SpeedLimit = MyGridPhysics.GetShipMaxLinearVelocity(main.GridSizeEnum)
 		};
-		foreach (IMyCubeGrid grid in cache.Grids)
-		{
-			if (!grid.IsStatic && grid.Physics != null)
-			{
-				ship.Mass += grid.Physics.Mass;
-			}
-		}
+		ship.Mass = ReadMass(main, cache);
 
 		IMyShipController reference = PickReference(cache);
 		ship.Reference = reference?.WorldMatrix ?? main.WorldMatrix;
@@ -169,6 +164,58 @@ internal static class ShipReader
 		ReadSources(ship, cache, countOff);
 		ReadParachutes(ship, cache, countOff);
 		return ship;
+	}
+
+	/// <summary>
+	/// The ship's physical mass in kg, as the cockpit's mass readout gets it: MyCubeGrid.GetCurrentMass, which reads
+	/// each grid's collision shape. Physics.Mass reads 0 on multiplayer clients for grids the client doesn't
+	/// simulate, so it isn't used. If the shape isn't there either, the blocks and their cargo are added up.
+	/// </summary>
+	private static double ReadMass(IMyCubeGrid main, BlockCache cache)
+	{
+		try
+		{
+			((MyCubeGrid)main).GetCurrentMass(out float _, out float physical, GridLinkTypeEnum.Mechanical);
+			if (physical > 0f)
+			{
+				return physical;
+			}
+		}
+		catch (Exception ex)
+		{
+			MyLog.Default.WriteLineAndConsole($"[Fat Albert] Ship mass: {ex.Message}");
+		}
+
+		// Fallback: block masses, plus cargo at its physical weight (cargo counts for less when inventories are
+		// bigger than realistic, as in the game: actual mass ÷ the world's inventory size multiplier).
+		double multiplier = Math.Max(1.0, MyAPIGateway.Session?.SessionSettings?.BlocksInventorySizeMultiplier ?? 1f);
+		double mass = 0.0;
+		List<IMySlimBlock> blocks = new List<IMySlimBlock>();
+		foreach (IMyCubeGrid grid in cache.Grids)
+		{
+			if (grid.IsStatic)
+			{
+				continue;
+			}
+			blocks.Clear();
+			grid.GetBlocks(blocks);
+			foreach (IMySlimBlock block in blocks)
+			{
+				mass += block.Mass;
+			}
+		}
+		foreach (MyCubeBlock block in cache.Inventories)
+		{
+			for (int i = 0; i < block.InventoryCount; i++)
+			{
+				MyInventory inventory = block.GetInventory(i);
+				if (inventory != null)
+				{
+					mass += (double)inventory.CurrentMass / multiplier;
+				}
+			}
+		}
+		return mass;
 	}
 
 	private static BlockCache Build(IMyCubeGrid main, double now)
