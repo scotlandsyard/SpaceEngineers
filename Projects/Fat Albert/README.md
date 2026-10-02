@@ -19,16 +19,28 @@ It reads the ship (thrusters, mass, tanks, batteries, reactors, engines) and the
 | Lift with | Which thrusters lift the ship, named from the cockpit. **Up** = the thrusters that push the ship up (flames pointing down). **Auto** picks the side facing away from the planet right now |
 | Climb km | Empty: climb to where the planet's gravity ends (read from the world). A number: climb that many km from here |
 | Speed m/s | Empty: the world's speed limit. Slower climbs burn more |
-| Count blocks that are switched off... | On: blocks that are off, stockpiling or recharging count as if you'll switch them on. Off: only what works now |
+| Count switched-off blocks | On: blocks that are off, stockpiling or recharging count as if you'll switch them on. Off: only what works now |
+| Planet | **Where I am now**: lift off from here. **Visit <planet>**: every planet and moon in the world, nearest first; checks landing there and climbing back out |
 
 ## Views
 
 | View | Shows |
 |---|---|
-| Lift-off check | YES/NO with the reason; thrust-to-weight here; the heaviest the ship can be to lift off, and to reach space; climb distance and time; the weakest point on the way up; fuel, battery and reactor fuel used and left; power shortages |
-| Thrust by direction | All six directions: thrusters, thrust here, thrust in space, thrust-to-weight here, what they burn |
-| Thrusters | Each kind of thruster (modded too): count, direction, fuel, thrust each, effectiveness at this altitude, how many are off |
-| Fuel & power | Gas tanks, batteries, reactors, engines, solar/wind: stored, output, used to climb, left after |
+| Lift-off check | YES/NO with the reason; thrust-to-weight at the start; the heaviest the ship can be to lift off, and to reach space; landing burn (when visiting); climb distance and time; the weakest point on the way up; fuel, battery and reactor fuel used and left; power shortages |
+| Thrust by direction | All six directions: thrusters, thrust at the start of the climb, thrust in space, thrust-to-weight at the start, what they burn |
+| Thrusters | Each kind of thruster (modded too): count, direction, fuel, thrust each, effectiveness at the start of the climb, how many are off |
+| Fuel & power | Gas tanks, batteries, reactors, engines, solar/wind: stored, output, used on the trip, left after |
+| All planets | Every planet and moon: distance, surface gravity, air density, climb out, thrust-to-weight on the ground, YES/NO, and mass to spare (or too much). The planet you're on is checked from where you are; the others as visits |
+
+## Visiting another planet
+
+Picking a planet (or the All planets view) checks a round trip from space:
+
+1. **Fall in**: free. The game caps a ship's speed, so it drops at the speed limit with the thrusters idle.
+2. **Land**: full thrust from the speed limit to a stop at sea level, with sea-level gravity and air. If thrust can't beat weight there, the answer is NO (it would crash).
+3. **Climb back out**: the normal climb from sea level, with whatever fuel and power the landing left.
+
+Auto direction on a visit picks the side with the most thrust at that planet's sea level (that's the side you'll point up). Real terrain sits above or below sea level, so a landing on a mountain has a shorter climb.
 
 ## How the climb is worked out
 

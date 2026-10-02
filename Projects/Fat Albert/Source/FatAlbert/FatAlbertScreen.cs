@@ -24,11 +24,12 @@ public class FatAlbertScreen : MyGuiScreenBase
 		Directions,
 		Thrusters,
 		Fuel,
+		Planets,
 		Help
 	}
 
 	// In the same order as View.
-	private static readonly string[] ViewNames = { "Lift-off check", "Thrust by direction", "Thrusters", "Fuel & power", "Help" };
+	private static readonly string[] ViewNames = { "Lift-off check", "Thrust by direction", "Thrusters", "Fuel & power", "All planets", "Help" };
 
 	private static readonly string[] DirNames = { "Up", "Down", "Forward", "Backward", "Left", "Right" };
 
@@ -82,7 +83,19 @@ public class FatAlbertScreen : MyGuiScreenBase
 
 	private static View s_viewBeforeHelp = View.Check;
 
+	/// <summary>Planet to visit (land on, then climb back out of); 0 = where the ship is now.</summary>
+	private static long s_planetId;
+
 	private MyGuiControlCombobox _shipCombo;
+
+	private MyGuiControlCombobox _planetCombo;
+
+	private List<PlanetInfo> _planets = new List<PlanetInfo>();
+
+	/// <summary>All planets view: one trip per planet, by planet id.</summary>
+	private Dictionary<long, AscentResult> _planetResults;
+
+	private Dictionary<long, Dir> _planetDirs;
 
 	private MyGuiControlCombobox _viewCombo;
 
@@ -101,6 +114,8 @@ public class FatAlbertScreen : MyGuiScreenBase
 	private ShipSnapshot _ship;
 
 	private AscentResult _result;
+
+	private AscentPlan _plan;
 
 	private Dir _dir;
 
@@ -196,7 +211,7 @@ public class FatAlbertScreen : MyGuiScreenBase
 
 		AddLabel(Left, Row2Y, "Lift with");
 		_dirCombo = AddCombo(-0.33f, Row2Y, 0.24f, 7, "Which thrusters lift the ship, named from the cockpit: Up means the ones that push the ship up (their flames point down).");
-		_dirCombo.AddItem(-1, "Auto (facing up now)", 0, null, sort: false);
+		_dirCombo.AddItem(-1, "Auto", 0, "Here: the side facing away from the planet now. Another planet: the side with the most thrust at its sea level.", sort: false);
 		for (int i = 0; i < DirNames.Length; i++)
 		{
 			_dirCombo.AddItem(i, DirNames[i] + " thrusters", i + 1, null, sort: false);
@@ -224,7 +239,19 @@ public class FatAlbertScreen : MyGuiScreenBase
 			Refresh(rebuild: false);
 		};
 		Controls.Add(countOff);
-		Controls.Add(new MyGuiControlLabel(new Vector2(Left + 0.03f, Row3Y), null, "Count blocks that are switched off, stockpiling or recharging", null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER));
+		Controls.Add(new MyGuiControlLabel(new Vector2(Left + 0.03f, Row3Y), null, "Count switched-off blocks", null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER));
+
+		AddLabel(-0.07f, Row3Y, "Planet");
+		_planetCombo = AddCombo(0.0f, Row3Y, 0.42f, 12, "Where I am now: lift off from here. A planet: fall in at the speed limit (free), brake to land at its sea level, then climb back out with what's left.");
+		_planetCombo.ItemSelected += () =>
+		{
+			if (!_suppressEvents)
+			{
+				s_planetId = _planetCombo.GetSelectedKey();
+				Recompute();
+			}
+		};
+		FillPlanetCombo();
 
 		List<Column> columns = ColumnsFor(CurrentView);
 		_table = new MyGuiControlTable
@@ -268,6 +295,7 @@ public class FatAlbertScreen : MyGuiScreenBase
 		AddButton(-0.315f, "Rescan", () =>
 		{
 			FillShipCombo();
+			FillPlanetCombo();
 			Refresh(rebuild: true);
 		});
 		AddButton(-0.105f, "Reset inputs", ResetInputs);
@@ -290,7 +318,7 @@ public class FatAlbertScreen : MyGuiScreenBase
 			{
 				new Column("Lift with", 0.2f),
 				new Column("Thrusters", 0.11f, true),
-				new Column("Thrust here", 0.17f, true),
+				new Column("At start", 0.17f, true),
 				new Column("In space", 0.17f, true),
 				new Column("Thrust/weight", 0.15f, true),
 				new Column("Burns", 0.2f)
@@ -303,8 +331,20 @@ public class FatAlbertScreen : MyGuiScreenBase
 				new Column("Pushes", 0.13f),
 				new Column("Burns", 0.13f),
 				new Column("Thrust each", 0.14f, true),
-				new Column("Here", 0.1f, true),
+				new Column("At start", 0.1f, true),
 				new Column("Off", 0.08f, true)
+			};
+		case View.Planets:
+			return new List<Column>
+			{
+				new Column("Planet", 0.17f),
+				new Column("Away", 0.12f, true),
+				new Column("Gravity", 0.09f, true),
+				new Column("Air", 0.07f, true),
+				new Column("Climb out", 0.11f, true),
+				new Column("Thrust/wt", 0.11f, true),
+				new Column("Land and get out?", 0.22f),
+				new Column("Spare", 0.11f, true)
 			};
 		case View.Fuel:
 			return new List<Column>
@@ -447,6 +487,61 @@ public class FatAlbertScreen : MyGuiScreenBase
 		}
 	}
 
+	private void FillPlanetCombo()
+	{
+		_planets = ShipReader.ReadPlanets();
+		_planetCombo.ClearItems();
+		_planetCombo.AddItem(0, "Where I am now", 0, null, sort: false);
+		Vector3D position = MyAPIGateway.Session?.Player?.GetPosition() ?? Vector3D.Zero;
+		for (int i = 0; i < _planets.Count; i++)
+		{
+			PlanetInfo planet = _planets[i];
+			double away = Math.Max(0.0, Vector3D.Distance(position, planet.Center) - planet.AverageRadius);
+			_planetCombo.AddItem(planet.Id, $"Visit {planet.Name}  ({Format.Distance(away)})", i + 1, null, sort: false);
+		}
+		if (s_planetId != 0 && !_planets.Any(p => p.Id == s_planetId))
+		{
+			s_planetId = 0;
+		}
+		_planetCombo.SelectItemByKey(s_planetId, sendEvent: false);
+	}
+
+	/// <summary>The planet picked to visit, or null for "where I am now".</summary>
+	private PlanetInfo Visiting => s_planetId == 0 ? null : _planets.FirstOrDefault(p => p.Id == s_planetId);
+
+	private PlanetInfo Named(PlanetInfo planet)
+	{
+		return planet == null ? null : _planets.FirstOrDefault(p => p.Id == planet.Id) ?? planet;
+	}
+
+	private static Dir PickDir(ShipSnapshot ship, PlanetInfo visiting)
+	{
+		return Settings.Direction >= 0 ? (Dir)Settings.Direction : Ascent.AutoDirection(ship, visiting);
+	}
+
+	private AscentPlan BuildPlan(ShipSnapshot ship)
+	{
+		PlanetInfo visiting = Visiting;
+		Dir dir = PickDir(ship, visiting);
+		double speed = Settings.ClimbSpeed(ship.SpeedLimit);
+		return visiting != null ? AscentPlan.Visit(ship, visiting, dir, Settings.Distance, speed) : AscentPlan.Here(ship, dir, Settings.Distance, speed);
+	}
+
+	/// <summary>True when the ship is inside this planet's gravity now, so the trip there is just a lift-off.</summary>
+	private static bool IsOn(ShipSnapshot ship, PlanetInfo planet)
+	{
+		return ship.Planet != null && ship.Planet.Id == planet.Id && planet.GravityAt(ship.Radius) > 0.0;
+	}
+
+	/// <summary>All planets view: from here for the planet the ship is on, a visit for every other one.</summary>
+	private static AscentPlan PlanFor(ShipSnapshot ship, PlanetInfo planet)
+	{
+		double speed = Settings.ClimbSpeed(ship.SpeedLimit);
+		return IsOn(ship, planet)
+			? AscentPlan.Here(ship, PickDir(ship, null), Settings.Distance, speed)
+			: AscentPlan.Visit(ship, planet, PickDir(ship, planet), Settings.Distance, speed);
+	}
+
 	private void OnShipSelected()
 	{
 		int index = (int)_shipCombo.GetSelectedKey();
@@ -486,14 +581,23 @@ public class FatAlbertScreen : MyGuiScreenBase
 			_simAgain = true;
 			return;
 		}
-		_dir = Settings.Direction >= 0 ? (Dir)Settings.Direction : Ascent.AutoDirection(_ship);
 		ShipSnapshot ship = _ship;
-		Dir dir = _dir;
-		double? distance = Settings.Distance;
-		double speed = Settings.ClimbSpeed(ship.SpeedLimit);
+		AscentPlan plan = BuildPlan(ship);
+		_plan = plan;
+		_dir = plan.Dir;
+		// The All planets view runs a trip for every planet too; the plans are made here, on the game thread.
+		List<KeyValuePair<PlanetInfo, AscentPlan>> others = CurrentView == View.Planets ? _planets.Select(p => new KeyValuePair<PlanetInfo, AscentPlan>(p, PlanFor(ship, p))).ToList() : null;
 		AscentResult result = null;
+		Dictionary<long, AscentResult> planetResults = null;
 		_simRunning = true;
-		MyAPIGateway.Parallel.StartBackground(() => result = Ascent.Solve(ship, dir, distance, speed), () =>
+		MyAPIGateway.Parallel.StartBackground(() =>
+		{
+			result = Ascent.Solve(ship, plan);
+			if (others != null)
+			{
+				planetResults = others.ToDictionary(p => p.Key.Id, p => Ascent.Solve(ship, p.Value));
+			}
+		}, () =>
 		{
 			_simRunning = false;
 			if (_closed)
@@ -503,6 +607,11 @@ public class FatAlbertScreen : MyGuiScreenBase
 			if (ship.Key == s_shipKey)
 			{
 				_result = result;
+				if (planetResults != null)
+				{
+					_planetResults = planetResults;
+					_planetDirs = others.ToDictionary(p => p.Key.Id, p => p.Value.Dir);
+				}
 			}
 			if (_simAgain)
 			{
@@ -548,6 +657,9 @@ public class FatAlbertScreen : MyGuiScreenBase
 				break;
 			case View.Fuel:
 				AddFuelRows(rows);
+				break;
+			case View.Planets:
+				AddPlanetRows(rows);
 				break;
 			}
 		}
@@ -596,8 +708,10 @@ public class FatAlbertScreen : MyGuiScreenBase
 	{
 		ShipSnapshot ship = _ship;
 		AscentResult result = _result;
-		PlanetInfo planet = ship.Planet;
-		double radius = ship.Radius;
+		AscentPlan plan = _plan ?? BuildPlan(ship);
+		PlanetInfo planet = Named(plan.Planet);
+		double radius = plan.StartRadius;
+		string there = plan.Land ? "there" : "here";
 
 		if (result == null)
 		{
@@ -605,67 +719,85 @@ public class FatAlbertScreen : MyGuiScreenBase
 		}
 		else
 		{
-			rows.Add(Verdict(result));
+			rows.Add(Verdict(result, plan));
 		}
 
 		rows.Add(Row(null, "Ship", $"{ship.Name}: {Format.Mass(ship.Mass)}{(ship.Grids > 1 ? $" ({ship.Grids} grids joined by rotors, pistons or hinges)" : "")}"));
 		if (planet == null || planet.GravityAt(radius) <= 0)
 		{
-			rows.Add(Row(null, "Gravity", "None here: you're already out of every gravity well."));
+			rows.Add(Row(null, "Gravity", "None here: you're already out of every gravity well. Pick a planet to visit under Planet."));
 			return;
 		}
 		double gravity = planet.GravityAt(radius) * 9.81;
-		rows.Add(Row(null, "Planet", $"{planet.Name}: {Format.Gravity(gravity)} here, {Format.Distance(radius - planet.AverageRadius)} above sea level"));
+		if (plan.Land)
+		{
+			double away = Math.Max(0.0, Vector3D.Distance(ship.Position, planet.Center) - planet.AverageRadius);
+			rows.Add(Row(null, "Planet", $"{planet.Name}, {Format.Distance(away)} away: you land at sea level, {Format.Gravity(gravity)}, {(planet.HasAtmosphere ? "with air" : "no air")}"));
+		}
+		else
+		{
+			rows.Add(Row(null, "Planet", $"{planet.Name}: {Format.Gravity(gravity)} here, {Format.Distance(radius - planet.AverageRadius)} above sea level"));
+		}
 
-		string why = Settings.Direction < 0 ? " (auto: they face up now)" : "";
-		int count = CountPushing(ship, _dir);
-		rows.Add(Row(null, "Lift with", $"{DirNames[(int)_dir]} thrusters{why}: {count} pushing that way, flames pointing {DirNames[(int)Opposite(_dir)].ToLowerInvariant()}"));
+		string why = Settings.Direction >= 0 ? "" : plan.Land ? " (auto: most thrust there)" : " (auto: they face up now)";
+		int count = CountPushing(ship, plan.Dir);
+		rows.Add(Row(null, "Lift with", $"{DirNames[(int)plan.Dir]} thrusters{why}: {count} pushing that way, flames pointing {DirNames[(int)Opposite(plan.Dir)].ToLowerInvariant()}"));
 		if (result == null || result.Outcome == AscentOutcome.NoThrusters)
 		{
 			return;
 		}
 
+		if (plan.Land && result.Landed)
+		{
+			rows.Add(Row(null, "Landing", $"fall in at {plan.FallSpeed:0} m/s (no fuel), then brake for {Format.Time(result.LandingSeconds)} from {Format.Distance(result.LandingHeight)} up: uses {LandingText(ship, result)}"));
+		}
+
 		double weight = ship.Mass * gravity;
-		rows.Add(Row(result.StartTwr >= 1.0 ? null : (Color?)BadColor, "Thrust/weight", $"{Format.Ratio(result.StartTwr)} here: {Format.Force(result.StartThrust)} of thrust against {Format.Force(weight)} of weight"));
-		rows.Add(Row(null, "Lift-off limit", SpareText(result.MaxLiftoffMass, ship.Mass, "to lift off here")));
-		rows.Add(Row(result.MaxMass >= ship.Mass ? null : (Color?)BadColor, "Reach-space limit", SpareText(result.MaxMass, ship.Mass, "to get out of the gravity well")));
+		rows.Add(Row(result.StartTwr >= 1.0 ? null : (Color?)BadColor, "Thrust/weight", $"{Format.Ratio(result.StartTwr)} {there}: {Format.Force(result.StartThrust)} of thrust against {Format.Force(weight)} of weight"));
+		rows.Add(Row(null, "Lift-off limit", SpareText(result.MaxLiftoffMass, ship.Mass, $"to lift off {there}")));
+		rows.Add(Row(result.MaxMass >= ship.Mass ? null : (Color?)BadColor, "Reach-space limit", SpareText(result.MaxMass, ship.Mass, plan.Land ? "to land and get back out" : "to get out of the gravity well")));
 
 		double climb = result.TargetRadius - radius;
+		string from = plan.Land ? "from sea level " : "";
 		string end = Settings.Distance.HasValue ? "the distance you set" : $"where gravity ends ({Format.Distance(planet.GravityLimit - planet.AverageRadius)} above sea level)";
-		rows.Add(Row(null, "Climb", $"{Format.Distance(climb)} up to {end}, at up to {Settings.ClimbSpeed(ship.SpeedLimit):0} m/s"));
+		rows.Add(Row(null, "Climb", $"{Format.Distance(climb)} {from}up to {end}, at up to {plan.Speed:0} m/s"));
 		if (result.Success)
 		{
-			rows.Add(Row(null, "Time", $"{Format.Time(result.Seconds)} to get there"));
+			rows.Add(Row(null, "Time", $"{Format.Time(result.Seconds)} to climb out"));
 		}
-		rows.Add(Row(result.MinTwr < 1.0 ? BadColor : result.MinTwr < 1.2 ? WarningColor : (Color?)null, "Weakest point", $"thrust/weight {Format.Ratio(result.MinTwr)} at {Format.Distance(radius + result.MinTwrHeight - planet.AverageRadius)} above sea level"));
+		if (result.Outcome != AscentOutcome.CantLand)
+		{
+			rows.Add(Row(result.MinTwr < 1.0 ? BadColor : result.MinTwr < 1.2 ? WarningColor : (Color?)null, "Weakest point", $"thrust/weight {Format.Ratio(result.MinTwr)} at {Format.Distance(radius + result.MinTwrHeight - planet.AverageRadius)} above sea level"));
+		}
 
 		if (planet.HasAtmosphere)
 		{
 			double top = planet.AtmosphereTop - planet.AverageRadius;
-			int atmospheric = ship.Thrusters.Count(t => t.NeedsAtmosphere && Vector3D.Dot(t.Push, ship.Axis(_dir)) > 0.05);
+			int atmospheric = ship.Thrusters.Count(t => t.NeedsAtmosphere && Vector3D.Dot(t.Push, ship.Axis(plan.Dir)) > 0.05);
 			rows.Add(Row(null, "Atmosphere", atmospheric > 0 ? $"ends {Format.Distance(top)} above sea level; your {atmospheric} atmospheric thrusters fade out on the way up" : $"ends {Format.Distance(top)} above sea level"));
 		}
 
+		string uses = plan.Land ? "landing and climb use" : "uses";
 		foreach (GasPool pool in ship.Gas.Values.OrderBy(p => p.Name))
 		{
-			// Only the gases the climb burns; oxygen and empty tanks are covered elsewhere.
+			// Only the gases the trip burns; oxygen and empty tanks are covered elsewhere.
 			if (!result.GasUsed.TryGetValue(pool.Key, out double used))
 			{
 				continue;
 			}
-			rows.Add(Row(used >= pool.Litres - 1 && used > 0 ? WarningColor : (Color?)null, pool.Name, $"uses {Format.Litres(used)} of {Format.Litres(pool.Litres)} ({Format.Percent(Math.Max(0, pool.Litres - used), pool.Litres)} left of what's in the tanks)"));
+			rows.Add(Row(used >= pool.Litres - 1 && used > 0 ? WarningColor : (Color?)null, pool.Name, $"{uses} {Format.Litres(used)} of {Format.Litres(pool.Litres)} ({Format.Percent(Math.Max(0, pool.Litres - used), pool.Litres)} left of what's in the tanks)"));
 		}
 		double stored = ship.Sources.Where(s => s.Kind == SourceKind.Battery).Sum(s => s.StoredMWh);
 		if (result.BatteryUsed > 0 || stored > 0 && ship.Thrusters.Any(t => t.Electric))
 		{
-			rows.Add(Row(null, "Batteries", $"uses {Format.Energy(result.BatteryUsed)} of {Format.Energy(stored)} ({Format.Percent(Math.Max(0, stored - result.BatteryUsed), stored)} left)"));
+			rows.Add(Row(null, "Batteries", $"{uses} {Format.Energy(result.BatteryUsed)} of {Format.Energy(stored)} ({Format.Percent(Math.Max(0, stored - result.BatteryUsed), stored)} left)"));
 		}
 		foreach (KeyValuePair<string, double> fuel in ship.ItemFuel)
 		{
 			result.ItemUsed.TryGetValue(fuel.Key, out double used);
 			if (used > 0)
 			{
-				rows.Add(Row(null, ship.FuelName(fuel.Key), $"uses {used:#,0.##} kg of {fuel.Value:#,0.##} kg"));
+				rows.Add(Row(null, ship.FuelName(fuel.Key), $"{uses} {used:#,0.##} kg of {fuel.Value:#,0.##} kg"));
 			}
 		}
 		if (result.PowerShort)
@@ -688,18 +820,36 @@ public class FatAlbertScreen : MyGuiScreenBase
 		}
 	}
 
-	private RowData Verdict(AscentResult result)
+	/// <summary>What the landing burn uses, e.g. "12,000 L Hydrogen, 0.5 MWh".</summary>
+	private static string LandingText(ShipSnapshot ship, AscentResult result)
 	{
+		List<string> parts = new List<string>();
+		parts.AddRange(result.LandingGas.Where(g => g.Value > 0).Select(g => $"{Format.Litres(g.Value)} {ship.FuelName(g.Key)}"));
+		if (result.LandingBattery > 0)
+		{
+			parts.Add(Format.Energy(result.LandingBattery));
+		}
+		parts.AddRange(result.LandingItems.Where(i => i.Value > 0).Select(i => $"{i.Value:#,0.##} kg {ship.FuelName(i.Key)}"));
+		return parts.Count > 0 ? string.Join(", ", parts) : "almost nothing";
+	}
+
+	private RowData Verdict(AscentResult result, AscentPlan plan)
+	{
+		string where = Named(plan.Planet)?.Name ?? "there";
 		switch (result.Outcome)
 		{
 		case AscentOutcome.Made:
-			return Row(GoodColor, "Answer", $"YES: it lifts off and gets out of the gravity well in {Format.Time(result.Seconds)}");
+			return Row(GoodColor, "Answer", plan.Land
+				? $"YES: it can land on {where} and climb back out of its gravity in {Format.Time(result.Seconds)}"
+				: $"YES: it lifts off and gets out of the gravity well in {Format.Time(result.Seconds)}");
 		case AscentOutcome.NoGravity:
-			return Row(GoodColor, "Answer", "You're not in any gravity: nothing to climb out of");
+			return Row(GoodColor, "Answer", "You're not in any gravity: nothing to climb out of. Pick a planet to visit under Planet");
 		case AscentOutcome.NoThrusters:
 			return Row(BadColor, "Answer", $"NO: no working thrusters push {DirNames[(int)result.Direction].ToLowerInvariant()}. Pick another direction under Lift with");
+		case AscentOutcome.CantLand:
+			return Row(BadColor, "Answer", $"NO: it can't slow down to land on {where} (thrust/weight {Format.Ratio(result.StartTwr)} at sea level) and would crash");
 		case AscentOutcome.TooHeavy:
-			return Row(BadColor, "Answer", $"NO: too heavy to lift off. Lose {Format.Mass(result.Mass - result.MaxLiftoffMass)} or add {Format.Force(result.StartGravity * result.Mass - result.StartThrust)} of thrust");
+			return Row(BadColor, "Answer", $"NO: too heavy to lift off{(plan.Land ? " again" : "")}. Lose {Format.Mass(result.Mass - result.MaxLiftoffMass)} or add {Format.Force(result.StartGravity * result.Mass - result.StartThrust)} of thrust");
 		case AscentOutcome.OutOfFuel:
 			return Row(BadColor, "Answer", $"NO: {result.RanOut} runs out {Format.Distance(result.RanOutHeight)} up and it falls back");
 		case AscentOutcome.Stalled:
@@ -707,6 +857,65 @@ public class FatAlbertScreen : MyGuiScreenBase
 		default:
 			return Row(BadColor, "Answer", "NO: it climbs so slowly it would take over 4 hours");
 		}
+	}
+
+	/// <summary>The answer in a few words, for the All planets table.</summary>
+	private static string ShortVerdict(AscentResult result)
+	{
+		switch (result.Outcome)
+		{
+		case AscentOutcome.Made:
+			return "YES";
+		case AscentOutcome.NoThrusters:
+			return "NO: no thrusters that way";
+		case AscentOutcome.CantLand:
+			return "NO: can't brake to land";
+		case AscentOutcome.TooHeavy:
+			return "NO: too heavy to lift off";
+		case AscentOutcome.OutOfFuel:
+			return $"NO: {result.RanOut} runs out";
+		case AscentOutcome.Stalled:
+			return $"NO: stalls {Format.Distance(result.Height)} up";
+		case AscentOutcome.TooSlow:
+			return "NO: too slow";
+		default:
+			return "-";
+		}
+	}
+
+	private void AddPlanetRows(List<RowData> rows)
+	{
+		ShipSnapshot ship = _ship;
+		if (_planets.Count == 0)
+		{
+			rows.Add(Row(MutedColor, "No planets in this world"));
+			return;
+		}
+		foreach (PlanetInfo planet in _planets)
+		{
+			bool on = IsOn(ship, planet);
+			AscentResult result = null;
+			_planetResults?.TryGetValue(planet.Id, out result);
+			double away = Math.Max(0.0, Vector3D.Distance(ship.Position, planet.Center) - planet.AverageRadius);
+			double start = on ? ship.Radius : planet.AverageRadius;
+			double climb = Settings.Distance ?? Math.Max(0.0, planet.GravityLimit - start);
+			string dir = _planetDirs != null && _planetDirs.TryGetValue(planet.Id, out Dir picked) && Settings.Direction < 0 ? $" ({DirNames[(int)picked]})" : "";
+			Color? color = result == null ? MutedColor : result.Success ? GoodColor : (Color?)BadColor;
+			rows.Add(Row(color,
+				planet.Name + (on ? " (here)" : ""),
+				on ? "here" : Format.Distance(away),
+				Format.Gravity(planet.Intensity * 9.81),
+				planet.HasAtmosphere ? $"{planet.AirDensity:0.##}" : "none",
+				Format.Distance(climb),
+				result == null ? "..." : Format.Ratio(result.StartTwr),
+				result == null ? "working it out..." : ShortVerdict(result) + dir,
+				result == null || result.Outcome == AscentOutcome.NoThrusters ? "" : SignedMass(result.MaxMass - ship.Mass)));
+		}
+	}
+
+	private static string SignedMass(double kg)
+	{
+		return kg >= 0 ? "+" + Format.Mass(kg) : "-" + Format.Mass(-kg);
 	}
 
 	private static string SpareText(double limit, double mass, string what)
@@ -744,13 +953,15 @@ public class FatAlbertScreen : MyGuiScreenBase
 	private void AddDirectionRows(List<RowData> rows)
 	{
 		ShipSnapshot ship = _ship;
-		double gravity = (ship.Planet?.GravityAt(ship.Radius) ?? 0.0) * 9.81;
+		// Measured where the climb starts: here, or sea level on the planet you're visiting.
+		AscentPlan plan = _plan ?? BuildPlan(ship);
+		double gravity = (plan.Planet?.GravityAt(plan.StartRadius) ?? 0.0) * 9.81;
 		double weight = ship.Mass * gravity;
 		foreach (Dir dir in (Dir[])Enum.GetValues(typeof(Dir)))
 		{
 			Vector3D axis = ship.Axis(dir);
 			List<ThrusterInfo> pushing = ship.Thrusters.Where(t => Vector3D.Dot(t.Push, axis) > 0.05).ToList();
-			double here = Ascent.ThrustHere(ship, dir);
+			double here = Ascent.ThrustAt(ship, dir, plan.Planet, plan.StartRadius);
 			string fuels = string.Join(", ", pushing.Select(t => t.Electric ? "Power" : ship.FuelName(t.FuelKey)).Distinct().OrderBy(s => s));
 			Color? color = dir == _dir ? GoodColor : (Color?)null;
 			rows.Add(Row(color,
@@ -766,8 +977,9 @@ public class FatAlbertScreen : MyGuiScreenBase
 	private void AddThrusterRows(List<RowData> rows)
 	{
 		ShipSnapshot ship = _ship;
-		double air = ship.Planet?.AirAt(ship.Radius) ?? 0.0;
-		bool atmosphere = ship.Planet?.HasAtmosphere ?? false;
+		AscentPlan plan = _plan ?? BuildPlan(ship);
+		double air = plan.Planet?.AirAt(plan.StartRadius) ?? 0.0;
+		bool atmosphere = plan.Planet?.HasAtmosphere ?? false;
 		var groups = ship.Thrusters.GroupBy(t => new { t.TypeName, Dir = DirOf(ship, t), t.FuelKey, t.Force });
 		foreach (var group in groups.OrderBy(g => g.Key.Dir).ThenBy(g => g.Key.TypeName))
 		{
@@ -855,7 +1067,9 @@ public class FatAlbertScreen : MyGuiScreenBase
 		"WHAT IT DOES\n" +
 		"Fat Albert flies your ship straight up from where it sits, on paper, and tells you whether it lifts off and gets out of the planet's gravity, and what it burns on the way. Nothing on the ship is touched, so it works on any server.\n\n" +
 		"LIFT WITH\n" +
-		"The thrusters that lift the ship, named from the cockpit. Up means the thrusters that push the ship up (their flames point down, under the ship). Auto picks whichever side faces away from the planet right now. Thrusters on rotors or hinges count for the part of their push that points the chosen way.\n\n" +
+		"The thrusters that lift the ship, named from the cockpit. Up means the thrusters that push the ship up (their flames point down, under the ship). Auto picks whichever side faces away from the planet right now, or, when visiting another planet, the side with the most thrust at its sea level. Thrusters on rotors or hinges count for the part of their push that points the chosen way.\n\n" +
+		"PLANET: VISITING ANOTHER PLANET\n" +
+		"Where I am now checks lift-off from where the ship is. Pick a planet to check a trip there from space: the ship falls in at the speed limit (the game caps falling speed, so that costs no fuel), brakes at full thrust to land at sea level, then climbs back out with whatever fuel and power are left. If it can't brake hard enough to land, the answer is NO. The All planets view runs this for every planet and moon in the world at once, with how much mass you have to spare for each. The Thrust by direction and Thrusters views show thrust at the start of the climb, so at sea level on the planet you picked.\n\n" +
 		"CLIMB KM / SPEED M/S\n" +
 		"Leave Climb empty to climb to where the planet's gravity ends; the plugin reads that from the world. Type a number to climb that many km from where you are instead. Speed is how fast to climb; empty uses the world's speed limit. The ship goes full thrust until it reaches that speed, then holds it, as the dampeners do. A slower climb burns more, because the thrusters hold the ship up for longer.\n\n" +
 		"THE ANSWER\n" +

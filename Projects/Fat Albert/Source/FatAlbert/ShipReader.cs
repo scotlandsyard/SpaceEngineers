@@ -6,6 +6,7 @@ using Sandbox.Game;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.Entities.Cube;
+using Sandbox.Game.Entities.Planet;
 using Sandbox.Game.EntityComponents;
 using Sandbox.ModAPI;
 using VRage.Game;
@@ -216,7 +217,33 @@ internal static class ShipReader
 
 	private static PlanetInfo ReadPlanet(Vector3D position)
 	{
-		MyPlanet planet = MyGamePruningStructure.GetClosestPlanet(position);
+		return ReadPlanet(MyGamePruningStructure.GetClosestPlanet(position));
+	}
+
+	/// <summary>Every planet and moon in the world, nearest to the player first. Planets are always loaded.</summary>
+	public static List<PlanetInfo> ReadPlanets()
+	{
+		Vector3D position = MyAPIGateway.Session?.Player?.GetPosition() ?? Vector3D.Zero;
+		List<PlanetInfo> planets = MyPlanets.GetPlanets()
+			.Where(p => p != null && !p.MarkedForClose)
+			.Select(ReadPlanet)
+			.Where(p => p != null)
+			.OrderBy(p => Vector3D.Distance(position, p.Center))
+			.ToList();
+		// Two planets of the same type (two moons, say) get a number so they can be told apart.
+		foreach (IGrouping<string, PlanetInfo> same in planets.GroupBy(p => p.Name).Where(g => g.Count() > 1))
+		{
+			int number = 1;
+			foreach (PlanetInfo planet in same)
+			{
+				planet.Name += " " + number++;
+			}
+		}
+		return planets;
+	}
+
+	private static PlanetInfo ReadPlanet(MyPlanet planet)
+	{
 		if (planet == null || !(planet.Components.Get<MyGravityProviderComponent>() is MySphericalNaturalGravityComponent gravity))
 		{
 			return null;
@@ -224,6 +251,7 @@ internal static class ShipReader
 		IMySphericalNaturalGravityComponent sphere = gravity;
 		return new PlanetInfo
 		{
+			Id = planet.EntityId,
 			Name = planet.Generator?.Id.SubtypeName ?? planet.StorageName ?? "Planet",
 			Center = planet.PositionComp.GetPosition(),
 			MinRadius = sphere.MinRadius,

@@ -133,6 +133,8 @@ public class PowerSource
 /// <summary>A planet's gravity and atmosphere, with the game's own formulas.</summary>
 public class PlanetInfo
 {
+	public long Id;
+
 	public string Name;
 
 	public Vector3D Center;

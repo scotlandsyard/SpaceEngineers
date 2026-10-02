@@ -10,10 +10,46 @@ public enum AscentOutcome
 	Made,
 	NoGravity,
 	NoThrusters,
+	CantLand,
 	TooHeavy,
 	Stalled,
 	OutOfFuel,
 	TooSlow
+}
+
+/// <summary>
+/// What to fly: from where the ship is now, or a visit to another planet (fall in, brake to land at sea level,
+/// then climb back out on what's left).
+/// </summary>
+public class AscentPlan
+{
+	public PlanetInfo Planet;
+
+	public double StartRadius;
+
+	public bool Land;
+
+	public Dir Dir;
+
+	/// <summary>Metres to climb; null climbs to the planet's gravity limit.</summary>
+	public double? Distance;
+
+	public double Speed;
+
+	/// <summary>Speed the ship falls in at before braking: the world's speed limit, which costs no fuel to reach.</summary>
+	public double FallSpeed;
+
+	public double TargetRadius => Distance.HasValue ? StartRadius + Distance.Value : Planet?.GravityLimit ?? 0.0;
+
+	public static AscentPlan Here(ShipSnapshot ship, Dir dir, double? distance, double speed)
+	{
+		return new AscentPlan { Planet = ship.Planet, StartRadius = ship.Radius, Dir = dir, Distance = distance, Speed = speed, FallSpeed = ship.SpeedLimit };
+	}
+
+	public static AscentPlan Visit(ShipSnapshot ship, PlanetInfo planet, Dir dir, double? distance, double speed)
+	{
+		return new AscentPlan { Planet = planet, StartRadius = planet.AverageRadius, Land = true, Dir = dir, Distance = distance, Speed = speed, FallSpeed = ship.SpeedLimit };
+	}
 }
 
 public class AscentResult
@@ -28,7 +64,7 @@ public class AscentResult
 
 	public double TargetRadius;
 
-	/// <summary>Thrust pushing the chosen way at the start, in newtons.</summary>
+	/// <summary>Thrust pushing the chosen way at the start of the climb, in newtons.</summary>
 	public double StartThrust;
 
 	public double StartGravity;
@@ -57,26 +93,41 @@ public class AscentResult
 
 	public double PowerShortHeight;
 
+	/// <summary>Totals for the whole trip, landing included.</summary>
 	public readonly Dictionary<string, double> GasUsed = new Dictionary<string, double>();
 
 	public readonly Dictionary<string, double> ItemUsed = new Dictionary<string, double>();
 
 	public double BatteryUsed;
 
+	/// <summary>Landing only: braking time, how high braking starts, and what it burns.</summary>
+	public bool Landed;
+
+	public double LandingSeconds;
+
+	public double LandingHeight;
+
+	public readonly Dictionary<string, double> LandingGas = new Dictionary<string, double>();
+
+	public readonly Dictionary<string, double> LandingItems = new Dictionary<string, double>();
+
+	public double LandingBattery;
+
 	/// <summary>Heaviest the ship could be and still make it, in kg (filled in by Ascent.Solve).</summary>
 	public double MaxMass;
 
-	/// <summary>Heaviest the ship could be and still lift off from where it is, in kg.</summary>
+	/// <summary>Heaviest the ship could be and still lift off from the start, in kg.</summary>
 	public double MaxLiftoffMass;
 
 	public bool Success => Outcome == AscentOutcome.Made;
 }
 
 /// <summary>
-/// Flies the ship straight up from where it is, one half-second step at a time: full thrust until the speed limit,
-/// then just enough to hold that speed, as the dampeners would. Each step works out gravity and air density at the
-/// ship's height, what every thruster can push there, and burns gas, battery charge and reactor fuel in the game's
-/// own order. Plain maths on a snapshot, so it runs on a background thread.
+/// Flies the ship straight up, one half-second step at a time: full thrust until the speed limit, then just enough
+/// to hold that speed, as the dampeners would. Each step works out gravity and air density at the ship's height,
+/// what every thruster can push there, and burns gas, battery charge and reactor fuel in the game's own order.
+/// A visit to another planet first brakes from the fall speed to land at sea level, at full thrust. Plain maths on
+/// a snapshot, so it runs on a background thread.
 /// </summary>
 internal static class Ascent
 {
@@ -99,16 +150,192 @@ internal static class Ascent
 		public double Power;
 	}
 
-	/// <summary>The direction that points most away from the planet right now, else the strongest.</summary>
-	public static Dir AutoDirection(ShipSnapshot ship)
+	/// <summary>The fuel and power left on board during one flight, and what the thrusters can do at a given height.</summary>
+	private class Flight
+	{
+		private readonly ShipSnapshot _ship;
+
+		private readonly PlanetInfo _planet;
+
+		private readonly List<Active> _active;
+
+		private readonly AscentResult _result;
+
+		private readonly Dictionary<string, double> _gas;
+
+		private readonly Dictionary<string, double> _items;
+
+		private readonly List<PowerSource> _sources;
+
+		private readonly double[] _charge;
+
+		private readonly Dictionary<string, double> _gasRate = new Dictionary<string, double>();
+
+		private double _demand;
+
+		/// <summary>Full thrust at the last Measure, after fuel and power limits.</summary>
+		public double Thrust;
+
+		/// <summary>Share of the electric thrusters' full-thrust power the ship can make (1 = enough).</summary>
+		public double PowerShare;
+
+		public Flight(ShipSnapshot ship, PlanetInfo planet, List<Active> active, AscentResult result)
+		{
+			_ship = ship;
+			_planet = planet;
+			_active = active;
+			_result = result;
+			_gas = ship.Gas.ToDictionary(p => p.Key, p => p.Value.Litres);
+			_items = new Dictionary<string, double>(ship.ItemFuel);
+			_sources = ship.Sources.Where(s => s.MaxOutput > 0).OrderBy(s => s.Priority).ToList();
+			_charge = _sources.Select(s => s.StoredMWh).ToArray();
+		}
+
+		public void Measure(double radius, double gravityG)
+		{
+			double air = _planet.AirAt(radius);
+			double gasThrust = 0.0;
+			double electricThrust = 0.0;
+			_demand = 0.0;
+			_gasRate.Clear();
+			foreach (Active entry in _active)
+			{
+				ThrusterInfo thruster = entry.Thruster;
+				if (!thruster.Electric && (!_gas.TryGetValue(thruster.FuelKey, out double left) || left <= 0.0))
+				{
+					continue;
+				}
+				double effect = thruster.Effectiveness(air, _planet.HasAtmosphere);
+				double force = entry.Force * effect;
+				// MyEntityThrustComponent: full-thrust power scales with the atmosphere factor and the gravity factor.
+				double power = entry.Power * effect * thruster.ConsumptionMultiplier(gravityG);
+				if (thruster.Electric)
+				{
+					electricThrust += force;
+					_demand += power;
+				}
+				else
+				{
+					gasThrust += force;
+					_gasRate[thruster.FuelKey] = (_gasRate.TryGetValue(thruster.FuelKey, out double rate) ? rate : 0.0) + power * thruster.LitresPerMWs;
+				}
+			}
+
+			double supply = 0.0;
+			for (int i = 0; i < _sources.Count; i++)
+			{
+				if (HasFuel(i))
+				{
+					supply += _sources[i].MaxOutput;
+				}
+			}
+			PowerShare = _demand > 0.0 ? Math.Min(1.0, supply / _demand) : 0.0;
+			Thrust = gasThrust + electricThrust * PowerShare;
+		}
+
+		public bool PowerShort => _demand > 0.0 && PowerShare < 0.999;
+
+		/// <summary>Burns what the thrusters used at this throttle for this long, as measured last.</summary>
+		public void Consume(double throttle, double seconds, double height)
+		{
+			foreach (KeyValuePair<string, double> rate in _gasRate)
+			{
+				Burn(_gas, rate.Key, throttle * rate.Value * seconds, _result.GasUsed, height);
+			}
+			double draw = throttle * PowerShare * _demand;
+			for (int i = 0; i < _sources.Count && draw > 0.0; i++)
+			{
+				PowerSource source = _sources[i];
+				if (!HasFuel(i))
+				{
+					continue;
+				}
+				double take = Math.Min(draw, source.MaxOutput);
+				draw -= take;
+				switch (source.Kind)
+				{
+				case SourceKind.Battery:
+				{
+					double used = Math.Min(_charge[i], take * seconds / 3600.0);
+					_charge[i] -= used;
+					_result.BatteryUsed += used;
+					if (_charge[i] <= 0.0 && !_sources.Where((s, j) => s.Kind == SourceKind.Battery && _charge[j] > 0.0).Any())
+					{
+						NoteRanOut("Batteries", height);
+					}
+					break;
+				}
+				case SourceKind.Reactor:
+					if (source.EnergyPerUnit > 0.0)
+					{
+						Burn(_items, source.FuelKey, take * seconds / source.EnergyPerUnit, _result.ItemUsed, height);
+					}
+					break;
+				case SourceKind.Engine:
+					if (source.EnergyPerUnit > 0.0)
+					{
+						Burn(_gas, source.FuelKey, take * seconds / source.EnergyPerUnit, _result.GasUsed, height);
+					}
+					break;
+				}
+			}
+		}
+
+		private bool HasFuel(int index)
+		{
+			PowerSource source = _sources[index];
+			switch (source.Kind)
+			{
+			case SourceKind.Battery:
+				return _charge[index] > 0.0;
+			case SourceKind.Reactor:
+				return _items.TryGetValue(source.FuelKey, out double kg) && kg > 0.0;
+			case SourceKind.Engine:
+				return _gas.TryGetValue(source.FuelKey, out double litres) && litres > 0.0;
+			default:
+				return true;
+			}
+		}
+
+		private void Burn(Dictionary<string, double> pool, string key, double amount, Dictionary<string, double> used, double height)
+		{
+			if (key == null || amount <= 0.0 || !pool.TryGetValue(key, out double left) || left <= 0.0)
+			{
+				return;
+			}
+			double take = Math.Min(left, amount);
+			pool[key] = left - take;
+			used[key] = (used.TryGetValue(key, out double total) ? total : 0.0) + take;
+			if (left - take <= 0.0)
+			{
+				NoteRanOut(key, height);
+			}
+		}
+
+		private void NoteRanOut(string what, double height)
+		{
+			if (_result.RanOut == null)
+			{
+				_result.RanOut = what == "Batteries" ? what : _ship.FuelName(what);
+				_result.RanOutHeight = height;
+			}
+		}
+	}
+
+	/// <summary>
+	/// Auto direction. Here: the side facing away from the planet right now. Visiting another planet (or out in
+	/// space): the side with the most thrust at that planet's sea level, since you'll point that one up.
+	/// </summary>
+	public static Dir AutoDirection(ShipSnapshot ship, PlanetInfo visiting)
 	{
 		Dir[] dirs = (Dir[])Enum.GetValues(typeof(Dir));
-		if (ship.Planet != null && ship.Radius > 1.0)
+		if (visiting == null && ship.Planet != null && ship.Planet.GravityAt(ship.Radius) > 0.0)
 		{
 			Vector3D up = Vector3D.Normalize(ship.Position - ship.Planet.Center);
 			return dirs.OrderByDescending(d => Vector3D.Dot(ship.Axis(d), up)).First();
 		}
-		return dirs.OrderByDescending(d => VacuumThrust(ship, d)).First();
+		PlanetInfo planet = visiting ?? ship.Planet;
+		return dirs.OrderByDescending(d => planet == null ? VacuumThrust(ship, d) : ThrustAt(ship, d, planet, planet.AverageRadius)).First();
 	}
 
 	/// <summary>Thrust pushing this way with no atmosphere penalty, in newtons.</summary>
@@ -118,41 +345,31 @@ internal static class Ascent
 		return ship.Thrusters.Sum(t => Math.Max(0.0, Vector3D.Dot(t.Push, axis)) * t.Force);
 	}
 
-	/// <summary>Thrust pushing this way at the ship's position, before fuel and power limits, in newtons.</summary>
-	public static double ThrustHere(ShipSnapshot ship, Dir dir)
+	/// <summary>Thrust pushing this way at this distance from a planet's centre, before fuel and power limits, in newtons.</summary>
+	public static double ThrustAt(ShipSnapshot ship, Dir dir, PlanetInfo planet, double radius)
 	{
 		Vector3D axis = ship.Axis(dir);
-		double air = ship.Planet?.AirAt(ship.Radius) ?? 0.0;
-		bool atmosphere = ship.Planet?.HasAtmosphere ?? false;
+		double air = planet?.AirAt(radius) ?? 0.0;
+		bool atmosphere = planet?.HasAtmosphere ?? false;
 		return ship.Thrusters.Sum(t => Math.Max(0.0, Vector3D.Dot(t.Push, axis)) * t.Force * t.Effectiveness(air, atmosphere));
 	}
 
-	/// <summary>Where the climb ends: the gravity limit, or the player's own distance.</summary>
-	public static double TargetRadius(ShipSnapshot ship, double? distance)
+	/// <summary>Runs the trip for the ship as it is, then searches for the heaviest mass that still makes it.</summary>
+	public static AscentResult Solve(ShipSnapshot ship, AscentPlan plan)
 	{
-		if (ship.Planet == null)
-		{
-			return 0.0;
-		}
-		return distance.HasValue ? ship.Radius + distance.Value : ship.Planet.GravityLimit;
-	}
-
-	/// <summary>Runs the climb for the ship as it is, then searches for the heaviest mass that still makes it.</summary>
-	public static AscentResult Solve(ShipSnapshot ship, Dir dir, double? distance, double speed)
-	{
-		AscentResult result = Run(ship, dir, ship.Mass, distance, speed);
+		AscentResult result = Run(ship, plan, ship.Mass);
 		if (result.Outcome == AscentOutcome.NoGravity || result.Outcome == AscentOutcome.NoThrusters || result.StartGravity <= 0)
 		{
 			return result;
 		}
 		result.MaxLiftoffMass = result.StartThrust / result.StartGravity;
-		// Nothing heavier than the lift-off limit can make it, so search below that.
+		// Nothing heavier than the lift-off limit with full tanks can make it, so search below that.
 		double low = 0.0;
-		double high = result.MaxLiftoffMass;
+		double high = Run(ship, plan, 1.0).MaxLiftoffLimit();
 		for (int i = 0; i < 24 && high - low > Math.Max(1.0, high * 0.001); i++)
 		{
 			double mid = (low + high) / 2.0;
-			if (Run(ship, dir, mid, distance, speed).Success)
+			if (Run(ship, plan, mid).Success)
 			{
 				low = mid;
 			}
@@ -165,21 +382,26 @@ internal static class Ascent
 		return result;
 	}
 
-	public static AscentResult Run(ShipSnapshot ship, Dir dir, double mass, double? distance, double speed)
+	private static double MaxLiftoffLimit(this AscentResult result)
 	{
-		AscentResult result = new AscentResult { Direction = dir, Mass = mass };
-		PlanetInfo planet = ship.Planet;
-		double r0 = ship.Radius;
+		return result.StartGravity > 0 ? result.StartThrust / result.StartGravity : 0.0;
+	}
+
+	public static AscentResult Run(ShipSnapshot ship, AscentPlan plan, double mass)
+	{
+		AscentResult result = new AscentResult { Direction = plan.Dir, Mass = mass };
+		PlanetInfo planet = plan.Planet;
+		double r0 = plan.StartRadius;
 		result.StartRadius = r0;
 		if (planet == null || planet.GravityAt(r0) <= 0.0)
 		{
 			result.Outcome = AscentOutcome.NoGravity;
 			return result;
 		}
-		double target = TargetRadius(ship, distance);
+		double target = plan.TargetRadius;
 		result.TargetRadius = target;
 
-		Vector3D axis = ship.Axis(dir);
+		Vector3D axis = ship.Axis(plan.Dir);
 		Dictionary<string, Active> kinds = new Dictionary<string, Active>();
 		foreach (ThrusterInfo thruster in ship.Thrusters)
 		{
@@ -197,19 +419,17 @@ internal static class Ascent
 			entry.Force += thruster.Force * share;
 			entry.Power += thruster.MaxPower;
 		}
-		List<Active> active = kinds.Values.ToList();
-		if (active.Count == 0)
+		if (kinds.Count == 0)
 		{
 			result.Outcome = AscentOutcome.NoThrusters;
 			return result;
 		}
+		Flight flight = new Flight(ship, planet, kinds.Values.ToList(), result);
 
-		// Working copies of everything the climb burns.
-		Dictionary<string, double> gas = ship.Gas.ToDictionary(p => p.Key, p => p.Value.Litres);
-		Dictionary<string, double> items = new Dictionary<string, double>(ship.ItemFuel);
-		List<PowerSource> sources = ship.Sources.Where(s => s.MaxOutput > 0).OrderBy(s => s.Priority).ToList();
-		double[] charge = sources.Select(s => s.StoredMWh).ToArray();
-		Dictionary<string, double> gasRate = new Dictionary<string, double>();
+		if (plan.Land && !Land(flight, plan, mass, result))
+		{
+			return result;
+		}
 
 		double height = 0.0;
 		double velocity = 0.0;
@@ -230,51 +450,14 @@ internal static class Ascent
 			}
 			double gravityG = planet.GravityAt(radius);
 			double gravity = gravityG * 9.81;
-			double air = planet.AirAt(radius);
-
-			double gasThrust = 0.0;
-			double electricThrust = 0.0;
-			double demand = 0.0;
-			gasRate.Clear();
-			foreach (Active entry in active)
-			{
-				ThrusterInfo thruster = entry.Thruster;
-				if (!thruster.Electric && (!gas.TryGetValue(thruster.FuelKey, out double left) || left <= 0.0))
-				{
-					continue;
-				}
-				double effect = thruster.Effectiveness(air, planet.HasAtmosphere);
-				double force = entry.Force * effect;
-				// MyEntityThrustComponent: full-thrust power scales with the atmosphere factor and the gravity factor.
-				double power = entry.Power * effect * thruster.ConsumptionMultiplier(gravityG);
-				if (thruster.Electric)
-				{
-					electricThrust += force;
-					demand += power;
-				}
-				else
-				{
-					gasThrust += force;
-					gasRate[thruster.FuelKey] = (gasRate.TryGetValue(thruster.FuelKey, out double rate) ? rate : 0.0) + power * thruster.LitresPerMWs;
-				}
-			}
-
-			double supply = 0.0;
-			for (int i = 0; i < sources.Count; i++)
-			{
-				if (HasFuel(sources[i], charge[i], gas, items))
-				{
-					supply += sources[i].MaxOutput;
-				}
-			}
-			double powerShare = demand > 0.0 ? Math.Min(1.0, supply / demand) : 0.0;
-			if (demand > 0.0 && powerShare < 0.999 && !result.PowerShort)
+			flight.Measure(radius, gravityG);
+			if (flight.PowerShort && !result.PowerShort)
 			{
 				result.PowerShort = true;
 				result.PowerShortHeight = height;
 			}
 
-			double thrust = gasThrust + electricThrust * powerShare;
+			double thrust = flight.Thrust;
 			double weight = mass * gravity;
 			double twr = weight > 0.0 ? thrust / weight : double.MaxValue;
 			if (first)
@@ -290,9 +473,9 @@ internal static class Ascent
 			}
 
 			// Full thrust up to the speed limit, then just enough to hold it.
-			double throttle = velocity < speed - 1e-6 ? 1.0 : (thrust > 0.0 ? Math.Min(1.0, weight / thrust) : 0.0);
+			double throttle = velocity < plan.Speed - 1e-6 ? 1.0 : (thrust > 0.0 ? Math.Min(1.0, weight / thrust) : 0.0);
 			double acceleration = mass > 0.0 ? (throttle * thrust - weight) / mass : 0.0;
-			double newVelocity = Math.Min(speed, velocity + acceleration * Step);
+			double newVelocity = Math.Min(plan.Speed, velocity + acceleration * Step);
 			if (newVelocity <= 0.0)
 			{
 				if (first)
@@ -310,48 +493,7 @@ internal static class Ascent
 			velocity = newVelocity;
 			result.TopSpeed = Math.Max(result.TopSpeed, velocity);
 			seconds += Step;
-
-			foreach (KeyValuePair<string, double> rate in gasRate)
-			{
-				Burn(gas, rate.Key, throttle * rate.Value * Step, result.GasUsed, result, height);
-			}
-			double draw = throttle * powerShare * demand;
-			for (int i = 0; i < sources.Count && draw > 0.0; i++)
-			{
-				PowerSource source = sources[i];
-				if (!HasFuel(source, charge[i], gas, items))
-				{
-					continue;
-				}
-				double take = Math.Min(draw, source.MaxOutput);
-				draw -= take;
-				switch (source.Kind)
-				{
-				case SourceKind.Battery:
-				{
-					double used = Math.Min(charge[i], take * Step / 3600.0);
-					charge[i] -= used;
-					result.BatteryUsed += used;
-					if (charge[i] <= 0.0 && sources.Where((s, j) => s.Kind == SourceKind.Battery && charge[j] > 0.0).Count() == 0)
-					{
-						NoteRanOut(result, "Batteries", height);
-					}
-					break;
-				}
-				case SourceKind.Reactor:
-					if (source.EnergyPerUnit > 0.0)
-					{
-						Burn(items, source.FuelKey, take * Step / source.EnergyPerUnit, result.ItemUsed, result, height);
-					}
-					break;
-				case SourceKind.Engine:
-					if (source.EnergyPerUnit > 0.0)
-					{
-						Burn(gas, source.FuelKey, take * Step / source.EnergyPerUnit, result.GasUsed, result, height);
-					}
-					break;
-				}
-			}
+			flight.Consume(throttle, Step, height);
 		}
 		result.Height = height;
 		result.Seconds = seconds;
@@ -359,50 +501,58 @@ internal static class Ascent
 		{
 			result.MinTwr = result.StartTwr;
 		}
-		// The names in RanOut are fuel keys until here.
-		if (result.RanOut != null && result.RanOut != "Batteries")
-		{
-			result.RanOut = ship.FuelName(result.RanOut);
-		}
 		return result;
 	}
 
-	private static bool HasFuel(PowerSource source, double charge, Dictionary<string, double> gas, Dictionary<string, double> items)
+	/// <summary>
+	/// Falling in costs nothing: the game caps the ship's speed, so it drops at the speed limit with the thrusters
+	/// idle. Landing is the braking at the bottom: full thrust from the fall speed to a stop, worked out with sea
+	/// level's gravity and air. False (and CantLand) when the thrusters can't stop the ship.
+	/// </summary>
+	private static bool Land(Flight flight, AscentPlan plan, double mass, AscentResult result)
 	{
-		switch (source.Kind)
+		PlanetInfo planet = plan.Planet;
+		double gravityG = planet.GravityAt(plan.StartRadius);
+		double weight = mass * gravityG * 9.81;
+		double velocity = plan.FallSpeed;
+		double seconds = 0.0;
+		double distance = 0.0;
+		bool first = true;
+		while (velocity > 0.0)
 		{
-		case SourceKind.Battery:
-			return charge > 0.0;
-		case SourceKind.Reactor:
-			return items.TryGetValue(source.FuelKey, out double kg) && kg > 0.0;
-		case SourceKind.Engine:
-			return gas.TryGetValue(source.FuelKey, out double litres) && litres > 0.0;
-		default:
-			return true;
+			flight.Measure(plan.StartRadius, gravityG);
+			if (first)
+			{
+				// Shown as the lift-off numbers when it can't even land.
+				result.StartThrust = flight.Thrust;
+				result.StartGravity = gravityG * 9.81;
+				result.StartTwr = weight > 0.0 ? flight.Thrust / weight : double.MaxValue;
+				first = false;
+			}
+			double deceleration = (flight.Thrust - weight) / mass;
+			if (deceleration <= 0.0 || seconds > 3600.0)
+			{
+				result.Outcome = AscentOutcome.CantLand;
+				return false;
+			}
+			double dt = Math.Min(Step, velocity / deceleration);
+			distance += (velocity - deceleration * dt / 2.0) * dt;
+			velocity -= deceleration * dt;
+			seconds += dt;
+			flight.Consume(1.0, dt, 0.0);
 		}
-	}
-
-	private static void Burn(Dictionary<string, double> pool, string key, double amount, Dictionary<string, double> used, AscentResult result, double height)
-	{
-		if (key == null || amount <= 0.0 || !pool.TryGetValue(key, out double left) || left <= 0.0)
+		result.Landed = true;
+		result.LandingSeconds = seconds;
+		result.LandingHeight = distance;
+		result.LandingBattery = result.BatteryUsed;
+		foreach (KeyValuePair<string, double> used in result.GasUsed)
 		{
-			return;
+			result.LandingGas[used.Key] = used.Value;
 		}
-		double take = Math.Min(left, amount);
-		pool[key] = left - take;
-		used[key] = (used.TryGetValue(key, out double total) ? total : 0.0) + take;
-		if (left - take <= 0.0)
+		foreach (KeyValuePair<string, double> used in result.ItemUsed)
 		{
-			NoteRanOut(result, key, height);
+			result.LandingItems[used.Key] = used.Value;
 		}
-	}
-
-	private static void NoteRanOut(AscentResult result, string what, double height)
-	{
-		if (result.RanOut == null)
-		{
-			result.RanOut = what;
-			result.RanOutHeight = height;
-		}
+		return true;
 	}
 }
