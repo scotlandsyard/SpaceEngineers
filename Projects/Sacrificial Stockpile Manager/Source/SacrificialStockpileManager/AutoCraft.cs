@@ -20,7 +20,7 @@ namespace SacrificialStockpileManager;
 /// so docking never applies a ship's quotas to a station or the other way round.
 ///
 /// Orders follow the assembler modes shared with our other plugins (Shared/AssemblerModes.cs): each order goes to
-/// one Main assembler and the Co-op ones share it out; Manual assemblers are never used.
+/// one Main assembler and the Co-op ones share it out; Manual assemblers, and ones with no mode yet, are never used.
 ///
 /// Queuing uses AddQueueItemRequest and mode changes RequestDisassembleEnabled, the same requests as the
 /// production screen. On a client the server checks access and the local state only updates after its reply,
@@ -53,7 +53,7 @@ internal static class AutoCraft
 
 		public GridRules Rules;
 
-		/// <summary>The unit's assemblers the plugin may use (not Manual, not someone else's).</summary>
+		/// <summary>The unit's assemblers the plugin may use (Main or Co-op, not someone else's).</summary>
 		public List<MyAssembler> Assemblers;
 
 		public Dictionary<string, double> Totals;
@@ -85,7 +85,8 @@ internal static class AutoCraft
 				Assemblers = construct.Blocks
 					.Where(b => b.Unit == entry.Key && (b.Kind == BlockKind.Assembler || (rules != null && rules.UseSurvivalKits && b.Kind == BlockKind.SurvivalKit)) && b.Role != Effective.Manual)
 					.Select(b => b.Block as MyAssembler)
-					.Where(b => b != null && !b.Closed)
+					// Assemblers are Manual until the player makes them Main or Co-op.
+					.Where(b => b != null && !b.Closed && !AssemblerModes.IsManual(b))
 					.ToList(),
 				// The Items view shows the grid's own notes; a docked ship's show when it's undocked again.
 				Notes = core ? construct.QuotaNotes : new Dictionary<string, string>()
@@ -150,10 +151,10 @@ internal static class AutoCraft
 			}
 			if (usable.Count == 0)
 			{
-				unit.Notes[key] = unit.Assemblers.Count == 0 ? "No assembler here (or all set to Manual)" : "Assemblers are off, disassembling or unpowered";
+				unit.Notes[key] = unit.Assemblers.Count == 0 ? "No Main or Co-op assembler: set one in Production" : "Assemblers are off, disassembling or unpowered";
 				continue;
 			}
-			// Fills in the modes (Co-op by default, one Main) and turns the game's cooperative switch to match.
+			// Makes sure one is Main and turns the game's cooperative switch to match.
 			unit.Receivers ??= AssemblerModes.PrepareForOrders(usable.Cast<IMyAssembler>().ToList()).OfType<MyAssembler>().ToList();
 			MyAssembler receiver = unit.Receivers.Where(a => a.CanUseBlueprint(blueprint)).OrderBy(a => a.Queue.Sum(q => (double)q.Amount)).FirstOrDefault();
 			if (receiver == null)

@@ -758,19 +758,19 @@ public partial class SsmScreen
 		BlockRole role = (BlockRole)_roleCombo.GetSelectedKey();
 		Store.EditBlockRules(block.Id).Role = role;
 		Store.SaveSettings();
-		// For an assembler, Manual is also the mode shared with our other plugins, so they leave it alone too.
+		// For an assembler, the Manual role also sets the mode shared with our other plugins to Manual, so nothing
+		// queues on it either. Leaving Manual doesn't opt it back in: that's the assembler mode's job.
 		string shared = "";
 		if (LiveEntity(block.Id) is IMyAssembler assembler)
 		{
 			if (role == BlockRole.Manual && !TimShared.AssemblerModes.IsManual(assembler))
 			{
 				TimShared.AssemblerModes.Set(assembler, TimShared.AssemblerMode.Manual);
-				shared = " Our other plugins leave it alone too.";
+				shared = " Its assembler mode is Manual too, so none of our plugins queues on it.";
 			}
 			else if (role != BlockRole.Manual && TimShared.AssemblerModes.IsManual(assembler))
 			{
-				TimShared.AssemblerModes.Set(assembler, TimShared.AssemblerMode.Unset);
-				shared = " Its assembler mode is back to the default (Co-op).";
+				shared = " Its assembler mode is still Manual: set Main or Co-op in Production details to let autocraft use it.";
 			}
 		}
 		else if (block.Kind == BlockKind.Assembler && role == BlockRole.Manual)
@@ -963,7 +963,7 @@ public partial class SsmScreen
 			{
 				Key = "b:" + block.Id,
 				Texts = new[] { block.Name, block.Type, mode, state, detail },
-				Color = mode == "Manual" ? MutedColor : state == "On" ? (Color?)null : WarningColor
+				Color = mode.StartsWith("Manual") ? MutedColor : state == "On" ? (Color?)null : WarningColor
 			});
 		}
 		return rows.OrderBy(r => r.Texts[1], StringComparer.OrdinalIgnoreCase).ThenBy(r => r.Texts[0], StringComparer.OrdinalIgnoreCase).ToList();

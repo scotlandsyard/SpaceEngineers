@@ -131,18 +131,19 @@ internal class Construct
 
 	public static Effective Resolve(BlockSnapshot block)
 	{
-		return Resolve(block.Kind, Store.BlockRules(block.Id), block.Docked, block.NotYours, block.AssemblerMode == nameof(TimShared.AssemblerMode.Manual));
+		return Resolve(block.Kind, Store.BlockRules(block.Id), block.Docked, block.NotYours);
 	}
 
 	/// <summary>
-	/// The role a block acts in. A block that isn't yours (unless the grid includes shared blocks), and an
-	/// assembler set to Manual in the mode shared with our other plugins, are left alone whatever their role. Auto
-	/// blocks on a grid docked by connector count as machines: they keep their own limits (so a docked ship's
-	/// lockers restock), but a docked ship's cargo isn't sorted into the station.
+	/// The role a block acts in. A block that isn't yours (unless the grid includes shared blocks) is left alone
+	/// whatever its role. Auto blocks on a grid docked by connector count as machines: they keep their own limits
+	/// (so a docked ship's lockers restock), but a docked ship's cargo isn't sorted into the station. An
+	/// assembler's mode shared with our other plugins only decides whether it gets orders (see AutoCraft), not how
+	/// its inventory is handled, because every assembler is Manual until the player gives it a mode.
 	/// </summary>
-	public static Effective Resolve(BlockKind kind, BlockRules rules, bool docked, bool notYours = false, bool sharedManual = false)
+	public static Effective Resolve(BlockKind kind, BlockRules rules, bool docked, bool notYours = false)
 	{
-		if (notYours || sharedManual)
+		if (notYours)
 		{
 			return Effective.Manual;
 		}
@@ -330,7 +331,7 @@ internal class Construct
 			{
 				live.AssemblerMode = TimShared.AssemblerModes.Get(block);
 			}
-			live.Role = Resolve(live.Kind, live.Rules, live.Docked, live.NotYours, live.AssemblerMode == TimShared.AssemblerMode.Manual);
+			live.Role = Resolve(live.Kind, live.Rules, live.Docked, live.NotYours);
 			live.Limits = live.Rules?.Limits.ToList() ?? new List<ItemLimit>();
 			TypeLimits typeLimits = live.Docked ? null : gridRules?.Type(live.Kind);
 			if (typeLimits != null)

@@ -115,6 +115,8 @@ public partial class SsmScreen : MyGuiScreenBase
 
 	private MyGuiControlCombobox _priorityCombo;
 
+	private MyGuiControlCombobox _modeCombo;
+
 	private MyGuiControlCombobox _itemCombo;
 
 	private MyGuiControlCombobox _pageCombo;
@@ -244,6 +246,7 @@ public partial class SsmScreen : MyGuiScreenBase
 		_blockCombo = null;
 		_roleCombo = null;
 		_priorityCombo = null;
+		_modeCombo = null;
 		_itemCombo = null;
 		_amountBox = null;
 		_pageCombo = null;
@@ -500,7 +503,7 @@ public partial class SsmScreen : MyGuiScreenBase
 			s_machineId = machines[0].Id;
 		}
 		AddLabel(Left, Row2Y, "Block");
-		_blockCombo = AddCombo(-0.36f, Row2Y, 0.78f, 14);
+		_blockCombo = AddCombo(-0.36f, Row2Y, 0.48f, 14);
 		_blockKeys.Clear();
 		foreach (BlockSnapshot machine in machines)
 		{
@@ -517,10 +520,50 @@ public partial class SsmScreen : MyGuiScreenBase
 			if (!_suppressEvents && index >= 0 && index < _blockKeys.Count)
 			{
 				s_machineId = _blockKeys[index];
+				UpdateModeCombo();
 				_rowsSignature = null;
 				RefreshAll();
 			}
 		};
+
+		// The assembler mode shared with our other plugins.
+		AddLabel(0.135f, Row2Y, "Mode");
+		_modeCombo = AddCombo(0.2f, Row2Y, 0.22f, 3, "Assembler mode, shared with our other plugins: Main takes autocraft orders, Co-op helps a Main assembler, Manual (the default) is never used by any of them.");
+		_modeCombo.AddItem((long)TimShared.AssemblerMode.Main, "Main", 0, null, sort: false);
+		_modeCombo.AddItem((long)TimShared.AssemblerMode.Coop, "Co-op", 1, null, sort: false);
+		_modeCombo.AddItem((long)TimShared.AssemblerMode.Manual, "Manual", 2, null, sort: false);
+		UpdateModeCombo();
+		_modeCombo.ItemSelected += () =>
+		{
+			if (!_suppressEvents)
+			{
+				SetAssemblerMode(s_machineId, (TimShared.AssemblerMode)_modeCombo.GetSelectedKey());
+			}
+		};
+	}
+
+	/// <summary>Shows the selected machine's assembler mode; disabled for anything that isn't a loaded assembler of yours.</summary>
+	private void UpdateModeCombo()
+	{
+		if (_modeCombo == null)
+		{
+			return;
+		}
+		bool wasSuppressed = _suppressEvents;
+		_suppressEvents = true;
+		try
+		{
+			IMyAssembler assembler = LiveEntity(s_machineId) as IMyAssembler;
+			BlockSnapshot block = Grid?.Block(s_machineId);
+			TimShared.AssemblerMode mode = assembler != null ? TimShared.AssemblerModes.Get(assembler)
+				: block != null && Enum.TryParse(block.AssemblerMode, out TimShared.AssemblerMode saved) ? saved : TimShared.AssemblerMode.Unset;
+			_modeCombo.SelectItemByKey((long)(mode == TimShared.AssemblerMode.Unset ? TimShared.AssemblerMode.Manual : mode), sendEvent: false);
+			_modeCombo.Enabled = assembler != null && assembler.HasLocalPlayerAccess() && block?.NotYours != true;
+		}
+		finally
+		{
+			_suppressEvents = wasSuppressed;
+		}
 	}
 
 	/// <summary>Find box, item picker and amount box, used by Items & quotas and Block settings.</summary>
@@ -872,7 +915,7 @@ public partial class SsmScreen : MyGuiScreenBase
 			return volume + "Pick an item, type an amount, set a minimum or maximum. Blank clears it.";
 		}
 		case View.Production:
-			return live ? "Double-click an assembler or refinery for its queue and what it's missing. Assembler mode: Main, Co-op or Manual." : "Last known state." + offline;
+			return live ? "Double-click an assembler or refinery for its queue and what it's missing. Assembler mode steps Manual (default) > Main > Co-op; autocraft only uses Main and Co-op." : "Last known state." + offline;
 		case View.Machine:
 			return live ? "Queue first, then the materials the whole queue needs. Missing = what the grid doesn't have." : "Not loaded: queue details show while the grid is in range.";
 		case View.Refining:

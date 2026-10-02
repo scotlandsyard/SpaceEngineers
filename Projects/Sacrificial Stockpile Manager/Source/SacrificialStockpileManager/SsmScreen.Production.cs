@@ -245,34 +245,47 @@ public partial class SsmScreen
 	}
 
 	/// <summary>
-	/// Steps the selected assembler's mode, shared with our other plugins: Main (takes the orders), then Manual (no
-	/// plugin touches it), then Co-op (helps a Main assembler; the default), then Main again.
+	/// Steps the selected assembler's mode, shared with our other plugins: Manual (the default; no plugin uses it),
+	/// then Main (takes the orders), then Co-op (helps a Main assembler), then Manual again.
 	/// </summary>
 	private void CycleAssemblerMode()
 	{
 		long id = SelectedBlockId();
-		if (id == 0 || !(LiveEntity(id) is IMyAssembler assembler) || !assembler.HasLocalPlayerAccess())
+		if (id == 0 || !(LiveEntity(id) is IMyAssembler assembler))
 		{
 			ShowMessage("Select an assembler first (the grid has to be loaded).", WarningColor);
-			return;
-		}
-		if (Grid?.Block(id)?.NotYours == true)
-		{
-			ShowMessage($"{assembler.CustomName} isn't yours, so its mode is left alone.", WarningColor);
 			return;
 		}
 		TimShared.AssemblerMode next;
 		switch (TimShared.AssemblerModes.Get(assembler))
 		{
 		case TimShared.AssemblerMode.Main:
-			next = TimShared.AssemblerMode.Manual;
-			break;
-		case TimShared.AssemblerMode.Manual:
 			next = TimShared.AssemblerMode.Coop;
+			break;
+		case TimShared.AssemblerMode.Coop:
+			next = TimShared.AssemblerMode.Manual;
 			break;
 		default:
 			next = TimShared.AssemblerMode.Main;
 			break;
+		}
+		SetAssemblerMode(id, next);
+	}
+
+	/// <summary>Sets an assembler's mode, shared with our other plugins (Production view button, Production details).</summary>
+	private void SetAssemblerMode(long id, TimShared.AssemblerMode next)
+	{
+		if (id == 0 || !(LiveEntity(id) is IMyAssembler assembler) || !assembler.HasLocalPlayerAccess())
+		{
+			ShowMessage("Select an assembler first (the grid has to be loaded).", WarningColor);
+			UpdateModeCombo();
+			return;
+		}
+		if (Grid?.Block(id)?.NotYours == true)
+		{
+			ShowMessage($"{assembler.CustomName} isn't yours, so its mode is left alone.", WarningColor);
+			UpdateModeCombo();
+			return;
 		}
 		TimShared.AssemblerModes.Set(assembler, next);
 		// Keep the plugin's own role in step, so Manual only has to be set in one place.
@@ -297,6 +310,7 @@ public partial class SsmScreen
 			break;
 		}
 		ShowMessage($"{assembler.CustomName} is now {text}", next == TimShared.AssemblerMode.Manual ? (Color?)null : GoodColor);
+		UpdateModeCombo();
 		_rowsSignature = null;
 		RefreshAll();
 	}

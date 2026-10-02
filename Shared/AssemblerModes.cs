@@ -10,7 +10,7 @@ namespace TimShared;
 /// <summary>How our plugins may use an assembler. Stored on the block, so every plugin sees the same value.</summary>
 internal enum AssemblerMode
 {
-	/// <summary>Not set yet: becomes Coop (or Main) the first time a plugin queues work on this construct.</summary>
+	/// <summary>Not set: treated as Manual, so an assembler is only used once the player gives it a mode.</summary>
 	Unset,
 
 	/// <summary>Takes the plugins' orders. Kept out of cooperative mode so the co-op assemblers can help it.</summary>
@@ -30,10 +30,11 @@ internal enum AssemblerMode
 /// Assembler=Coop
 /// </code>
 /// In the game, a cooperative assembler only takes work from a conveyor-connected assembler that is not in
-/// cooperative mode and has a queue. So orders go to Main assemblers and the Co-op ones share them out. A plugin
-/// that queues work calls <see cref="PrepareForOrders"/> first: it gives unset assemblers their default mode,
-/// makes sure one is Main, and sets the game's cooperative switch to match. Only the plugin's own assemblers are
-/// ever changed, and modes are only ever filled in, never swapped, so two plugins can't fight over one.
+/// cooperative mode and has a queue. So orders go to Main assemblers and the Co-op ones share them out. An
+/// assembler with no mode is Manual: plugins only use assemblers the player has made Main or Co-op. A plugin
+/// that queues work calls <see cref="PrepareForOrders"/> first: it makes sure one is Main and sets the game's
+/// cooperative switch to match. Only the plugin's own assemblers are ever changed, and modes are only ever
+/// filled in, never swapped, so two plugins can't fight over one.
 /// This one file is linked into every plugin that needs it (see Shared/README.md).
 /// </summary>
 internal static class AssemblerModes
@@ -48,9 +49,11 @@ internal static class AssemblerModes
 		return value != null && Enum.TryParse(value, true, out AssemblerMode mode) ? mode : AssemblerMode.Unset;
 	}
 
+	/// <summary>True for Manual and for no mode at all (the default).</summary>
 	public static bool IsManual(IMyTerminalBlock block)
 	{
-		return Get(block) == AssemblerMode.Manual;
+		AssemblerMode mode = Get(block);
+		return mode == AssemblerMode.Manual || mode == AssemblerMode.Unset;
 	}
 
 	public static string Describe(AssemblerMode mode)
@@ -64,7 +67,7 @@ internal static class AssemblerModes
 		case AssemblerMode.Manual:
 			return "Manual";
 		default:
-			return "Co-op (default)";
+			return "Manual (default)";
 		}
 	}
 
@@ -78,20 +81,20 @@ internal static class AssemblerModes
 	/// <summary>
 	/// Readies a plugin's assemblers for new orders and returns the ones to queue into. <paramref name="usable"/>
 	/// should be the assemblers the plugin may use right now (on, working, in assembly mode, accessible); Manual
-	/// ones are skipped here. Unset assemblers become Co-op, and if none of the usable ones is Main one is made
+	/// ones (including ones with no mode) are skipped here. If none of the usable Co-op ones is Main, one is made
 	/// Main: preferably one already out of cooperative mode, else the one with the lowest entity id, so every
 	/// plugin picks the same one.
 	/// </summary>
 	public static List<IMyAssembler> PrepareForOrders(List<IMyAssembler> usable)
 	{
-		List<IMyAssembler> managed = usable.Where(a => a != null && !a.Closed && Get(a) != AssemblerMode.Manual).ToList();
+		List<IMyAssembler> managed = usable.Where(a => a != null && !a.Closed && !IsManual(a)).ToList();
 		if (managed.Count == 0)
 		{
 			return managed;
 		}
 		if (!managed.Any(a => Get(a) == AssemblerMode.Main))
 		{
-			IMyAssembler pick = managed.Where(a => Get(a) == AssemblerMode.Unset && !a.CooperativeMode).OrderBy(a => a.EntityId).FirstOrDefault()
+			IMyAssembler pick = managed.Where(a => !a.CooperativeMode).OrderBy(a => a.EntityId).FirstOrDefault()
 				?? managed.OrderBy(a => a.EntityId).First();
 			WriteValue(pick, AssemblerMode.Main.ToString());
 		}
@@ -99,11 +102,6 @@ internal static class AssemblerModes
 		foreach (IMyAssembler assembler in managed)
 		{
 			AssemblerMode mode = Get(assembler);
-			if (mode == AssemblerMode.Unset)
-			{
-				mode = AssemblerMode.Coop;
-				WriteValue(assembler, mode.ToString());
-			}
 			ApplySwitch(assembler, mode);
 			// An assembler that can't be cooperative (the game doesn't allow it for every type) would sit idle as Co-op,
 			// so it takes orders like a Main one.
