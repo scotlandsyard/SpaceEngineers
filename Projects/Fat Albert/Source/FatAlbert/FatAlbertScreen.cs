@@ -1,0 +1,871 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using Sandbox.Graphics.GUI;
+using Sandbox.ModAPI;
+using TimShared;
+using VRage.Game;
+using VRage.Utils;
+using VRageMath;
+
+namespace FatAlbert;
+
+/// <summary>
+/// The Fat Albert window: pick a ship, the way it lifts and how far it has to go, and see whether it gets off the
+/// ground and out of the gravity well, and what it burns on the way. Refreshes once a second; the climb itself is
+/// worked out on a background thread.
+/// </summary>
+public class FatAlbertScreen : MyGuiScreenBase
+{
+	private enum View
+	{
+		Check,
+		Directions,
+		Thrusters,
+		Fuel,
+		Help
+	}
+
+	// In the same order as View.
+	private static readonly string[] ViewNames = { "Lift-off check", "Thrust by direction", "Thrusters", "Fuel & power", "Help" };
+
+	private static readonly string[] DirNames = { "Up", "Down", "Forward", "Backward", "Left", "Right" };
+
+	private class Column
+	{
+		public string Name;
+
+		public float Width;
+
+		public bool RightAligned;
+
+		public Column(string name, float width, bool rightAligned = false)
+		{
+			Name = name;
+			Width = width;
+			RightAligned = rightAligned;
+		}
+	}
+
+	private class RowData
+	{
+		public string[] Texts;
+
+		public Color? Color;
+	}
+
+	private const int RefreshFrames = 60;
+
+	private const double ShipRange = 5000.0;
+
+	private const float Left = -0.42f;
+
+	private const float Row1Y = -0.375f;
+
+	private const float Row2Y = -0.325f;
+
+	private const float Row3Y = -0.28f;
+
+	private const float TableTop = -0.245f;
+
+	private const float StatusY = 0.315f;
+
+	private const float ButtonsY = 0.39f;
+
+	private const float ColumnGap = 0.01f;
+
+	private static readonly Thickness RightCellMargin = new Thickness(2f * ColumnGap, 0f, 0f, 0f);
+
+	// Remembered while the game runs; a new session starts with the ship you're in.
+	private static long s_shipKey;
+
+	private static View s_viewBeforeHelp = View.Check;
+
+	private MyGuiControlCombobox _shipCombo;
+
+	private MyGuiControlCombobox _viewCombo;
+
+	private MyGuiControlCombobox _dirCombo;
+
+	private MyGuiControlTable _table;
+
+	private MyGuiControlMultilineText _helpText;
+
+	private MyGuiControlLabel _status;
+
+	private readonly List<long> _shipKeys = new List<long>();
+
+	private bool[] _rightAligned = new bool[0];
+
+	private ShipSnapshot _ship;
+
+	private AscentResult _result;
+
+	private Dir _dir;
+
+	private bool _simRunning;
+
+	private bool _simAgain;
+
+	private int _frames;
+
+	private bool _recreatePending;
+
+	private bool _suppressEvents;
+
+	private bool _closed;
+
+	private static Color MutedColor => new Color(150, 160, 170);
+
+	private static Color WarningColor => new Color(255, 190, 90);
+
+	private static Color BadColor => new Color(255, 120, 110);
+
+	private static Color GoodColor => new Color(140, 230, 140);
+
+	private static View CurrentView
+	{
+		get => (View)MathHelper.Clamp(Settings.View, 0, ViewNames.Length - 1);
+		set => Settings.View = (int)value;
+	}
+
+	public FatAlbertScreen(long shipKey)
+		: base(new Vector2(0.5f, 0.5f), MyGuiConstants.SCREEN_BACKGROUND_COLOR, new Vector2(0.9f, 0.95f))
+	{
+		long controlled = ShipReader.ControlledShipKey();
+		if (shipKey != 0)
+		{
+			s_shipKey = shipKey;
+		}
+		else if (controlled != 0)
+		{
+			s_shipKey = controlled;
+		}
+		EnabledBackgroundFade = true;
+		m_closeOnEsc = true;
+		CanHideOthers = true;
+		CloseButtonEnabled = true;
+		RecreateControls(constructor: true);
+	}
+
+	public override string GetFriendlyName()
+	{
+		return "FatAlbertScreen";
+	}
+
+	protected override void OnClosed()
+	{
+		_closed = true;
+		Settings.Save();
+		base.OnClosed();
+	}
+
+	public override void RecreateControls(bool constructor)
+	{
+		base.RecreateControls(constructor);
+		_suppressEvents = true;
+		try
+		{
+			CreateControls();
+		}
+		finally
+		{
+			_suppressEvents = false;
+		}
+		Refresh(rebuild: constructor);
+	}
+
+	private void CreateControls()
+	{
+		PluginSwitcher.AddSwitcher(this, AddCaption("Fat Albert - can it make orbit?"));
+
+		AddLabel(Left, Row1Y, "Ship");
+		_shipCombo = AddCombo(-0.36f, Row1Y, 0.43f, 12, "Your ships within 5 km. The one you're sitting in comes first.");
+		_shipCombo.ItemSelected += OnShipSelected;
+		FillShipCombo();
+
+		AddLabel(0.1f, Row1Y, "View");
+		_viewCombo = AddCombo(0.16f, Row1Y, 0.26f, ViewNames.Length);
+		for (int i = 0; i < ViewNames.Length; i++)
+		{
+			_viewCombo.AddItem(i, ViewNames[i], i, null, sort: false);
+		}
+		_viewCombo.SelectItemByKey((long)CurrentView, sendEvent: false);
+		_viewCombo.ItemSelected += () => SwitchView((View)_viewCombo.GetSelectedKey());
+
+		AddLabel(Left, Row2Y, "Lift with");
+		_dirCombo = AddCombo(-0.33f, Row2Y, 0.24f, 7, "Which thrusters lift the ship, named from the cockpit: Up means the ones that push the ship up (their flames point down).");
+		_dirCombo.AddItem(-1, "Auto (facing up now)", 0, null, sort: false);
+		for (int i = 0; i < DirNames.Length; i++)
+		{
+			_dirCombo.AddItem(i, DirNames[i] + " thrusters", i + 1, null, sort: false);
+		}
+		_dirCombo.SelectItemByKey(Settings.Direction, sendEvent: false);
+		_dirCombo.ItemSelected += () =>
+		{
+			if (!_suppressEvents)
+			{
+				Settings.Direction = (int)_dirCombo.GetSelectedKey();
+				Recompute();
+			}
+		};
+
+		AddLabel(-0.07f, Row2Y, "Climb km");
+		AddNumberBox(0.025f, Row2Y, Settings.DistanceKm, "How far to climb from here, in km. Leave empty to climb to where the planet's gravity ends.", text => Settings.DistanceKm = text);
+
+		AddLabel(0.155f, Row2Y, "Speed m/s");
+		AddNumberBox(0.26f, Row2Y, Settings.Speed, "Climb speed in m/s. Leave empty for the world's speed limit. Slower climbs burn more: the thrusters hold the ship up for longer.", text => Settings.Speed = text);
+
+		MyGuiControlCheckbox countOff = new MyGuiControlCheckbox(new Vector2(Left + 0.01f, Row3Y), null, "On: thrusters, tanks and power blocks that are off, stockpiling or recharging count as if you'll switch them on before lift-off. Off: only what works right now counts.", Settings.CountOff);
+		countOff.IsCheckedChanged = box =>
+		{
+			Settings.CountOff = box.IsChecked;
+			Refresh(rebuild: false);
+		};
+		Controls.Add(countOff);
+		Controls.Add(new MyGuiControlLabel(new Vector2(Left + 0.03f, Row3Y), null, "Count blocks that are switched off, stockpiling or recharging", null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER));
+
+		List<Column> columns = ColumnsFor(CurrentView);
+		_table = new MyGuiControlTable
+		{
+			Position = new Vector2(0f, TableTop),
+			Size = new Vector2(0.84f, 0.5f),
+			OriginAlign = MyGuiDrawAlignEnum.HORISONTAL_CENTER_AND_VERTICAL_TOP,
+			ColumnsCount = columns.Count,
+			VisibleRowsCount = 13
+		};
+		_table.SetCustomColumnWidths(columns.Select(c => c.Width).ToArray());
+		_rightAligned = columns.Select(c => c.RightAligned).ToArray();
+		for (int i = 0; i < columns.Count; i++)
+		{
+			_table.SetColumnName(i, new StringBuilder(columns[i].Name));
+			if (columns[i].RightAligned)
+			{
+				_table.SetColumnAlign(i, MyGuiDrawAlignEnum.HORISONTAL_RIGHT_AND_VERTICAL_CENTER);
+				_table.SetHeaderColumnAlign(i, MyGuiDrawAlignEnum.HORISONTAL_RIGHT_AND_VERTICAL_CENTER);
+				// Same trick as the Stockpile Manager: a negative header margin lines right-aligned headers up with their cells.
+				_table.SetHeaderColumnMargin(i, new Thickness(-ColumnGap, 0f, ColumnGap, 0f));
+			}
+		}
+		_table.Visible = CurrentView != View.Help;
+		Controls.Add(_table);
+
+		_helpText = null;
+		if (CurrentView == View.Help)
+		{
+			_helpText = new MyGuiControlMultilineText(new Vector2(0f, TableTop), new Vector2(0.84f, 0.54f), null, "Blue", 0.8f, MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_TOP, null, drawScrollbarV: true, drawScrollbarH: false, MyGuiDrawAlignEnum.HORISONTAL_CENTER_AND_VERTICAL_TOP)
+			{
+				OriginAlign = MyGuiDrawAlignEnum.HORISONTAL_CENTER_AND_VERTICAL_TOP
+			};
+			_helpText.AppendText(HelpText);
+			Controls.Add(_helpText);
+		}
+
+		_status = new MyGuiControlLabel(new Vector2(Left, StatusY), null, "", null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER);
+		Controls.Add(_status);
+
+		AddButton(-0.315f, "Rescan", () =>
+		{
+			FillShipCombo();
+			Refresh(rebuild: true);
+		});
+		AddButton(-0.105f, "Reset inputs", ResetInputs);
+		if (CurrentView == View.Help)
+		{
+			AddButton(0.315f, "Back", () => SwitchView(s_viewBeforeHelp));
+		}
+		else
+		{
+			AddButton(0.315f, "Help", () => SwitchView(View.Help));
+		}
+	}
+
+	private static List<Column> ColumnsFor(View view)
+	{
+		switch (view)
+		{
+		case View.Directions:
+			return new List<Column>
+			{
+				new Column("Lift with", 0.2f),
+				new Column("Thrusters", 0.11f, true),
+				new Column("Thrust here", 0.17f, true),
+				new Column("In space", 0.17f, true),
+				new Column("Thrust/weight", 0.15f, true),
+				new Column("Burns", 0.2f)
+			};
+		case View.Thrusters:
+			return new List<Column>
+			{
+				new Column("Thruster", 0.3f),
+				new Column("Count", 0.08f, true),
+				new Column("Pushes", 0.13f),
+				new Column("Burns", 0.13f),
+				new Column("Thrust each", 0.14f, true),
+				new Column("Here", 0.1f, true),
+				new Column("Off", 0.08f, true)
+			};
+		case View.Fuel:
+			return new List<Column>
+			{
+				new Column("Supply", 0.26f),
+				new Column("Blocks", 0.08f, true),
+				new Column("Stored", 0.17f, true),
+				new Column("Output", 0.13f, true),
+				new Column("Used to climb", 0.17f, true),
+				new Column("Left", 0.11f, true)
+			};
+		default:
+			return new List<Column>
+			{
+				new Column("", 0.25f),
+				new Column("", 0.75f)
+			};
+		}
+	}
+
+	// ---- Controls ----
+
+	private void AddLabel(float x, float y, string text)
+	{
+		Controls.Add(new MyGuiControlLabel(new Vector2(x, y), null, text, null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER));
+	}
+
+	private MyGuiControlCombobox AddCombo(float x, float y, float width, int openItems, string toolTip = null)
+	{
+		MyGuiControlCombobox combo = new MyGuiControlCombobox(new Vector2(x, y), new Vector2(width, 0.04f), null, null, openItems, null, false, toolTip, MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER);
+		Controls.Add(combo);
+		return combo;
+	}
+
+	private void AddNumberBox(float x, float y, string text, string toolTip, Action<string> changed)
+	{
+		MyGuiControlTextbox box = new MyGuiControlTextbox(new Vector2(x, y), text, 10)
+		{
+			Size = new Vector2(0.09f, 0.045f),
+			OriginAlign = MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER
+		};
+		box.SetToolTip(toolTip);
+		box.TextChanged += b =>
+		{
+			changed(b.Text ?? "");
+			Recompute();
+		};
+		Controls.Add(box);
+	}
+
+	private MyGuiControlButton AddButton(float x, string text, Action onClick)
+	{
+		MyGuiControlButton button = new MyGuiControlButton(new Vector2(x, ButtonsY), MyGuiControlButtonStyleEnum.Default, null, null, MyGuiDrawAlignEnum.HORISONTAL_CENTER_AND_VERTICAL_CENTER, null, new StringBuilder(text), 0.8f, MyGuiDrawAlignEnum.HORISONTAL_CENTER_AND_VERTICAL_CENTER, MyGuiControlHighlightType.WHEN_CURSOR_OVER, (MyGuiControlButton _) =>
+		{
+			try
+			{
+				onClick();
+			}
+			catch (Exception ex)
+			{
+				SetStatus("Something went wrong: " + ex.Message, BadColor);
+				MyLog.Default.WriteLineAndConsole($"[Fat Albert] Button '{text}': {ex}");
+			}
+		});
+		Controls.Add(button);
+		return button;
+	}
+
+	private void SetStatus(string text, Color? color = null)
+	{
+		if (_status != null)
+		{
+			_status.Text = text;
+			_status.ColorMask = (color ?? MutedColor).ToVector4();
+		}
+	}
+
+	public override bool Update(bool hasFocus)
+	{
+		bool result = base.Update(hasFocus);
+		try
+		{
+			if (_recreatePending)
+			{
+				// Rebuilt here rather than inside a combobox event, which is still going through the controls.
+				_recreatePending = false;
+				RecreateControls(constructor: false);
+			}
+			else if (++_frames >= RefreshFrames)
+			{
+				Refresh(rebuild: false);
+			}
+		}
+		catch (Exception ex)
+		{
+			MyLog.Default.WriteLineAndConsole($"[Fat Albert] Screen update: {ex}");
+		}
+		return result;
+	}
+
+	private void SwitchView(View view)
+	{
+		if (_suppressEvents || view == CurrentView)
+		{
+			return;
+		}
+		if (view == View.Help)
+		{
+			s_viewBeforeHelp = CurrentView;
+		}
+		CurrentView = view;
+		_recreatePending = true;
+	}
+
+	private void ResetInputs()
+	{
+		Settings.Direction = -1;
+		Settings.DistanceKm = "";
+		Settings.Speed = "";
+		Settings.CountOff = true;
+		_recreatePending = true;
+	}
+
+	private void FillShipCombo()
+	{
+		_shipCombo.ClearItems();
+		_shipKeys.Clear();
+		foreach (ShipReader.ShipEntry ship in ShipReader.FindShips(ShipRange))
+		{
+			_shipCombo.AddItem(_shipKeys.Count, $"{ship.Name}  ({Format.Distance(ship.Distance)})", _shipKeys.Count, null, sort: false);
+			_shipKeys.Add(ship.Key);
+		}
+		if (_shipKeys.Count > 0 && !_shipKeys.Contains(s_shipKey))
+		{
+			s_shipKey = _shipKeys[0];
+		}
+		if (_shipKeys.Contains(s_shipKey))
+		{
+			_shipCombo.SelectItemByKey(_shipKeys.IndexOf(s_shipKey), sendEvent: false);
+		}
+	}
+
+	private void OnShipSelected()
+	{
+		int index = (int)_shipCombo.GetSelectedKey();
+		if (_suppressEvents || index < 0 || index >= _shipKeys.Count)
+		{
+			return;
+		}
+		s_shipKey = _shipKeys[index];
+		_result = null;
+		Refresh(rebuild: true);
+	}
+
+	// ---- Reading the ship and running the climb ----
+
+	private void Refresh(bool rebuild)
+	{
+		_frames = 0;
+		_ship = s_shipKey == 0 ? null : ShipReader.Read(s_shipKey, Settings.CountOff, rebuild);
+		Recompute();
+	}
+
+	/// <summary>Runs the climb in the background; if one is already running, runs again once it's done.</summary>
+	private void Recompute()
+	{
+		if (_suppressEvents)
+		{
+			return;
+		}
+		ShowRows();
+		if (_ship == null || _ship.IsStatic)
+		{
+			_result = null;
+			return;
+		}
+		if (_simRunning)
+		{
+			_simAgain = true;
+			return;
+		}
+		_dir = Settings.Direction >= 0 ? (Dir)Settings.Direction : Ascent.AutoDirection(_ship);
+		ShipSnapshot ship = _ship;
+		Dir dir = _dir;
+		double? distance = Settings.Distance;
+		double speed = Settings.ClimbSpeed(ship.SpeedLimit);
+		AscentResult result = null;
+		_simRunning = true;
+		MyAPIGateway.Parallel.StartBackground(() => result = Ascent.Solve(ship, dir, distance, speed), () =>
+		{
+			_simRunning = false;
+			if (_closed)
+			{
+				return;
+			}
+			if (ship.Key == s_shipKey)
+			{
+				_result = result;
+			}
+			if (_simAgain)
+			{
+				_simAgain = false;
+				Recompute();
+			}
+			else
+			{
+				ShowRows();
+			}
+		});
+	}
+
+	// ---- Tables ----
+
+	private void ShowRows()
+	{
+		if (_table == null)
+		{
+			return;
+		}
+		List<RowData> rows = new List<RowData>();
+		if (_ship == null)
+		{
+			rows.Add(Row(BadColor, "No ship", s_shipKey == 0 ? "None of your ships is within 5 km. Sit in one, or press Rescan." : "That ship isn't loaded any more. Press Rescan."));
+		}
+		else if (_ship.IsStatic)
+		{
+			rows.Add(Row(BadColor, "Station", "This grid is a station (or joined to one), so it can't fly. Convert it to a ship first."));
+		}
+		else
+		{
+			switch (CurrentView)
+			{
+			case View.Check:
+				AddCheckRows(rows);
+				break;
+			case View.Directions:
+				AddDirectionRows(rows);
+				break;
+			case View.Thrusters:
+				AddThrusterRows(rows);
+				break;
+			case View.Fuel:
+				AddFuelRows(rows);
+				break;
+			}
+		}
+
+		float scroll = _table.ScrollBar?.Value ?? 0f;
+		_table.Clear();
+		foreach (RowData data in rows)
+		{
+			MyGuiControlTable.Row row = new MyGuiControlTable.Row();
+			for (int i = 0; i < _table.ColumnsCount; i++)
+			{
+				string text = (i < data.Texts.Length ? data.Texts[i] ?? "" : "").Replace("\r", "").Replace('\n', ' ');
+				MyGuiControlTable.Cell cell = new MyGuiControlTable.Cell(text, null, text.Length > 60 ? text : null, data.Color);
+				if (i < _rightAligned.Length && _rightAligned[i])
+				{
+					cell.Margin = RightCellMargin;
+				}
+				row.AddCell(cell);
+			}
+			_table.Add(row);
+		}
+		if (_table.ScrollBar != null)
+		{
+			_table.ScrollBar.Value = scroll;
+		}
+		UpdateStatus();
+	}
+
+	private void UpdateStatus()
+	{
+		if (_ship == null)
+		{
+			SetStatus("");
+			return;
+		}
+		string seat = _ship.ReferenceName != null ? $"Directions are from {_ship.ReferenceName}." : "No cockpit or remote control: directions are from the grid itself.";
+		SetStatus(_simRunning && _result == null ? "Working it out..." : seat);
+	}
+
+	private static RowData Row(Color? color, params string[] texts)
+	{
+		return new RowData { Texts = texts, Color = color };
+	}
+
+	private void AddCheckRows(List<RowData> rows)
+	{
+		ShipSnapshot ship = _ship;
+		AscentResult result = _result;
+		PlanetInfo planet = ship.Planet;
+		double radius = ship.Radius;
+
+		if (result == null)
+		{
+			rows.Add(Row(MutedColor, "Answer", "Working it out..."));
+		}
+		else
+		{
+			rows.Add(Verdict(result));
+		}
+
+		rows.Add(Row(null, "Ship", $"{ship.Name}: {Format.Mass(ship.Mass)}{(ship.Grids > 1 ? $" ({ship.Grids} grids joined by rotors, pistons or hinges)" : "")}"));
+		if (planet == null || planet.GravityAt(radius) <= 0)
+		{
+			rows.Add(Row(null, "Gravity", "None here: you're already out of every gravity well."));
+			return;
+		}
+		double gravity = planet.GravityAt(radius) * 9.81;
+		rows.Add(Row(null, "Planet", $"{planet.Name}: {Format.Gravity(gravity)} here, {Format.Distance(radius - planet.AverageRadius)} above sea level"));
+
+		string why = Settings.Direction < 0 ? " (auto: they face up now)" : "";
+		int count = CountPushing(ship, _dir);
+		rows.Add(Row(null, "Lift with", $"{DirNames[(int)_dir]} thrusters{why}: {count} pushing that way, flames pointing {DirNames[(int)Opposite(_dir)].ToLowerInvariant()}"));
+		if (result == null || result.Outcome == AscentOutcome.NoThrusters)
+		{
+			return;
+		}
+
+		double weight = ship.Mass * gravity;
+		rows.Add(Row(result.StartTwr >= 1.0 ? null : (Color?)BadColor, "Thrust/weight", $"{Format.Ratio(result.StartTwr)} here: {Format.Force(result.StartThrust)} of thrust against {Format.Force(weight)} of weight"));
+		rows.Add(Row(null, "Lift-off limit", SpareText(result.MaxLiftoffMass, ship.Mass, "to lift off here")));
+		rows.Add(Row(result.MaxMass >= ship.Mass ? null : (Color?)BadColor, "Reach-space limit", SpareText(result.MaxMass, ship.Mass, "to get out of the gravity well")));
+
+		double climb = result.TargetRadius - radius;
+		string end = Settings.Distance.HasValue ? "the distance you set" : $"where gravity ends ({Format.Distance(planet.GravityLimit - planet.AverageRadius)} above sea level)";
+		rows.Add(Row(null, "Climb", $"{Format.Distance(climb)} up to {end}, at up to {Settings.ClimbSpeed(ship.SpeedLimit):0} m/s"));
+		if (result.Success)
+		{
+			rows.Add(Row(null, "Time", $"{Format.Time(result.Seconds)} to get there"));
+		}
+		rows.Add(Row(result.MinTwr < 1.0 ? BadColor : result.MinTwr < 1.2 ? WarningColor : (Color?)null, "Weakest point", $"thrust/weight {Format.Ratio(result.MinTwr)} at {Format.Distance(radius + result.MinTwrHeight - planet.AverageRadius)} above sea level"));
+
+		if (planet.HasAtmosphere)
+		{
+			double top = planet.AtmosphereTop - planet.AverageRadius;
+			int atmospheric = ship.Thrusters.Count(t => t.NeedsAtmosphere && Vector3D.Dot(t.Push, ship.Axis(_dir)) > 0.05);
+			rows.Add(Row(null, "Atmosphere", atmospheric > 0 ? $"ends {Format.Distance(top)} above sea level; your {atmospheric} atmospheric thrusters fade out on the way up" : $"ends {Format.Distance(top)} above sea level"));
+		}
+
+		foreach (GasPool pool in ship.Gas.Values.OrderBy(p => p.Name))
+		{
+			// Only the gases the climb burns; oxygen and empty tanks are covered elsewhere.
+			if (!result.GasUsed.TryGetValue(pool.Key, out double used))
+			{
+				continue;
+			}
+			rows.Add(Row(used >= pool.Litres - 1 && used > 0 ? WarningColor : (Color?)null, pool.Name, $"uses {Format.Litres(used)} of {Format.Litres(pool.Litres)} ({Format.Percent(Math.Max(0, pool.Litres - used), pool.Litres)} left of what's in the tanks)"));
+		}
+		double stored = ship.Sources.Where(s => s.Kind == SourceKind.Battery).Sum(s => s.StoredMWh);
+		if (result.BatteryUsed > 0 || stored > 0 && ship.Thrusters.Any(t => t.Electric))
+		{
+			rows.Add(Row(null, "Batteries", $"uses {Format.Energy(result.BatteryUsed)} of {Format.Energy(stored)} ({Format.Percent(Math.Max(0, stored - result.BatteryUsed), stored)} left)"));
+		}
+		foreach (KeyValuePair<string, double> fuel in ship.ItemFuel)
+		{
+			result.ItemUsed.TryGetValue(fuel.Key, out double used);
+			if (used > 0)
+			{
+				rows.Add(Row(null, ship.FuelName(fuel.Key), $"uses {used:#,0.##} kg of {fuel.Value:#,0.##} kg"));
+			}
+		}
+		if (result.PowerShort)
+		{
+			rows.Add(Row(WarningColor, "Power", $"short from {Format.Distance(radius + result.PowerShortHeight - planet.AverageRadius)} above sea level: the electric thrusters want more than the ship can make, so they push less"));
+		}
+		foreach (GasPool pool in ship.Gas.Values.Where(p => p.Litres <= 0 && ship.Thrusters.Any(t => t.FuelKey == p.Key)))
+		{
+			rows.Add(Row(BadColor, pool.Name, "the tanks are empty, so those thrusters give nothing"));
+		}
+		if (ship.Thrusters.Any(t => !t.Electric && !ship.Gas.ContainsKey(t.FuelKey)))
+		{
+			rows.Add(Row(BadColor, "Fuel", "some thrusters burn a gas this ship has no tanks for, so they give nothing"));
+		}
+		if (ship.BlocksOff > 0)
+		{
+			rows.Add(Row(WarningColor, "Switched off", Settings.CountOff
+				? $"{ship.BlocksOff} blocks are off, stockpiling or recharging; they're counted as if you'll switch them on"
+				: $"{ship.BlocksOff} blocks are off, stockpiling or recharging and aren't counted"));
+		}
+	}
+
+	private RowData Verdict(AscentResult result)
+	{
+		switch (result.Outcome)
+		{
+		case AscentOutcome.Made:
+			return Row(GoodColor, "Answer", $"YES: it lifts off and gets out of the gravity well in {Format.Time(result.Seconds)}");
+		case AscentOutcome.NoGravity:
+			return Row(GoodColor, "Answer", "You're not in any gravity: nothing to climb out of");
+		case AscentOutcome.NoThrusters:
+			return Row(BadColor, "Answer", $"NO: no working thrusters push {DirNames[(int)result.Direction].ToLowerInvariant()}. Pick another direction under Lift with");
+		case AscentOutcome.TooHeavy:
+			return Row(BadColor, "Answer", $"NO: too heavy to lift off. Lose {Format.Mass(result.Mass - result.MaxLiftoffMass)} or add {Format.Force(result.StartGravity * result.Mass - result.StartThrust)} of thrust");
+		case AscentOutcome.OutOfFuel:
+			return Row(BadColor, "Answer", $"NO: {result.RanOut} runs out {Format.Distance(result.RanOutHeight)} up and it falls back");
+		case AscentOutcome.Stalled:
+			return Row(BadColor, "Answer", $"NO: it stalls {Format.Distance(result.Height)} up, where thrust drops below its weight");
+		default:
+			return Row(BadColor, "Answer", "NO: it climbs so slowly it would take over 4 hours");
+		}
+	}
+
+	private static string SpareText(double limit, double mass, string what)
+	{
+		return limit >= mass
+			? $"up to {Format.Mass(limit)} {what} ({Format.Mass(limit - mass)} to spare)"
+			: $"up to {Format.Mass(limit)} {what} ({Format.Mass(mass - limit)} too heavy)";
+	}
+
+	private static int CountPushing(ShipSnapshot ship, Dir dir)
+	{
+		Vector3D axis = ship.Axis(dir);
+		return ship.Thrusters.Count(t => Vector3D.Dot(t.Push, axis) > 0.05);
+	}
+
+	private static Dir Opposite(Dir dir)
+	{
+		switch (dir)
+		{
+		case Dir.Up:
+			return Dir.Down;
+		case Dir.Down:
+			return Dir.Up;
+		case Dir.Forward:
+			return Dir.Backward;
+		case Dir.Backward:
+			return Dir.Forward;
+		case Dir.Left:
+			return Dir.Right;
+		default:
+			return Dir.Left;
+		}
+	}
+
+	private void AddDirectionRows(List<RowData> rows)
+	{
+		ShipSnapshot ship = _ship;
+		double gravity = (ship.Planet?.GravityAt(ship.Radius) ?? 0.0) * 9.81;
+		double weight = ship.Mass * gravity;
+		foreach (Dir dir in (Dir[])Enum.GetValues(typeof(Dir)))
+		{
+			Vector3D axis = ship.Axis(dir);
+			List<ThrusterInfo> pushing = ship.Thrusters.Where(t => Vector3D.Dot(t.Push, axis) > 0.05).ToList();
+			double here = Ascent.ThrustHere(ship, dir);
+			string fuels = string.Join(", ", pushing.Select(t => t.Electric ? "Power" : ship.FuelName(t.FuelKey)).Distinct().OrderBy(s => s));
+			Color? color = dir == _dir ? GoodColor : (Color?)null;
+			rows.Add(Row(color,
+				DirNames[(int)dir] + (dir == _dir ? "  (lifting)" : ""),
+				pushing.Count.ToString(),
+				Format.Force(here),
+				Format.Force(Ascent.VacuumThrust(ship, dir)),
+				weight > 0 ? Format.Ratio(here / weight) : "-",
+				fuels.Length > 0 ? fuels : "-"));
+		}
+	}
+
+	private void AddThrusterRows(List<RowData> rows)
+	{
+		ShipSnapshot ship = _ship;
+		double air = ship.Planet?.AirAt(ship.Radius) ?? 0.0;
+		bool atmosphere = ship.Planet?.HasAtmosphere ?? false;
+		var groups = ship.Thrusters.GroupBy(t => new { t.TypeName, Dir = DirOf(ship, t), t.FuelKey, t.Force });
+		foreach (var group in groups.OrderBy(g => g.Key.Dir).ThenBy(g => g.Key.TypeName))
+		{
+			ThrusterInfo first = group.First();
+			rows.Add(Row(group.Key.Dir == DirNames[(int)_dir] ? GoodColor : (Color?)null,
+				group.Key.TypeName,
+				group.Count().ToString(),
+				group.Key.Dir,
+				first.Electric ? "Power" : ship.FuelName(first.FuelKey),
+				Format.Force(first.Force),
+				$"{first.Effectiveness(air, atmosphere) * 100.0:0}%",
+				group.Count(t => !t.On).ToString()));
+		}
+		if (rows.Count == 0)
+		{
+			rows.Add(Row(BadColor, "No working thrusters on this ship"));
+		}
+	}
+
+	/// <summary>The cockpit direction a thruster pushes, or "Angled" when it's well off all six (on a rotor or hinge).</summary>
+	private static string DirOf(ShipSnapshot ship, ThrusterInfo thruster)
+	{
+		foreach (Dir dir in (Dir[])Enum.GetValues(typeof(Dir)))
+		{
+			if (Vector3D.Dot(thruster.Push, ship.Axis(dir)) > 0.95)
+			{
+				return DirNames[(int)dir];
+			}
+		}
+		return "Angled";
+	}
+
+	private void AddFuelRows(List<RowData> rows)
+	{
+		ShipSnapshot ship = _ship;
+		AscentResult result = _result;
+		foreach (GasPool pool in ship.Gas.Values.OrderBy(p => p.Name))
+		{
+			double used = 0.0;
+			result?.GasUsed.TryGetValue(pool.Key, out used);
+			rows.Add(Row(null, $"{pool.Name} tanks" + (pool.TanksOff > 0 ? $" ({pool.TanksOff} off)" : ""), pool.Tanks.ToString(), Format.Litres(pool.Litres), "", result == null ? "..." : Format.Litres(used), Format.Litres(Math.Max(0, pool.Litres - used))));
+		}
+		List<PowerSource> batteries = ship.Sources.Where(s => s.Kind == SourceKind.Battery).ToList();
+		if (batteries.Count > 0)
+		{
+			double stored = batteries.Sum(b => b.StoredMWh);
+			double used = result?.BatteryUsed ?? 0.0;
+			rows.Add(Row(null, "Batteries" + OffText(batteries), batteries.Count.ToString(), Format.Energy(stored), Format.Power(batteries.Sum(b => b.MaxOutput)), result == null ? "..." : Format.Energy(used), Format.Energy(Math.Max(0, stored - used))));
+		}
+		foreach (var group in ship.Sources.Where(s => s.Kind == SourceKind.Reactor).GroupBy(s => s.FuelKey))
+		{
+			ship.ItemFuel.TryGetValue(group.Key, out double kg);
+			double used = 0.0;
+			result?.ItemUsed.TryGetValue(group.Key, out used);
+			rows.Add(Row(kg <= 0 ? BadColor : (Color?)null, $"Reactors ({ship.FuelName(group.Key)})" + OffText(group), group.Count().ToString(), $"{kg:#,0.##} kg", Format.Power(group.Sum(s => s.MaxOutput)), result == null ? "..." : $"{used:#,0.##} kg", $"{Math.Max(0, kg - used):#,0.##} kg"));
+		}
+		foreach (var group in ship.Sources.Where(s => s.Kind == SourceKind.Engine).GroupBy(s => s.FuelKey))
+		{
+			rows.Add(Row(null, $"{ship.FuelName(group.Key)} engines" + OffText(group), group.Count().ToString(), "from tanks", Format.Power(group.Sum(s => s.MaxOutput)), "in tanks above", ""));
+		}
+		List<PowerSource> others = ship.Sources.Where(s => s.Kind == SourceKind.Other).ToList();
+		if (others.Count > 0)
+		{
+			rows.Add(Row(null, "Solar, wind and others" + OffText(others), others.Count.ToString(), "-", Format.Power(others.Sum(s => s.MaxOutput)), "-", "-"));
+		}
+		double demand = ship.Thrusters.Where(t => t.Electric && Vector3D.Dot(t.Push, ship.Axis(_dir)) > 0.05).Sum(t => t.MaxPower);
+		if (demand > 0)
+		{
+			double supply = ship.Sources.Sum(s => s.MaxOutput);
+			rows.Add(Row(supply < demand ? WarningColor : MutedColor, "Lifting thrusters need", "", "", Format.Power(demand), supply < demand ? "more than the ship makes" : "", ""));
+		}
+		if (rows.Count == 0)
+		{
+			rows.Add(Row(MutedColor, "No tanks or power blocks on this ship"));
+		}
+	}
+
+	private static string OffText(IEnumerable<PowerSource> sources)
+	{
+		int off = sources.Count(s => !s.On);
+		return off > 0 ? $" ({off} off)" : "";
+	}
+
+	private const string HelpText =
+		"WHAT IT DOES\n" +
+		"Fat Albert flies your ship straight up from where it sits, on paper, and tells you whether it lifts off and gets out of the planet's gravity, and what it burns on the way. Nothing on the ship is touched, so it works on any server.\n\n" +
+		"LIFT WITH\n" +
+		"The thrusters that lift the ship, named from the cockpit. Up means the thrusters that push the ship up (their flames point down, under the ship). Auto picks whichever side faces away from the planet right now. Thrusters on rotors or hinges count for the part of their push that points the chosen way.\n\n" +
+		"CLIMB KM / SPEED M/S\n" +
+		"Leave Climb empty to climb to where the planet's gravity ends; the plugin reads that from the world. Type a number to climb that many km from where you are instead. Speed is how fast to climb; empty uses the world's speed limit. The ship goes full thrust until it reaches that speed, then holds it, as the dampeners do. A slower climb burns more, because the thrusters hold the ship up for longer.\n\n" +
+		"THE ANSWER\n" +
+		"Thrust/weight above 1 means it lifts off. Lift-off limit is the heaviest the ship can be and still leave the ground here. Reach-space limit is the heaviest it can be and still get out of the gravity well with the fuel and power it has. Weakest point is where thrust is closest to the ship's weight; atmospheric thrusters lose thrust as the air thins and ion thrusters gain it.\n\n" +
+		"MODDED THRUSTERS\n" +
+		"Every thruster is read from its own block definition: thrust, power, the gas it burns and how air changes it. Modded thrusters and modded gases work the same way as vanilla ones, as long as they're normal thruster blocks.\n\n" +
+		"FUEL AND POWER\n" +
+		"Hydrogen (or any gas) comes from the tanks on the ship. Electric thrusters get power from solar and wind first, then batteries, then reactors and hydrogen engines, as the game does it. If the electric thrusters want more power than the ship can make, they push less, and the answer shows it.\n\n" +
+		"NOT COUNTED\n" +
+		"Power the rest of the ship uses (turn off what you don't need), ice in oxygen/hydrogen generators, ships docked by connector, tanks and thrusters that aren't joined by conveyors, and other planets' or moons' gravity. Solar and wind count what they give right now for the whole climb. Gas has no weight in the game, so the ship's mass stays the same all the way up.\n\n" +
+		"OPENING IT\n" +
+		"/fat in chat, the Fat Albert action on a cockpit's toolbar, or the plugin list at the top left of any of our plugins' windows.";
+}
