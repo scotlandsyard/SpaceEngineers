@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using Sandbox.ModAPI;
 using VRage;
+using VRage.Game.ModAPI;
 using VRage.Utils;
 using VRageMath;
 
@@ -25,6 +26,60 @@ internal static class PlanetNames
 
 		/// <summary>Where the name came from: the GPS text, or "typed".</summary>
 		public string Source;
+	}
+
+	/// <summary>A GPS that can be given to a planet by hand: from the last paste, or from the player's own GPS list.</summary>
+	public class GpsPoint
+	{
+		public string Name;
+
+		public Vector3D Coords;
+
+		public bool Pasted;
+	}
+
+	/// <summary>Every GPS from the last paste, matched or not, so any of them can be given to a planet by hand.</summary>
+	public static readonly List<GpsPoint> LastPasted = new List<GpsPoint>();
+
+	/// <summary>The last paste first, then the player's own GPS list (minus repeats of pasted ones).</summary>
+	public static List<GpsPoint> Candidates()
+	{
+		List<GpsPoint> points = new List<GpsPoint>(LastPasted);
+		try
+		{
+			long identity = MyAPIGateway.Session?.Player?.IdentityId ?? 0;
+			List<IMyGps> list = identity == 0 ? null : MyAPIGateway.Session.GPS.GetGpsList(identity);
+			if (list != null)
+			{
+				foreach (IMyGps gps in list.OrderBy(g => g.Name, StringComparer.OrdinalIgnoreCase))
+				{
+					if (!points.Any(p => p.Name == gps.Name && Vector3D.DistanceSquared(p.Coords, gps.Coords) < 1.0))
+					{
+						points.Add(new GpsPoint { Name = Clean(gps.Name), Coords = gps.Coords });
+					}
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			MyLog.Default.WriteLineAndConsole($"[Fat Albert] GPS list: {ex.Message}");
+		}
+		return points.Where(p => p.Name.Length > 0).ToList();
+	}
+
+	/// <summary>The planet a GPS belongs to: inside its gravity, nearest its surface. Null when it's in no planet's gravity.</summary>
+	public static PlanetInfo Match(Vector3D point, IEnumerable<PlanetInfo> planets)
+	{
+		return planets
+			.Where(p => Vector3D.Distance(point, p.Center) <= p.GravityLimit)
+			.OrderBy(p => Vector3D.Distance(point, p.Center) - p.AverageRadius)
+			.FirstOrDefault();
+	}
+
+	/// <summary>The planet whose surface is nearest the point, wherever it is.</summary>
+	public static PlanetInfo Nearest(Vector3D point, IEnumerable<PlanetInfo> planets)
+	{
+		return planets.OrderBy(p => Vector3D.Distance(point, p.Center) - p.AverageRadius).FirstOrDefault();
 	}
 
 	public class ImportReport
@@ -112,6 +167,7 @@ internal static class PlanetNames
 	{
 		ImportReport report = new ImportReport();
 		Dictionary<long, KeyValuePair<string, double>> best = new Dictionary<long, KeyValuePair<string, double>>();
+		LastPasted.Clear();
 		foreach (Match match in GpsPattern.Matches(text ?? ""))
 		{
 			if (!double.TryParse(match.Groups[2].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double x)
@@ -127,10 +183,8 @@ internal static class PlanetNames
 			}
 			report.Found++;
 			Vector3D point = new Vector3D(x, y, z);
-			PlanetInfo planet = planets
-				.Where(p => Vector3D.Distance(point, p.Center) <= p.GravityLimit)
-				.OrderBy(p => Vector3D.Distance(point, p.Center) - p.AverageRadius)
-				.FirstOrDefault();
+			LastPasted.Add(new GpsPoint { Name = name, Coords = point, Pasted = true });
+			PlanetInfo planet = Match(point, planets);
 			if (planet == null)
 			{
 				report.NoPlanet.Add(name);
@@ -211,6 +265,7 @@ internal static class PlanetNames
 	public static void Unload()
 	{
 		s_names.Clear();
+		LastPasted.Clear();
 		s_world = null;
 	}
 

@@ -76,6 +76,12 @@ public class FatAlbertScreen : MyGuiScreenBase
 
 	private const float EditorY = 0.255f;
 
+	/// <summary>Planet names view: the row for giving a planet a GPS by hand, above the name row.</summary>
+	private const float GpsY = 0.205f;
+
+	/// <summary>All planets view: top of the planet summary under the table.</summary>
+	private const float SummaryY = 0.1f;
+
 	private const float StatusY = 0.315f;
 
 	private const float ButtonsY = 0.39f;
@@ -100,6 +106,17 @@ public class FatAlbertScreen : MyGuiScreenBase
 	private static long s_namePlanetId;
 
 	private MyGuiControlTextbox _nameBox;
+
+	private MyGuiControlCombobox _gpsCombo;
+
+	private readonly List<PlanetNames.GpsPoint> _gpsPoints = new List<PlanetNames.GpsPoint>();
+
+	/// <summary>All planets view: the planet whose summary shows under the table.</summary>
+	private static long s_summaryPlanetId;
+
+	private MyGuiControlMultilineText _summary;
+
+	private string _summaryText;
 
 	private string _message;
 
@@ -277,7 +294,7 @@ public class FatAlbertScreen : MyGuiScreenBase
 			Size = new Vector2(0.84f, 0.5f),
 			OriginAlign = MyGuiDrawAlignEnum.HORISONTAL_CENTER_AND_VERTICAL_TOP,
 			ColumnsCount = columns.Count,
-			VisibleRowsCount = CurrentView == View.Names ? 10 : 12
+			VisibleRowsCount = CurrentView == View.Names ? 9 : CurrentView == View.Planets ? 7 : 12
 		};
 		_table.SetCustomColumnWidths(columns.Select(c => c.Width).ToArray());
 		_rightAligned = columns.Select(c => c.RightAligned).ToArray();
@@ -294,6 +311,26 @@ public class FatAlbertScreen : MyGuiScreenBase
 		}
 		_table.Visible = CurrentView != View.Help;
 		Controls.Add(_table);
+
+		_summary = null;
+		_summaryText = null;
+		if (CurrentView == View.Planets)
+		{
+			// Under the table: the full answer for the planet picked in it.
+			_summary = new MyGuiControlMultilineText(new Vector2(0f, SummaryY), new Vector2(0.84f, StatusY - 0.03f - SummaryY), null, "Blue", 0.75f, MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_TOP, null, drawScrollbarV: true, drawScrollbarH: false, MyGuiDrawAlignEnum.HORISONTAL_CENTER_AND_VERTICAL_TOP)
+			{
+				OriginAlign = MyGuiDrawAlignEnum.HORISONTAL_CENTER_AND_VERTICAL_TOP
+			};
+			Controls.Add(_summary);
+			_table.ItemSelected += (MyGuiControlTable table, MyGuiControlTable.EventArgs args) =>
+			{
+				if (_table.SelectedRow?.UserData is long id && id != 0 && id != s_summaryPlanetId)
+				{
+					s_summaryPlanetId = id;
+					ShowSummary();
+				}
+			};
+		}
 
 		_helpText = null;
 		if (CurrentView == View.Help)
@@ -355,6 +392,11 @@ public class FatAlbertScreen : MyGuiScreenBase
 		AddButton(0.105f, "Set name", SetPlanetName, EditorY);
 		AddButton(0.315f, "Game's name", ResetPlanetName, EditorY);
 
+		AddLabel(Left, GpsY, "GPS");
+		_gpsCombo = AddCombo(-0.36f, GpsY, 0.57f, 12, "GPS from your last paste (matched or not), then your own GPS list. Pick one and press Use this GPS to name the planet picked in the table after it, wherever the GPS is.");
+		FillGpsCombo();
+		AddButton(0.315f, "Use this GPS", UseGps, GpsY);
+
 		_table.ItemSelected += (MyGuiControlTable table, MyGuiControlTable.EventArgs args) =>
 		{
 			// The table re-selects the same planet on every refresh; only a different pick replaces what's typed.
@@ -369,6 +411,57 @@ public class FatAlbertScreen : MyGuiScreenBase
 		{
 			_nameBox.Text = selected.Name;
 		}
+	}
+
+	/// <summary>Each GPS with where it lands: the planet whose gravity it's in, or the nearest planet and how far off it is.</summary>
+	private void FillGpsCombo()
+	{
+		if (_gpsCombo == null)
+		{
+			return;
+		}
+		_gpsCombo.ClearItems();
+		_gpsPoints.Clear();
+		foreach (PlanetNames.GpsPoint point in PlanetNames.Candidates())
+		{
+			PlanetInfo match = PlanetNames.Match(point.Coords, _planets);
+			string where;
+			if (match != null)
+			{
+				where = $"in {match.GameName}'s gravity";
+			}
+			else
+			{
+				PlanetInfo nearest = PlanetNames.Nearest(point.Coords, _planets);
+				where = nearest == null ? "no planet" : $"{Format.Distance(Vector3D.Distance(point.Coords, nearest.Center) - nearest.GravityLimit)} outside {nearest.GameName}'s gravity";
+			}
+			_gpsCombo.AddItem(_gpsPoints.Count, $"{point.Name}  ({(point.Pasted ? "pasted" : "your GPS")}, {where})", _gpsPoints.Count, null, sort: false);
+			_gpsPoints.Add(point);
+		}
+		if (_gpsPoints.Count == 0)
+		{
+			_gpsCombo.AddItem(-1, "No GPS yet: paste a GPS list, or add them to your GPS list", 0, null, sort: false);
+		}
+		_gpsCombo.SelectItemByIndex(0);
+	}
+
+	/// <summary>Names the planet picked in the table after the GPS picked in the list, however far off the GPS is.</summary>
+	private void UseGps()
+	{
+		PlanetInfo planet = SelectedNamePlanet();
+		int index = (int)(_gpsCombo?.GetSelectedKey() ?? -1);
+		if (planet == null)
+		{
+			return;
+		}
+		if (index < 0 || index >= _gpsPoints.Count)
+		{
+			ShowMessage("Pick a GPS in the GPS list first.", WarningColor);
+			return;
+		}
+		PlanetNames.GpsPoint point = _gpsPoints[index];
+		PlanetNames.Set(planet.Id, point.Name, $"GPS {point.Name} (picked)");
+		AfterRename($"{planet.GameName} is now called {PlanetNames.Get(planet.Id)}.");
 	}
 
 	private PlanetInfo SelectedNamePlanet()
@@ -426,6 +519,7 @@ public class FatAlbertScreen : MyGuiScreenBase
 			return;
 		}
 		PlanetNames.ImportReport report = PlanetNames.Import(text, _planets);
+		FillGpsCombo();
 		if (report.Found == 0)
 		{
 			ShowMessage("No GPS found on the clipboard. They need the game's format: GPS:Name:X:Y:Z:", WarningColor);
@@ -434,7 +528,7 @@ public class FatAlbertScreen : MyGuiScreenBase
 		StringBuilder message = new StringBuilder($"{report.Found} GPS read, {report.Named.Count} planets named.");
 		if (report.NoPlanet.Count > 0)
 		{
-			message.Append($" Not in any planet's gravity: {string.Join(", ", report.NoPlanet.Take(4))}{(report.NoPlanet.Count > 4 ? "..." : "")}.");
+			message.Append($" Not in any planet's gravity (give them to a planet with the GPS list): {string.Join(", ", report.NoPlanet.Take(4))}{(report.NoPlanet.Count > 4 ? "..." : "")}.");
 		}
 		if (report.Clashes.Count > 0)
 		{
@@ -524,16 +618,15 @@ public class FatAlbertScreen : MyGuiScreenBase
 				new Column("Off", 0.08f, true)
 			};
 		case View.Planets:
+			// Few, wide columns; the summary under the table has the rest.
 			return new List<Column>
 			{
-				new Column("Planet", 0.17f),
-				new Column("Away", 0.12f, true),
-				new Column("Gravity", 0.09f, true),
-				new Column("Air", 0.07f, true),
-				new Column("Climb out", 0.11f, true),
-				new Column("Thrust/wt", 0.11f, true),
-				new Column("Land and get out?", 0.22f),
-				new Column("Spare", 0.11f, true)
+				new Column("Planet", 0.22f),
+				new Column("Away", 0.13f, true),
+				new Column("Gravity", 0.1f, true),
+				new Column("Thrust/weight", 0.14f, true),
+				new Column("Land and get out?", 0.23f),
+				new Column("Spare mass", 0.18f, true)
 			};
 		case View.Fuel:
 			return new List<Column>
@@ -866,7 +959,11 @@ public class FatAlbertScreen : MyGuiScreenBase
 			for (int i = 0; i < _table.ColumnsCount; i++)
 			{
 				string text = (i < data.Texts.Length ? data.Texts[i] ?? "" : "").Replace("\r", "").Replace('\n', ' ');
-				MyGuiControlTable.Cell cell = new MyGuiControlTable.Cell(text, null, text.Length > 60 ? text : null, data.Color);
+				// Long text shrinks to fit, then ends in "..."; the full text is in the cell's tooltip.
+				MyGuiControlTable.Cell cell = new MyGuiControlTable.Cell(text, null, text.Length > 25 ? text : null, data.Color)
+				{
+					IsAutoScaleEnabled = true
+				};
 				if (i < _rightAligned.Length && _rightAligned[i])
 				{
 					cell.Margin = RightCellMargin;
@@ -875,12 +972,18 @@ public class FatAlbertScreen : MyGuiScreenBase
 			}
 			_table.Add(row);
 		}
-		if (CurrentView == View.Names)
+		if (CurrentView == View.Planets && !_planets.Any(p => p.Id == s_summaryPlanetId))
+		{
+			// Nothing picked yet: the planet you're visiting, else the one you're at, else the nearest.
+			s_summaryPlanetId = (Visiting ?? (_ship?.Planet != null ? _planets.FirstOrDefault(p => p.Id == _ship.Planet.Id) : null) ?? _planets.FirstOrDefault())?.Id ?? 0;
+		}
+		long selectedId = CurrentView == View.Names ? s_namePlanetId : CurrentView == View.Planets ? s_summaryPlanetId : 0;
+		if (selectedId != 0)
 		{
 			// Keeps the picked planet selected when the table is rebuilt.
 			for (int i = 0; i < _table.RowsCount; i++)
 			{
-				if (_table.GetRow(i).UserData is long id && id == s_namePlanetId)
+				if (_table.GetRow(i).UserData is long id && id == selectedId)
 				{
 					_table.SelectedRowIndex = i;
 					break;
@@ -891,6 +994,7 @@ public class FatAlbertScreen : MyGuiScreenBase
 		{
 			_table.ScrollBar.Value = scroll;
 		}
+		ShowSummary();
 		UpdateStatus();
 	}
 
@@ -923,9 +1027,13 @@ public class FatAlbertScreen : MyGuiScreenBase
 
 	private void AddCheckRows(List<RowData> rows)
 	{
+		AddCheckRows(rows, _plan ?? BuildPlan(_ship), _result);
+	}
+
+	/// <summary>The full answer for one trip; also used for the planet summary in All planets.</summary>
+	private void AddCheckRows(List<RowData> rows, AscentPlan plan, AscentResult result)
+	{
 		ShipSnapshot ship = _ship;
-		AscentResult result = _result;
-		AscentPlan plan = _plan ?? BuildPlan(ship);
 		PlanetInfo planet = Named(plan.Planet);
 		double radius = plan.StartRadius;
 		string there = plan.Land ? "there" : "here";
@@ -969,8 +1077,7 @@ public class FatAlbertScreen : MyGuiScreenBase
 			rows.Add(Row(null, "Landing", $"fall in at {plan.FallSpeed:0} m/s (no fuel), then brake for {Format.Time(result.LandingSeconds)} from {Format.Distance(result.LandingHeight)} up: uses {LandingText(ship, result)}"));
 		}
 
-		double weight = ship.Mass * gravity;
-		rows.Add(Row(result.StartTwr >= 1.0 ? null : (Color?)BadColor, "Thrust/weight", $"{Format.Ratio(result.StartTwr)} {there}: {Format.Force(result.StartThrust)} of thrust against {Format.Force(weight)} of weight"));
+		rows.Add(Row(result.StartTwr >= 1.0 ? null : (Color?)BadColor, "Thrust/weight", $"{Format.Ratio(result.StartTwr)} {there}: {Format.Force(result.StartThrust)} of thrust holds up {Format.Mass(result.StartThrust / gravity)} at {Format.Gravity(gravity)}; the ship is {Format.Mass(ship.Mass)}"));
 		rows.Add(Row(null, "Lift-off limit", SpareText(result.MaxLiftoffMass, ship.Mass, $"to lift off {there}")));
 		rows.Add(Row(result.MaxMass >= ship.Mass ? null : (Color?)BadColor, "Reach-space limit", SpareText(result.MaxMass, ship.Mass, plan.Land ? "to land and get back out" : "to get out of the gravity well")));
 
@@ -1114,19 +1221,63 @@ public class FatAlbertScreen : MyGuiScreenBase
 			AscentResult result = null;
 			_planetResults?.TryGetValue(planet.Id, out result);
 			double away = Math.Max(0.0, Vector3D.Distance(ship.Position, planet.Center) - planet.AverageRadius);
-			double start = on ? ship.Radius : planet.AverageRadius;
-			double climb = Settings.Distance ?? Math.Max(0.0, planet.GravityLimit - start);
-			string dir = _planetDirs != null && _planetDirs.TryGetValue(planet.Id, out Dir picked) && Settings.Direction < 0 ? $" ({DirNames[(int)picked]})" : "";
 			Color? color = result == null ? MutedColor : result.Success ? GoodColor : (Color?)BadColor;
-			rows.Add(Row(color,
+			RowData row = Row(color,
 				planet.Name + (on ? " (here)" : ""),
 				on ? "here" : Format.Distance(away),
 				Format.Gravity(planet.Intensity * 9.81),
-				planet.HasAtmosphere ? $"{planet.AirDensity:0.##}" : "none",
-				Format.Distance(climb),
-				result == null ? "..." : Format.Ratio(result.StartTwr),
-				result == null ? "working it out..." : ShortVerdict(result) + dir,
-				result == null || result.Outcome == AscentOutcome.NoThrusters ? "" : SignedMass(result.MaxMass - ship.Mass)));
+				result == null ? "..." : result.Outcome == AscentOutcome.NoThrusters ? "none" : Format.Ratio(result.StartTwr),
+				result == null ? "working it out..." : ShortVerdict(result),
+				result == null || result.Outcome == AscentOutcome.NoThrusters ? "-" : SignedMass(result.MaxMass - ship.Mass));
+			row.Key = planet.Id;
+			rows.Add(row);
+		}
+	}
+
+	/// <summary>All planets view: the full answer for the planet picked in the table, under the table.</summary>
+	private void ShowSummary()
+	{
+		if (_summary == null)
+		{
+			return;
+		}
+		PlanetInfo planet = _planets.FirstOrDefault(p => p.Id == s_summaryPlanetId);
+		List<RowData> lines = new List<RowData>();
+		if (_ship == null || _ship.IsStatic)
+		{
+			lines.Add(Row(MutedColor, "", "No ship to check."));
+		}
+		else if (planet == null)
+		{
+			lines.Add(Row(MutedColor, "", "Click a planet in the table to see its summary here."));
+		}
+		else
+		{
+			AscentResult result = null;
+			_planetResults?.TryGetValue(planet.Id, out result);
+			lines.Add(Row(null, "", planet.Name == planet.GameName ? planet.Name : $"{planet.Name} ({planet.GameName})"));
+			string atmosphere = planet.HasAtmosphere ? $"air {planet.AirDensity:0.##} up to {Format.Distance(planet.AtmosphereAltitude)} above sea level" : "no air";
+			lines.Add(Row(null, "Planet", $"surface gravity {Format.Gravity(planet.Intensity * 9.81)}, {atmosphere}, gravity ends {Format.Distance(planet.GravityLimit - planet.AverageRadius)} above sea level"));
+			AddCheckRows(lines, PlanFor(_ship, planet), result);
+		}
+		StringBuilder signature = new StringBuilder();
+		foreach (RowData line in lines)
+		{
+			signature.Append(line.Color?.PackedValue ?? 0).Append(string.Join("|", line.Texts)).Append('\n');
+		}
+		// Rebuilt only when it changes, so the scroll position stays put between refreshes.
+		if (signature.ToString() == _summaryText)
+		{
+			return;
+		}
+		_summaryText = signature.ToString();
+		_summary.Clear();
+		foreach (RowData line in lines)
+		{
+			string label = line.Texts.Length > 1 && line.Texts[0].Length > 0 ? line.Texts[0] + ": " : "";
+			string text = line.Texts.Length > 1 ? line.Texts[1] : line.Texts.Length > 0 ? line.Texts[0] : "";
+			_summary.AppendText(label + text, "Blue", 0.75f, (line.Color ?? Color.White).ToVector4());
+			_summary.AppendLine();
 		}
 	}
 
@@ -1286,11 +1437,11 @@ public class FatAlbertScreen : MyGuiScreenBase
 		"LIFT WITH\n" +
 		"The thrusters that lift the ship, named from the cockpit. Up means the thrusters that push the ship up (their flames point down, under the ship). Auto picks whichever side faces away from the planet right now, or, when visiting another planet, the side with the most thrust at its sea level. Thrusters on rotors or hinges count for the part of their push that points the chosen way.\n\n" +
 		"PLANET: VISITING ANOTHER PLANET\n" +
-		"Where I am now checks lift-off from where the ship is. Pick a planet to check a trip there from space: the ship falls in at the speed limit (the game caps falling speed, so that costs no fuel), brakes at full thrust to land at sea level, then climbs back out with whatever fuel and power are left. If it can't brake hard enough to land, the answer is NO. The All planets view runs this for every planet and moon in the world at once, with how much mass you have to spare for each. The Thrust by direction and Thrusters views show thrust at the start of the climb, so at sea level on the planet you picked.\n\n" +
+		"Where I am now checks lift-off from where the ship is. Pick a planet to check a trip there from space: the ship falls in at the speed limit (the game caps falling speed, so that costs no fuel), brakes at full thrust to land at sea level, then climbs back out with whatever fuel and power are left. If it can't brake hard enough to land, the answer is NO. The All planets view runs this for every planet and moon in the world at once, with how much mass you have to spare for each; click a planet to see its full answer under the table (landing, climb, fuel used, limits). The Thrust by direction and Thrusters views show thrust at the start of the climb, so at sea level on the planet you picked.\n\n" +
 		"CLIMB KM / SPEED M/S\n" +
 		"Leave Climb empty to climb to where the planet's gravity ends; the plugin reads that from the world. Type a number to climb that many km from where you are instead. Speed is how fast to climb; empty uses the world's speed limit. The ship goes full thrust until it reaches that speed, then holds it, as the dampeners do. A slower climb burns more, because the thrusters hold the ship up for longer.\n\n" +
 		"PLANET NAMES (SETUP)\n" +
-		"Servers often call planets something other than the game does. In the Planet names view, copy the server's list of planet GPS (the usual GPS:Name:X:Y:Z: format, as many as you like, from Discord or anywhere) and press Paste GPS list. Each GPS names the planet whose gravity it's in, so the coordinates only need to be roughly right: a point on the surface, in orbit or at the centre all work. To fix a name, pick the planet, type a new one and press Set name; Game's name puts the original back. Names are kept on your computer, separately for each world, and show everywhere in the window.\n\n" +
+		"Servers often call planets something other than the game does. In the Planet names view, copy the server's list of planet GPS (the usual GPS:Name:X:Y:Z: format, as many as you like, from Discord or anywhere) and press Paste GPS list. Each GPS names the planet whose gravity it's in, so the coordinates only need to be roughly right: a point on the surface, in orbit or at the centre all work. A GPS that isn't inside any planet's gravity can still be given to a planet by hand: pick the planet in the table, pick the GPS in the GPS list (your last paste, then your own GPS list, each showing which planet it's near) and press Use this GPS. To fix a name, pick the planet, type a new one and press Set name; Game's name puts the original back. Names are kept on your computer, separately for each world, and show everywhere in the window.\n\n" +
 		"THE ANSWER\n" +
 		"Thrust/weight above 1 means it lifts off. Lift-off limit is the heaviest the ship can be and still leave the ground here. Reach-space limit is the heaviest it can be and still get out of the gravity well with the fuel and power it has. Weakest point is where thrust is closest to the ship's weight; atmospheric thrusters lose thrust as the air thins and ion thrusters gain it.\n\n" +
 		"MODDED THRUSTERS\n" +

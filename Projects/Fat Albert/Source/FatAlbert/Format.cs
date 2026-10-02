@@ -10,9 +10,10 @@ internal static class Format
 		return newtons >= 1e6 ? $"{newtons / 1e6:0.00} MN" : $"{newtons / 1e3:0.#} kN";
 	}
 
+	/// <summary>Always in kg, as the game's terminal shows ship mass.</summary>
 	public static string Mass(double kg)
 	{
-		return kg >= 1e6 ? $"{kg / 1e3:#,0} t" : kg >= 1e3 ? $"{kg / 1e3:#,0.0} t" : $"{kg:0} kg";
+		return $"{kg:#,0} kg";
 	}
 
 	public static string Litres(double litres)
@@ -48,7 +49,7 @@ internal static class Format
 
 	public static string Ratio(double ratio)
 	{
-		return double.IsInfinity(ratio) || ratio > 999 ? "-" : $"{ratio:0.00}";
+		return double.IsNaN(ratio) ? "?" : double.IsInfinity(ratio) || ratio > 999 ? "over 999" : $"{ratio:0.00}";
 	}
 
 	public static string Percent(double part, double whole)
