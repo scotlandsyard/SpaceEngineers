@@ -47,8 +47,6 @@ public class MarkerLibraryScreen : MyGuiScreenBase
 
 	private MyGuiControlLabel _status;
 
-	private MyGuiControlLabel _referenceLabel;
-
 	private Vector3D _playerPosition;
 
 	private string _statusText = "";
@@ -82,16 +80,13 @@ public class MarkerLibraryScreen : MyGuiScreenBase
 	public override void RecreateControls(bool constructor)
 	{
 		base.RecreateControls(constructor);
-		// The plugin switcher sits in the caption row's top-left corner, so nothing else goes there.
+		// The plugin switcher sits in the top-left corner (its list drops down over the left of the filter row), so the filter lives on the right.
 		PluginSwitcher.AddSwitcher(this, AddCaption("OreScout Marker Library"));
 
-		Controls.Add(new MyGuiControlLabel(new Vector2(-0.42f, -0.345f), null, "Show:", null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER));
-		_filterBox = new MyGuiControlCombobox(new Vector2(-0.36f, -0.345f), new Vector2(0.25f, 0.04f), originAlign: MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER, openAreaItemsCount: 12);
+		Controls.Add(new MyGuiControlLabel(new Vector2(0.16f, -0.345f), null, "Show:", null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_RIGHT_AND_VERTICAL_CENTER));
+		_filterBox = new MyGuiControlCombobox(new Vector2(0.42f, -0.345f), new Vector2(0.25f, 0.04f), originAlign: MyGuiDrawAlignEnum.HORISONTAL_RIGHT_AND_VERTICAL_CENTER, openAreaItemsCount: 12);
 		_filterBox.ItemSelected += OnFilterSelected;
 		Controls.Add(_filterBox);
-
-		_referenceLabel = new MyGuiControlLabel(new Vector2(0.42f, -0.345f), null, "", null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_RIGHT_AND_VERTICAL_CENTER);
-		Controls.Add(_referenceLabel);
 
 		_table = new MyGuiControlTable
 		{
@@ -192,7 +187,8 @@ public class MarkerLibraryScreen : MyGuiScreenBase
 				_table.ScrollToSelection();
 			}
 		}
-		_referenceLabel.Text = _reference == null ? "" : $"From marker: {_reference.Prefix} - {_reference.Label}";
+		// The header names the marker being measured from, e.g. "From Ice"; its own row says "(this one)".
+		_table.SetColumnName(ColumnFromReference, new StringBuilder(_reference == null ? "From marker" : $"From {_reference.Label}"));
 		string shown = filter == _filters[0] ? $"{entries.Count} saved marker(s)" : $"{_table.RowsCount} of {entries.Count} marker(s) shown";
 		string marked = _marked.Count > 0 ? $", {_marked.Count} marked" : "";
 		SetStatus(_statusText.Length > 0 ? _statusText : $"{shown}{marked}. Click a header to sort; double-click a row to mark it.");
@@ -312,14 +308,14 @@ public class MarkerLibraryScreen : MyGuiScreenBase
 			return;
 		}
 		_reference = entry;
-		_statusText = $"'From marker' now shows each marker's distance from {entry.Prefix} - {entry.Label}. Click its header to sort.";
+		_statusText = $"Measuring from {entry.Prefix} - {entry.Label}. Click the From {entry.Label} header to sort by it.";
 		RefreshRows(entry);
 	}
 
 	private void MeasureFromMe()
 	{
 		_reference = null;
-		_statusText = "'From marker' cleared. 'From you' shows each marker's distance from you.";
+		_statusText = "Stopped measuring from a marker. From you still shows distances from you.";
 		RefreshRows(SelectedEntry());
 	}
 
