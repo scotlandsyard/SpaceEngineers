@@ -273,10 +273,19 @@ public class FatAlbertScreen : MyGuiScreenBase
 			Refresh(rebuild: false);
 		};
 		Controls.Add(countOff);
-		Controls.Add(new MyGuiControlLabel(new Vector2(Left + 0.03f, Row3Y), null, "Count switched-off blocks", null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER));
+		Controls.Add(new MyGuiControlLabel(new Vector2(Left + 0.03f, Row3Y), null, "Count off blocks", null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER));
 
-		AddLabel(-0.07f, Row3Y, "Planet");
-		_planetCombo = AddCombo(0.0f, Row3Y, 0.42f, 12, "Where I am now: lift off from here. A planet: fall in at the speed limit (free), brake to land at its sea level, then climb back out with what's left.");
+		MyGuiControlCheckbox chutes = new MyGuiControlCheckbox(new Vector2(-0.215f, Row3Y), null, "Open the ship's parachutes when landing on a planet with air thick enough for them. Each needs its canopy material (canvas) on board.", Settings.UseChutes);
+		chutes.IsCheckedChanged = box =>
+		{
+			Settings.UseChutes = box.IsChecked;
+			Recompute();
+		};
+		Controls.Add(chutes);
+		Controls.Add(new MyGuiControlLabel(new Vector2(-0.195f, Row3Y), null, "Parachutes", null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER));
+
+		AddLabel(-0.04f, Row3Y, "Planet");
+		_planetCombo = AddCombo(0.03f, Row3Y, 0.39f, 12, "Where I am now: lift off from here. A planet: fall in at the speed limit (free), brake to land at its sea level, then climb back out with what's left.");
 		_planetCombo.ItemSelected += () =>
 		{
 			if (!_suppressEvents)
@@ -366,6 +375,11 @@ public class FatAlbertScreen : MyGuiScreenBase
 		{
 			AddButton(-0.105f, "Reset inputs", ResetInputs);
 		}
+		AddButton(0.105f, Settings.Hud ? "HUD: on" : "HUD: off", () =>
+		{
+			Hud.Toggle();
+			_recreatePending = true;
+		}).SetToolTip($"Show the answer on your HUD while you fly. Hotkey {Hud.KeyName}, or /fat hud in chat.");
 		if (CurrentView == View.Help)
 		{
 			AddButton(0.315f, "Back", () => SwitchView(s_viewBeforeHelp));
@@ -803,26 +817,39 @@ public class FatAlbertScreen : MyGuiScreenBase
 
 	private AscentPlan BuildPlan(ShipSnapshot ship)
 	{
-		PlanetInfo visiting = Visiting;
+		return BuildPlan(ship, Visiting);
+	}
+
+	/// <summary>The trip the window's inputs describe: lift off from here, or visit a planet. Also used by the HUD.</summary>
+	internal static AscentPlan BuildPlan(ShipSnapshot ship, PlanetInfo visiting)
+	{
 		Dir dir = PickDir(ship, visiting);
 		double speed = Settings.ClimbSpeed(ship.SpeedLimit);
-		return visiting != null ? AscentPlan.Visit(ship, visiting, dir, Settings.Distance, speed) : AscentPlan.Here(ship, dir, Settings.Distance, speed);
+		return visiting != null ? AscentPlan.Visit(ship, visiting, dir, Settings.Distance, speed, Settings.UseChutes) : AscentPlan.Here(ship, dir, Settings.Distance, speed);
 	}
 
-	/// <summary>True when the ship is inside this planet's gravity now, so the trip there is just a lift-off.</summary>
+	/// <summary>
+	/// True when the ship is sitting on this planet's ground, so the trip there is just a lift-off. Flying or in
+	/// orbit inside its gravity still counts as a visit (land at sea level, then climb out).
+	/// </summary>
 	private static bool IsOn(ShipSnapshot ship, PlanetInfo planet)
 	{
-		return ship.Planet != null && ship.Planet.Id == planet.Id && planet.GravityAt(ship.Radius) > 0.0;
+		return ship.Planet != null && ship.Planet.Id == planet.Id && Ascent.OnGround(ship);
 	}
 
-	/// <summary>All planets view: from here for the planet the ship is on, a visit for every other one.</summary>
+	/// <summary>All planets view: from here for the planet the ship is sitting on, a visit for every other one.</summary>
 	private static AscentPlan PlanFor(ShipSnapshot ship, PlanetInfo planet)
 	{
 		double speed = Settings.ClimbSpeed(ship.SpeedLimit);
 		return IsOn(ship, planet)
 			? AscentPlan.Here(ship, PickDir(ship, null), Settings.Distance, speed)
-			: AscentPlan.Visit(ship, planet, PickDir(ship, planet), Settings.Distance, speed);
+			: AscentPlan.Visit(ship, planet, PickDir(ship, planet), Settings.Distance, speed, Settings.UseChutes);
 	}
+
+	/// <summary>Planet picked under Planet (0 = where I am now) and the ship picked last, for the HUD.</summary>
+	internal static long VisitPlanetId => s_planetId;
+
+	internal static long LastShipKey => s_shipKey;
 
 	private void OnShipSelected()
 	{
@@ -1074,7 +1101,19 @@ public class FatAlbertScreen : MyGuiScreenBase
 
 		if (plan.Land && result.Landed)
 		{
-			rows.Add(Row(null, "Landing", $"fall in at {plan.FallSpeed:0} m/s (no fuel), then brake for {Format.Time(result.LandingSeconds)} from {Format.Distance(result.LandingHeight)} up: uses {LandingText(ship, result)}"));
+			string fall = result.ChuteCount > 0
+				? $"{result.ChuteCount} parachute{(result.ChuteCount == 1 ? "" : "s")} bring it down at {result.ChuteSpeed:0.#} m/s"
+				: $"falls in at {plan.FallSpeed:0} m/s (no fuel)";
+			string brake = result.LandingSeconds > 0 ? $", then brakes for {Format.Time(result.LandingSeconds)} from {Format.Distance(result.LandingHeight)} up, using {LandingText(ship, result)}" : ", no braking burn needed";
+			string touch = result.TouchdownSpeed > 0 ? $"; touches down at {result.TouchdownSpeed:0.#} m/s on the parachutes" : "";
+			rows.Add(Row(result.TouchdownSpeed > 0 ? WarningColor : (Color?)null, "Landing", fall + brake + touch));
+		}
+		if (plan.Land && Settings.UseChutes && ship.Parachutes.Count > 0 && result.ChuteCount == 0 && result.Outcome != AscentOutcome.NoThrusters)
+		{
+			string reason = !planet.HasAtmosphere ? "this planet has no air"
+				: plan.Chutes == null || plan.Chutes.Count == 0 ? "there's no canopy material (canvas) for them on board"
+				: "the air at sea level is too thin to open them";
+			rows.Add(Row(MutedColor, "Parachutes", $"not used: {reason}"));
 		}
 
 		rows.Add(Row(result.StartTwr >= 1.0 ? null : (Color?)BadColor, "Thrust/weight", $"{Format.Ratio(result.StartTwr)} {there}: {Format.Force(result.StartThrust)} of thrust holds up {Format.Mass(result.StartThrust / gravity)} at {Format.Gravity(gravity)}; the ship is {Format.Mass(ship.Mass)}"));
@@ -1184,7 +1223,7 @@ public class FatAlbertScreen : MyGuiScreenBase
 	}
 
 	/// <summary>The answer in a few words, for the All planets table.</summary>
-	private static string ShortVerdict(AscentResult result)
+	internal static string ShortVerdict(AscentResult result)
 	{
 		switch (result.Outcome)
 		{
@@ -1223,7 +1262,7 @@ public class FatAlbertScreen : MyGuiScreenBase
 			double away = Math.Max(0.0, Vector3D.Distance(ship.Position, planet.Center) - planet.AverageRadius);
 			Color? color = result == null ? MutedColor : result.Success ? GoodColor : (Color?)BadColor;
 			RowData row = Row(color,
-				planet.Name + (on ? " (here)" : ""),
+				planet.Name + (on ? " (on it)" : ""),
 				on ? "here" : Format.Distance(away),
 				Format.Gravity(planet.Intensity * 9.81),
 				result == null ? "..." : result.Outcome == AscentOutcome.NoThrusters ? "none" : Format.Ratio(result.StartTwr),
@@ -1281,7 +1320,7 @@ public class FatAlbertScreen : MyGuiScreenBase
 		}
 	}
 
-	private static string SignedMass(double kg)
+	internal static string SignedMass(double kg)
 	{
 		return kg >= 0 ? "+" + Format.Mass(kg) : "-" + Format.Mass(-kg);
 	}
@@ -1435,7 +1474,7 @@ public class FatAlbertScreen : MyGuiScreenBase
 		"WHAT IT DOES\n" +
 		"Fat Albert flies your ship straight up from where it sits, on paper, and tells you whether it lifts off and gets out of the planet's gravity, and what it burns on the way. Nothing on the ship is touched, so it works on any server.\n\n" +
 		"LIFT WITH\n" +
-		"The thrusters that lift the ship, named from the cockpit. Up means the thrusters that push the ship up (their flames point down, under the ship). Auto picks whichever side faces away from the planet right now, or, when visiting another planet, the side with the most thrust at its sea level. Thrusters on rotors or hinges count for the part of their push that points the chosen way.\n\n" +
+		"The thrusters that lift the ship, named from the cockpit. Up means the thrusters that push the ship up (their flames point down, under the ship). Auto: sitting on the ground (within 1 km of the highest ground), the side facing away from the planet, since the ship can't turn over; anywhere else (flying, in orbit, or visiting a planet), the side with the most thrust where the climb starts, since you'll point that one up. Thrusters on rotors or hinges count for the part of their push that points the chosen way.\n\n" +
 		"PLANET: VISITING ANOTHER PLANET\n" +
 		"Where I am now checks lift-off from where the ship is. Pick a planet to check a trip there from space: the ship falls in at the speed limit (the game caps falling speed, so that costs no fuel), brakes at full thrust to land at sea level, then climbs back out with whatever fuel and power are left. If it can't brake hard enough to land, the answer is NO. The All planets view runs this for every planet and moon in the world at once, with how much mass you have to spare for each; click a planet to see its full answer under the table (landing, climb, fuel used, limits). The Thrust by direction and Thrusters views show thrust at the start of the climb, so at sea level on the planet you picked.\n\n" +
 		"CLIMB KM / SPEED M/S\n" +
@@ -1451,5 +1490,9 @@ public class FatAlbertScreen : MyGuiScreenBase
 		"NOT COUNTED\n" +
 		"Power the rest of the ship uses (turn off what you don't need), ice in oxygen/hydrogen generators, ships docked by connector, tanks and thrusters that aren't joined by conveyors, and other planets' or moons' gravity. Solar and wind count what they give right now for the whole climb. Gas has no weight in the game, so the ship's mass stays the same all the way up.\n\n" +
 		"OPENING IT\n" +
-		"/fat in chat, the Fat Albert action on a cockpit's toolbar, or the plugin list at the top left of any of our plugins' windows.";
+		"/fat in chat, the Fat Albert action on a cockpit's toolbar, or the plugin list at the top left of any of our plugins' windows.\n\n" +
+		"PARACHUTES\n" +
+		"With Parachutes ticked, a landing on a planet with air opens every parachute that has its canopy material (canvas) on board, using the game's own drag formula at sea level. The ship comes down at the parachutes' speed instead of the speed limit, so the braking burn is shorter, and the parachutes keep pulling while it brakes. If they alone get it down to 5 m/s or less, it lands even when the thrusters couldn't hold it up (lifting off again is another matter). Parachutes need air at least as thick as their opening level (0.2 for vanilla ones).\n\n" +
+		"HUD OVERLAY\n" +
+		"Three lines at the left of your screen with the answer for the ship you're flying (or the one picked last here) and the trip picked under Planet, rechecked every two seconds. Turn it on and off with Ctrl+Alt+F, /fat hud in chat, or the HUD button below. It hides when you hide the game's HUD. To use another key, change HudKey in FatAlbert_Settings.txt (for example HudKey=Ctrl+Shift+H) while the game is closed.";
 }

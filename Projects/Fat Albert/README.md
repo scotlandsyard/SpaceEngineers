@@ -16,10 +16,11 @@ It reads the ship (thrusters, mass, tanks, batteries, reactors, engines) and the
 |---|---|
 | Ship | Your ships within 5 km; the one you're sitting in comes first |
 | View | Lift-off check, Thrust by direction, Thrusters, Fuel & power, Help |
-| Lift with | Which thrusters lift the ship, named from the cockpit. **Up** = the thrusters that push the ship up (flames pointing down). **Auto** picks the side facing away from the planet right now |
+| Lift with | Which thrusters lift the ship, named from the cockpit. **Up** = the thrusters that push the ship up (flames pointing down). **Auto**: on the ground (within 1 km of the highest ground), the side facing away from the planet; anywhere else, the side with the most thrust where the climb starts |
 | Climb km | Empty: climb to where the planet's gravity ends (read from the world). A number: climb that many km from here |
 | Speed m/s | Empty: the world's speed limit. Slower climbs burn more |
-| Count switched-off blocks | On: blocks that are off, stockpiling or recharging count as if you'll switch them on. Off: only what works now |
+| Count off blocks | On: blocks that are off, stockpiling or recharging count as if you'll switch them on. Off: only what works now |
+| Parachutes | Open the ship's parachutes when landing on a planet with air (see Parachutes below) |
 | Planet | **Where I am now**: lift off from here. **Visit <planet>**: every planet and moon in the world, nearest first; checks landing there and climbing back out |
 
 ## Views
@@ -30,7 +31,7 @@ It reads the ship (thrusters, mass, tanks, batteries, reactors, engines) and the
 | Thrust by direction | All six directions: thrusters, thrust at the start of the climb, thrust in space, thrust-to-weight at the start, what they burn |
 | Thrusters | Each kind of thruster (modded too): count, direction, fuel, thrust each, effectiveness at the start of the climb, how many are off |
 | Fuel & power | Gas tanks, batteries, reactors, engines, solar/wind: stored, output, used on the trip, left after |
-| All planets | Every planet and moon: distance, surface gravity, thrust-to-weight on the ground, YES/NO, and mass to spare (or too much). Click a planet for its full answer in the summary under the table (air, where gravity ends, landing, climb, fuel used, limits). The planet you're on is checked from where you are; the others as visits. Long text shrinks to fit, and its tooltip has all of it |
+| All planets | Every planet and moon: distance, surface gravity, thrust-to-weight on the ground, YES/NO, and mass to spare (or too much). Click a planet for its full answer in the summary under the table (air, where gravity ends, landing, climb, fuel used, limits). The planet you're sitting on (within 1 km of its highest ground) is checked from where you are, marked "(on it)"; every other planet, including one whose gravity you're flying in, as a visit. Long text shrinks to fit, and its tooltip has all of it |
 | Planet names (setup) | Your names for the planets: name, game's name, distance, gravity, where the name came from. **Paste GPS list** names planets from GPS on the clipboard; **Use this GPS** gives a planet any GPS by hand; pick a row, type a name and **Set name**, or **Game's name** to undo |
 
 ## Planet names
@@ -53,6 +54,22 @@ Picking a planet (or the All planets view) checks a round trip from space:
 
 Auto direction on a visit picks the side with the most thrust at that planet's sea level (that's the side you'll point up). Real terrain sits above or below sea level, so a landing on a mountain has a shorter climb.
 
+## Parachutes
+
+With **Parachutes** ticked, a visit to a planet with air opens every parachute that has its canopy material on board (canvas in vanilla; each opening uses `MaterialDeployCost` items, shared from what's on the ship). Drag is `MyParachute`'s formula, `2.5 × (air × 1.225) × v² × πr² × DragCoefficient`, with the fully open canopy's radius from `ReefAtmosphereLevel` and `RadiusMultiplier`, worked out at sea level. A parachute needs air of at least its `MinimumAtmosphereLevel` (0.2 vanilla).
+
+- The ship comes down at the parachutes' terminal speed (or the speed limit, if lower), so the braking burn starts slower and the parachutes keep pulling while it brakes.
+- If thrust can't hold the ship up but the parachutes get it down to 5 m/s or less, it counts as landed (the landing line says so, in amber).
+- Modded parachutes are read from their own definitions.
+
+## HUD overlay
+
+Three lines at the left of the screen: the ship and trip, YES/NO with the reason, and thrust/weight, spare mass and what's left in the tanks and batteries. It uses the ship you're sitting in (else the one picked last in the window) and the trip picked under **Planet**, rechecked every two seconds on a background thread.
+
+- Toggle: **Ctrl+Alt+F**, `/fat hud`, or the **HUD** button in the window. Remembered between sessions.
+- Other hotkey: set `HudKey` in `FatAlbert_Settings.txt` (local storage) while the game is closed, e.g. `HudKey=Ctrl+Shift+H` (key names are `VRage.Input.MyKeys`).
+- It's a draw-only screen set up like the game's own HUD screen: it never takes focus or input, and it hides when the game's HUD is hidden.
+
 ## How the climb is worked out
 
 All formulas are copied from the game's code:
@@ -72,7 +89,8 @@ Not counted: power used by the rest of the ship, ice in O2/H2 generators, ships 
 | What | Name |
 |---|---|
 | Assembly / namespace | `FatAlbert` |
-| Chat commands | `/fat`, `/fatalbert` |
+| Chat commands | `/fat`, `/fatalbert`, `/fat hud` |
+| HUD hotkey | Ctrl+Alt+F (`HudKey` setting) |
 | Toolbar action | `FatAlbert_OpenMenu` |
 | Settings file (local storage) | `FatAlbert_Settings.txt` |
 | Planet names (local storage) | `FatAlbert_<world>_PlanetNames.txt` |

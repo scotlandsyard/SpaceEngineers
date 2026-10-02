@@ -49,6 +49,8 @@ internal static class ShipReader
 		public readonly List<MyCubeBlock> Inventories = new List<MyCubeBlock>();
 
 		public readonly List<IMyShipController> Controllers = new List<IMyShipController>();
+
+		public readonly List<MyCubeBlock> Parachutes = new List<MyCubeBlock>();
 	}
 
 	private const double CacheSeconds = 10.0;
@@ -165,6 +167,7 @@ internal static class ShipReader
 		ReadThrusters(ship, cache, countOff);
 		ReadTanks(ship, cache, countOff);
 		ReadSources(ship, cache, countOff);
+		ReadParachutes(ship, cache, countOff);
 		return ship;
 	}
 
@@ -190,6 +193,9 @@ internal static class ShipReader
 					break;
 				case IMyPowerProducer _:
 					cache.Producers.Add(block);
+					break;
+				case MyCubeBlock _ when block.BlockDefinition is MyParachuteDefinition:
+					cache.Parachutes.Add(block);
 					break;
 				case IMyShipController controller:
 					cache.Controllers.Add(controller);
@@ -424,9 +430,19 @@ internal static class ShipReader
 			ship.Sources.Add(source);
 		}
 
-		if (reactorFuels.Count == 0)
+		foreach (KeyValuePair<string, double> fuel in CountItems(cache, reactorFuels))
 		{
-			return;
+			ship.ItemFuel[fuel.Key] = fuel.Value;
+		}
+	}
+
+	/// <summary>How much of each item is in all the ship's inventories, by item id.</summary>
+	private static Dictionary<string, double> CountItems(BlockCache cache, ICollection<MyDefinitionId> items)
+	{
+		Dictionary<string, double> totals = new Dictionary<string, double>();
+		if (items.Count == 0)
+		{
+			return totals;
 		}
 		foreach (MyCubeBlock block in cache.Inventories)
 		{
@@ -441,16 +457,59 @@ internal static class ShipReader
 				{
 					continue;
 				}
-				foreach (MyDefinitionId fuel in reactorFuels)
+				foreach (MyDefinitionId item in items)
 				{
-					double amount = (double)inventory.GetItemAmount(fuel);
+					double amount = (double)inventory.GetItemAmount(item);
 					if (amount > 0)
 					{
-						string key = fuel.ToString();
-						ship.ItemFuel[key] = (ship.ItemFuel.TryGetValue(key, out double total) ? total : 0.0) + amount;
+						string key = item.ToString();
+						totals[key] = (totals.TryGetValue(key, out double total) ? total : 0.0) + amount;
 					}
 				}
 			}
+		}
+		return totals;
+	}
+
+	/// <summary>Parachutes and the canopy material for them, read from each parachute's definition.</summary>
+	private static void ReadParachutes(ShipSnapshot ship, BlockCache cache, bool countOff)
+	{
+		HashSet<MyDefinitionId> materials = new HashSet<MyDefinitionId>();
+		foreach (MyCubeBlock block in cache.Parachutes)
+		{
+			if (block.MarkedForClose || !block.IsFunctional || !(block.BlockDefinition is MyParachuteDefinition definition))
+			{
+				continue;
+			}
+			bool on = !(block is IMyFunctionalBlock functional) || functional.Enabled;
+			if (!on)
+			{
+				ship.BlocksOff++;
+				if (!countOff)
+				{
+					continue;
+				}
+			}
+			bool hasMaterial = !definition.MaterialDefinitionId.TypeId.IsNull && definition.MaterialDeployCost > 0;
+			ship.Parachutes.Add(new ParachuteInfo
+			{
+				DragCoefficient = definition.DragCoefficient,
+				RadiusMultiplier = definition.RadiusMultiplier,
+				GridSize = block.CubeGrid.GridSize,
+				ReefLevel = definition.ReefAtmosphereLevel,
+				MinimumAir = definition.MinimumAtmosphereLevel,
+				Cost = hasMaterial ? definition.MaterialDeployCost : 0,
+				MaterialKey = hasMaterial ? definition.MaterialDefinitionId.ToString() : null
+			});
+			if (hasMaterial)
+			{
+				materials.Add(definition.MaterialDefinitionId);
+				ship.FuelNames[definition.MaterialDefinitionId.ToString()] = MyDefinitionManager.Static.GetPhysicalItemDefinition(definition.MaterialDefinitionId)?.DisplayNameText ?? definition.MaterialDefinitionId.SubtypeName;
+			}
+		}
+		foreach (KeyValuePair<string, double> material in CountItems(cache, materials))
+		{
+			ship.ChuteMaterial[material.Key] = material.Value;
 		}
 	}
 

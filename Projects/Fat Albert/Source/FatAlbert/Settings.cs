@@ -26,6 +26,15 @@ internal static class Settings
 
 	public static int View;
 
+	/// <summary>Open the ship's parachutes when landing on a planet with air.</summary>
+	public static bool UseChutes = true;
+
+	/// <summary>Show the HUD overlay.</summary>
+	public static bool Hud;
+
+	/// <summary>Key that turns the HUD overlay on and off, as modifiers and a key name, e.g. "Ctrl+Alt+F".</summary>
+	public static string HudKey = "Ctrl+Alt+F";
+
 	public static double? Distance
 	{
 		get
@@ -84,6 +93,18 @@ internal static class Settings
 			{
 				CountOff = countOff != "0";
 			}
+			if (values.TryGetValue("UseChutes", out string chutes))
+			{
+				UseChutes = chutes != "0";
+			}
+			if (values.TryGetValue("Hud", out string hud))
+			{
+				Hud = hud == "1";
+			}
+			if (values.TryGetValue("HudKey", out string hudKey) && hudKey.Length > 0)
+			{
+				HudKey = hudKey;
+			}
 			if (values.TryGetValue("View", out string view) && int.TryParse(view, out int index))
 			{
 				View = index;
@@ -106,6 +127,9 @@ internal static class Settings
 				writer.WriteLine("Speed=" + Speed);
 				writer.WriteLine("CountOff=" + (CountOff ? "1" : "0"));
 				writer.WriteLine("View=" + View);
+				writer.WriteLine("UseChutes=" + (UseChutes ? "1" : "0"));
+				writer.WriteLine("Hud=" + (Hud ? "1" : "0"));
+				writer.WriteLine("HudKey=" + HudKey);
 			}
 		}
 		catch (Exception ex)

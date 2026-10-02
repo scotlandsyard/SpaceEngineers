@@ -17,7 +17,7 @@ namespace FatAlbert;
 /// Wires up the window: a toolbar action on cockpits and remote controls, the /fat chat command, and the plugin
 /// switcher. Client only, and it never changes anything on the ship, so it's fine on any server.
 /// </summary>
-[MySessionComponentDescriptor(MyUpdateOrder.NoUpdate)]
+[MySessionComponentDescriptor(MyUpdateOrder.AfterSimulation)]
 public class FatAlbertSession : MySessionComponentBase
 {
 	public const string ChatSender = "Fat Albert";
@@ -76,6 +76,7 @@ public class FatAlbertSession : MySessionComponentBase
 				MyLog.Default.WriteLineAndConsole($"[Fat Albert] Unload: {ex}");
 			}
 		}
+		Hud.Unload();
 		ShipReader.Clear();
 		PlanetNames.Unload();
 		_started = false;
@@ -105,7 +106,28 @@ public class FatAlbertSession : MySessionComponentBase
 			return;
 		}
 		sendToOthers = false;
+		if (words.Length > 1 && words[1].Equals("hud", StringComparison.OrdinalIgnoreCase))
+		{
+			Hud.Toggle();
+			return;
+		}
 		OpenMenu(null);
+	}
+
+	public override void UpdateAfterSimulation()
+	{
+		if (!_started || MyAPIGateway.Session?.Player == null)
+		{
+			return;
+		}
+		try
+		{
+			Hud.Update();
+		}
+		catch (Exception ex)
+		{
+			MyLog.Default.WriteLineAndConsole($"[Fat Albert] HUD update: {ex}");
+		}
 	}
 
 	internal void OpenMenu(IMyTerminalBlock fromBlock)

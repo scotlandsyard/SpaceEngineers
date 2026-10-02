@@ -39,6 +39,9 @@ public class AscentPlan
 	/// <summary>Speed the ship falls in at before braking: the world's speed limit, which costs no fuel to reach.</summary>
 	public double FallSpeed;
 
+	/// <summary>Parachutes to open for the landing (ones with canopy material), or null to land on thrusters alone.</summary>
+	public List<ParachuteInfo> Chutes;
+
 	public double TargetRadius => Distance.HasValue ? StartRadius + Distance.Value : Planet?.GravityLimit ?? 0.0;
 
 	public static AscentPlan Here(ShipSnapshot ship, Dir dir, double? distance, double speed)
@@ -46,9 +49,9 @@ public class AscentPlan
 		return new AscentPlan { Planet = ship.Planet, StartRadius = ship.Radius, Dir = dir, Distance = distance, Speed = speed, FallSpeed = ship.SpeedLimit };
 	}
 
-	public static AscentPlan Visit(ShipSnapshot ship, PlanetInfo planet, Dir dir, double? distance, double speed)
+	public static AscentPlan Visit(ShipSnapshot ship, PlanetInfo planet, Dir dir, double? distance, double speed, bool useChutes)
 	{
-		return new AscentPlan { Planet = planet, StartRadius = planet.AverageRadius, Land = true, Dir = dir, Distance = distance, Speed = speed, FallSpeed = ship.SpeedLimit };
+		return new AscentPlan { Planet = planet, StartRadius = planet.AverageRadius, Land = true, Dir = dir, Distance = distance, Speed = speed, FallSpeed = ship.SpeedLimit, Chutes = useChutes ? ship.UsableParachutes() : null };
 	}
 }
 
@@ -113,6 +116,13 @@ public class AscentResult
 
 	public double LandingBattery;
 
+	/// <summary>Parachutes that opened, the speed they brought the ship down to, and the speed it touched down at.</summary>
+	public int ChuteCount;
+
+	public double ChuteSpeed;
+
+	public double TouchdownSpeed;
+
 	/// <summary>Heaviest the ship could be and still make it, in kg (filled in by Ascent.Solve).</summary>
 	public double MaxMass;
 
@@ -134,6 +144,12 @@ internal static class Ascent
 	private const double Step = 0.5;
 
 	private const double MaxSeconds = 4 * 3600;
+
+	/// <summary>An hour of half-second braking steps, plus a little for the final short one.</summary>
+	private const int MaxLandingSteps = 7300;
+
+	/// <summary>Touching down on parachutes alone counts as a landing at or below this speed (m/s).</summary>
+	public const double SafeTouchdown = 5.0;
 
 	/// <summary>Thrusters at more than about 87° off the lift direction add nothing worth counting.</summary>
 	private const double MinShare = 0.05;
@@ -322,20 +338,31 @@ internal static class Ascent
 		}
 	}
 
+	/// <summary>Within this height above a planet's highest ground, a ship counts as sitting on it (can't turn over).</summary>
+	public const double GroundHeight = 1000.0;
+
+	/// <summary>True when the ship is on or near the ground of the planet it's on, so it lifts with the side facing up.</summary>
+	public static bool OnGround(ShipSnapshot ship)
+	{
+		return ship.Planet != null && ship.Planet.GravityAt(ship.Radius) > 0.0 && ship.Radius - ship.Planet.MaxRadius < GroundHeight;
+	}
+
 	/// <summary>
-	/// Auto direction. Here: the side facing away from the planet right now. Visiting another planet (or out in
-	/// space): the side with the most thrust at that planet's sea level, since you'll point that one up.
+	/// Auto direction. On the ground: the side facing away from the planet, since it can't turn over. Anywhere else
+	/// (flying, in orbit, or visiting a planet): the side with the most thrust where the climb starts, since you'll
+	/// point that one up.
 	/// </summary>
 	public static Dir AutoDirection(ShipSnapshot ship, PlanetInfo visiting)
 	{
 		Dir[] dirs = (Dir[])Enum.GetValues(typeof(Dir));
-		if (visiting == null && ship.Planet != null && ship.Planet.GravityAt(ship.Radius) > 0.0)
+		if (visiting == null && OnGround(ship))
 		{
 			Vector3D up = Vector3D.Normalize(ship.Position - ship.Planet.Center);
 			return dirs.OrderByDescending(d => Vector3D.Dot(ship.Axis(d), up)).First();
 		}
 		PlanetInfo planet = visiting ?? ship.Planet;
-		return dirs.OrderByDescending(d => planet == null ? VacuumThrust(ship, d) : ThrustAt(ship, d, planet, planet.AverageRadius)).First();
+		double radius = visiting != null || planet == null ? planet?.AverageRadius ?? 0.0 : ship.Radius;
+		return dirs.OrderByDescending(d => planet == null ? VacuumThrust(ship, d) : ThrustAt(ship, d, planet, radius)).First();
 	}
 
 	/// <summary>Thrust pushing this way with no atmosphere penalty, in newtons.</summary>
@@ -506,8 +533,10 @@ internal static class Ascent
 
 	/// <summary>
 	/// Falling in costs nothing: the game caps the ship's speed, so it drops at the speed limit with the thrusters
-	/// idle. Landing is the braking at the bottom: full thrust from the fall speed to a stop, worked out with sea
-	/// level's gravity and air. False (and CantLand) when the thrusters can't stop the ship.
+	/// idle. With parachutes (and air thick enough to open them) it comes down at their terminal speed instead.
+	/// Landing is the braking at the bottom: full thrust (plus the parachutes' drag) from that speed to a stop,
+	/// worked out with sea level's gravity and air. If the parachutes alone get it down to SafeTouchdown, it lands
+	/// even when the thrusters couldn't hold it up. False (and CantLand) when it can't slow down enough.
 	/// </summary>
 	private static bool Land(Flight flight, AscentPlan plan, double mass, AscentResult result)
 	{
@@ -515,10 +544,33 @@ internal static class Ascent
 		double gravityG = planet.GravityAt(plan.StartRadius);
 		double weight = mass * gravityG * 9.81;
 		double velocity = plan.FallSpeed;
+
+		// Drag of every parachute that has canopy material and air to open in, per (m/s)².
+		double drag = 0.0;
+		if (plan.Chutes != null && planet.HasAtmosphere)
+		{
+			double air = planet.AirAt(plan.StartRadius);
+			foreach (ParachuteInfo chute in plan.Chutes)
+			{
+				double factor = chute.DragFactor(air);
+				if (factor > 0.0)
+				{
+					drag += factor;
+					result.ChuteCount++;
+				}
+			}
+		}
+		if (drag > 0.0)
+		{
+			velocity = Math.Min(velocity, Math.Sqrt(weight / drag));
+			result.ChuteSpeed = velocity;
+		}
+
 		double seconds = 0.0;
 		double distance = 0.0;
 		bool first = true;
-		while (velocity > 0.0)
+		// The step cap is a backstop: the last step always ends exactly at a stop (below).
+		for (int steps = 0; velocity > 0.0; steps++)
 		{
 			flight.Measure(plan.StartRadius, gravityG);
 			if (first)
@@ -529,19 +581,26 @@ internal static class Ascent
 				result.StartTwr = weight > 0.0 ? flight.Thrust / weight : double.MaxValue;
 				first = false;
 			}
-			double deceleration = (flight.Thrust - weight) / mass;
-			if (deceleration <= 0.0 || seconds > 3600.0)
+			double deceleration = (flight.Thrust - weight + drag * velocity * velocity) / mass;
+			if (deceleration <= 0.0 || steps > MaxLandingSteps)
 			{
+				if (drag > 0.0 && velocity <= SafeTouchdown)
+				{
+					// Can't slow down any more, but the parachutes have it slow enough to touch down.
+					break;
+				}
 				result.Outcome = AscentOutcome.CantLand;
 				return false;
 			}
 			double dt = Math.Min(Step, velocity / deceleration);
 			distance += (velocity - deceleration * dt / 2.0) * dt;
-			velocity -= deceleration * dt;
+			// Rounding can leave a sliver of speed after the final step, which would loop forever; that step stops it.
+			velocity = dt < Step ? 0.0 : velocity - deceleration * dt;
 			seconds += dt;
 			flight.Consume(1.0, dt, 0.0);
 		}
 		result.Landed = true;
+		result.TouchdownSpeed = velocity;
 		result.LandingSeconds = seconds;
 		result.LandingHeight = distance;
 		result.LandingBattery = result.BatteryUsed;

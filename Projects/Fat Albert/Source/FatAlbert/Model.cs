@@ -130,6 +130,46 @@ public class PowerSource
 	public bool On;
 }
 
+/// <summary>One parachute block, read from its definition (so modded parachutes work too).</summary>
+public class ParachuteInfo
+{
+	public double DragCoefficient;
+
+	public double RadiusMultiplier;
+
+	public double GridSize;
+
+	public double ReefLevel;
+
+	/// <summary>Air density below which it won't open.</summary>
+	public double MinimumAir;
+
+	/// <summary>Canopy items one opening uses, and which item.</summary>
+	public int Cost;
+
+	public string MaterialKey;
+
+	/// <summary>
+	/// Drag per (m/s)² when fully open at this air density, in newtons: MyParachute's
+	/// 2.5 × (air × 1.225) × v² × π r² × drag coefficient, with r from the open canopy's size.
+	/// </summary>
+	public double DragFactor(double air)
+	{
+		if (air < MinimumAir)
+		{
+			return 0.0;
+		}
+		double size = 10.0 * (air - ReefLevel);
+		size = size <= 0.5 ? 0.5 : Math.Log(size - 0.99) + 5.0;
+		if (size < 0.5 || double.IsNaN(size))
+		{
+			size = 0.5;
+		}
+		double radius = size * RadiusMultiplier * GridSize / 2.0;
+		return 2.5 * (air * 1.225) * Math.PI * radius * radius * DragCoefficient;
+	}
+}
+
 /// <summary>A planet's gravity and atmosphere, with the game's own formulas.</summary>
 public class PlanetInfo
 {
@@ -224,6 +264,31 @@ public class ShipSnapshot
 	public readonly Dictionary<string, GasPool> Gas = new Dictionary<string, GasPool>();
 
 	public readonly List<PowerSource> Sources = new List<PowerSource>();
+
+	public readonly List<ParachuteInfo> Parachutes = new List<ParachuteInfo>();
+
+	/// <summary>Canopy items (canvas in vanilla) on the whole ship, by item id.</summary>
+	public readonly Dictionary<string, double> ChuteMaterial = new Dictionary<string, double>();
+
+	/// <summary>Parachutes that have canopy material for one opening, sharing what's on the ship.</summary>
+	public List<ParachuteInfo> UsableParachutes()
+	{
+		List<ParachuteInfo> usable = new List<ParachuteInfo>();
+		Dictionary<string, double> left = new Dictionary<string, double>(ChuteMaterial);
+		foreach (ParachuteInfo chute in Parachutes)
+		{
+			if (chute.MaterialKey == null || chute.Cost <= 0)
+			{
+				usable.Add(chute);
+			}
+			else if (left.TryGetValue(chute.MaterialKey, out double amount) && amount >= chute.Cost)
+			{
+				left[chute.MaterialKey] = amount - chute.Cost;
+				usable.Add(chute);
+			}
+		}
+		return usable;
+	}
 
 	/// <summary>Reactor fuel items on the ship, in kg, by item id.</summary>
 	public readonly Dictionary<string, double> ItemFuel = new Dictionary<string, double>();
