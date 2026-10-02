@@ -33,7 +33,7 @@ Amounts are what a vanilla ship drill would collect, times the world's harvest m
 
 ## Marker library
 
-**Export from GPS** moves Scout Ore markers out of the GPS list into the library (deposit markers stay in GPS), **Import to GPS** or a double-click puts one back, and **Delete** removes one. Click a column header to sort. The library is saved per world name as `OreScout_Markers_<world>.xml` in `%AppData%\SpaceEngineers\Storage\`.
+**Export from GPS** moves Scout Ore markers out of the GPS list into the library (deposit markers stay in GPS), and **Delete** removes the selected one. **Show** filters to one ore, **From you** gives each marker's distance from you, and **Measure From Row** fills **From marker** with distances from the selected marker (**Measure From Me** clears it). Tick markers with **Mark / Unmark** or a double-click, then **Import Marked**, or use **Import All Shown** to import everything the filter shows. Click a column header to sort. The library is saved per world name as `OreScout_Markers_<world>.xml` in `%AppData%\SpaceEngineers\Storage\`.
 
 ## Switching between our plugins
 
