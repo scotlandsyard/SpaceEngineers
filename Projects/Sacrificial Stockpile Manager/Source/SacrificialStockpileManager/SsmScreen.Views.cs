@@ -192,6 +192,7 @@ public partial class SsmScreen
 		int notYours = grid.Blocks.Count(b => b.NotYours);
 		rows.Add(Row("set:shared", shared ? WarningColor : (Color?)null, "Blocks shared with me", shared ? "Included: faction-shared, shared-with-all and unowned blocks are managed too" : notYours > 0 ? $"Left alone: only your own blocks are touched ({notYours} aren't yours)" : "Left alone: only your own blocks are touched"));
 		rows.Add(Row("set:personality", null, "Personality (all grids)", PersonalityText(Store.Chattiness)));
+		rows.Add(Row("set:name", null, "Chat name (all grids)", $"{TimShared.Personality.DisplayName}  (type /ssm name <name> in chat)"));
 
 		Vector3D player = MyAPIGateway.Session?.Player?.GetPosition() ?? Vector3D.Zero;
 		string distance = FormatDistance(Vector3D.Distance(player, grid.Position));
@@ -281,6 +282,11 @@ public partial class SsmScreen
 		if (setting == "personality")
 		{
 			CyclePersonality();
+			return;
+		}
+		if (setting == "name")
+		{
+			ShowMessage($"To rename {TimShared.Personality.DisplayName} in chat, type /ssm name <new name> (at most {TimShared.Personality.MaxNameLength} characters; /ssm name alone resets it).", null);
 			return;
 		}
 		GridSnapshot grid = Grid;

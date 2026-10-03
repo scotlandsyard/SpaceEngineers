@@ -55,9 +55,6 @@ public class SsmSession : MySessionComponentBase
 
 	private const int SaveTicks = 60 * 120;
 
-	/// <summary>Ticks after the world loads before Stockpile Manager greets, so the line isn't lost in the load.</summary>
-	private const int GreetingTicks = 600;
-
 	/// <summary>Name shown in chat for the plugin's in-character lines (Shared/Personality.cs).</summary>
 	private const string CharacterName = "Stockpile Manager";
 
@@ -133,6 +130,9 @@ public class SsmSession : MySessionComponentBase
 			MyAPIGateway.Utilities.MessageEntered += OnMessageEntered;
 			PluginSwitcher.Register("Stockpile Manager", () => OpenMenu(null));
 			Personality.Level = Store.Chattiness;
+			// The name the player chose for the character; it can also be changed from Wilson's window.
+			Personality.DisplayName = Store.DisplayName;
+			Personality.Changed += OnPersonalityChanged;
 			Personality.Register(CharacterName);
 			_started = true;
 		}
@@ -151,6 +151,7 @@ public class SsmSession : MySessionComponentBase
 				MyAPIGateway.TerminalControls.CustomActionGetter -= CustomActionGetter;
 				MyAPIGateway.Utilities.MessageEntered -= OnMessageEntered;
 				PluginSwitcher.Unregister();
+				Personality.Changed -= OnPersonalityChanged;
 				Personality.Unregister();
 				Store.Unload();
 			}
@@ -173,10 +174,6 @@ public class SsmSession : MySessionComponentBase
 		try
 		{
 			StepDiscovery();
-			if (_tick == GreetingTicks)
-			{
-				Personality.Say("greeting");
-			}
 			if (_tick % StepTicks == 0)
 			{
 				StepConstruct();
@@ -229,6 +226,13 @@ public class SsmSession : MySessionComponentBase
 		case "":
 			OpenMenu(null);
 			break;
+		case "name":
+			// Everything after "/ssm name", spaces and capitals kept; blank goes back to the character's own name.
+			string rest = (messageText ?? "").Trim();
+			int at = rest.IndexOf(words[1], ChatCommand.Length, StringComparison.OrdinalIgnoreCase) + words[1].Length;
+			SetDisplayName(rest.Substring(Math.Min(at, rest.Length)));
+			MyAPIGateway.Utilities.ShowMessage(ChatSender, $"Chat name: {Personality.DisplayName}.");
+			break;
 		case "sort":
 		case "unload":
 			RefreshNow();
@@ -241,7 +245,7 @@ public class SsmSession : MySessionComponentBase
 			StartOneShot(construct, command == "unload");
 			break;
 		default:
-			MyAPIGateway.Utilities.ShowMessage(ChatSender, "/ssm opens the menu. /ssm sort sorts the grid you're on now. /ssm unload empties ships docked to it into its storage.");
+			MyAPIGateway.Utilities.ShowMessage(ChatSender, "/ssm opens the menu. /ssm sort sorts the grid you're on now. /ssm unload empties ships docked to it into its storage. /ssm name <name> renames Stockpile Manager in chat (blank resets).");
 			break;
 		}
 	}
@@ -471,6 +475,20 @@ public class SsmSession : MySessionComponentBase
 			_list.AddRange(_constructs.Values.OrderBy(c => c.MainGrid.CustomName, StringComparer.OrdinalIgnoreCase));
 			ConstructsVersion++;
 		}
+	}
+
+	/// <summary>Renames the character in chat; null or blank goes back to "Stockpile Manager". Saved from <see cref="OnPersonalityChanged"/>.</summary>
+	internal static void SetDisplayName(string name)
+	{
+		Personality.DisplayName = name;
+	}
+
+	/// <summary>Saves the chat name whenever it changes, here or from Wilson's window.</summary>
+	private static void OnPersonalityChanged()
+	{
+		string name = Personality.DisplayName;
+		Store.DisplayName = name == CharacterName ? "" : name;
+		Store.SavePreferences();
 	}
 
 	/// <summary>True when a position is far enough from the player for a grid there to have left the sync range.</summary>

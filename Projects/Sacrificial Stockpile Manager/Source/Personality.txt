@@ -3,15 +3,6 @@
 # Written with Gemini (2026-10-03, round 2 v001). Refresh through the personality workflow, then check with Check-Personality.ps1.
 
 
-[greeting]
-- The Grand Vault awakeneth. Walk softly among the crates, for every Steel Plate within is a sanctified tithe.
-- Blessed be the conveyors, pristine and untangled. May our stores multiply and the heretical surplus be purged.
-- I salute the Keeper of Grids. Let us tally the sacred inventory and bring divine order to this worldly clutter.
-- The reliquaries are sealed, the sorters chant their endless rhythm. Approach with reverence and an accurate manifest.
-- Another dawn upon the cargo bays. Let no loose ingot wander from its ordained container, lest Klang take offence.
-- Welcome, steward of the hulls. Bring your tithes to the sorting altar and receive the blessings of full capacity.
-- The ledger is unrolled. Let us sanctify the bins, banish the disordered gravel, and guard the Sacred Quotas.
-
 [menu_opened]
 - You approach the Sacred Registry. State your intentions: are we declaring quotas, or purging the profane surplus?
 - The archives open before you. Seek the manifest with pure intent and clean hands, steward of the hold.

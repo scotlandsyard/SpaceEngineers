@@ -364,6 +364,9 @@ public class PreferencesFile
 {
 	/// <summary>How much Stockpile Manager says in chat: Off, Quiet, Normal or Chatty.</summary>
 	public string Personality = "Normal";
+
+	/// <summary>The name its chat lines show under; blank for its own name, Stockpile Manager.</summary>
+	public string DisplayName = "";
 }
 
 public class GridsFile

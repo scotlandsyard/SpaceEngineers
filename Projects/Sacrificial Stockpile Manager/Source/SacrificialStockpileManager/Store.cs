@@ -41,12 +41,16 @@ internal static class Store
 	/// <summary>How much Stockpile Manager says in chat. The same in every world; call <see cref="SavePreferences"/> after changing it.</summary>
 	public static TimShared.Personality.Chattiness Chattiness { get; set; } = TimShared.Personality.Chattiness.Normal;
 
+	/// <summary>The chat name the player chose; blank for the character's own. Saved with <see cref="SavePreferences"/>.</summary>
+	public static string DisplayName { get; set; } = "";
+
 	private static string PreferencesFileName => FilePrefix + "Preferences.xml";
 
 	public static void Load()
 	{
 		PreferencesFile preferences = Read<PreferencesFile>(PreferencesFileName);
 		Chattiness = preferences != null && Enum.TryParse(preferences.Personality, true, out TimShared.Personality.Chattiness level) ? level : TimShared.Personality.Chattiness.Normal;
+		DisplayName = preferences?.DisplayName ?? "";
 		s_world = WorldName();
 		s_settings = Read<SettingsFile>(SettingsFileName()) ?? new SettingsFile();
 		s_settings.Blocks ??= new List<BlockRules>();
@@ -308,7 +312,7 @@ internal static class Store
 	{
 		try
 		{
-			string xml = MyAPIGateway.Utilities.SerializeToXML(new PreferencesFile { Personality = Chattiness.ToString() });
+			string xml = MyAPIGateway.Utilities.SerializeToXML(new PreferencesFile { Personality = Chattiness.ToString(), DisplayName = DisplayName ?? "" });
 			string fileName = PreferencesFileName;
 			long sequence = ++s_saveSequence;
 			MyAPIGateway.Parallel.StartBackground(() => Write(fileName, xml, sequence));
