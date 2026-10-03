@@ -22,9 +22,8 @@ internal static class Chatter
 	/// <summary>Sets how much Fat Albert talks, and saves it.</summary>
 	public static void SetLevel(Personality.Chattiness level)
 	{
-		Settings.Chattiness = level;
 		Personality.Level = level;
-		Settings.Save();
+		SaveDisplayName();
 	}
 
 	/// <summary>Renames him in chat; null or blank goes back to his own name.</summary>
@@ -36,11 +35,12 @@ internal static class Chatter
 		MyAPIGateway.Utilities.ShowMessage(FatAlbertSession.ChatSender, $"Chat name: {Personality.DisplayName}. /fat name on its own puts it back.");
 	}
 
-	/// <summary>Saves the chat name; also runs when the player renames him from Wilson's window.</summary>
+	/// <summary>Saves the chat name and level; runs whenever either changes (the window's Chat dropdown, /fat chat, Wilson).</summary>
 	public static void SaveDisplayName()
 	{
 		string name = Personality.DisplayName;
 		Settings.DisplayName = name == null || name == FatAlbertSession.ChatSender ? "" : name;
+		Settings.Chattiness = Personality.Level;
 		Settings.Save();
 	}
 

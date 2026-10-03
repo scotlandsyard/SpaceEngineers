@@ -66,7 +66,7 @@ With **Parachutes** ticked, a visit to a planet with air opens every parachute t
 
 Three lines at the left of the screen: the ship and trip, YES/NO with the reason, and thrust/weight, spare mass and what's left in the tanks and batteries. It uses the ship you're sitting in (else the one picked last in the window) and the trip picked under **Planet**, rechecked every two seconds on a background thread.
 
-- Toggle: **Ctrl+Alt+F**, `/fat hud`, or the **HUD** button in the window (every page except Help). Remembered between sessions.
+- Toggle: **Ctrl+Alt+F**, `/fat hud`, or the **HUD** button in the window. Remembered between sessions.
 - Move: **Move HUD** in the window (the window closes first). The HUD follows the mouse; left click keeps it there (saved as `HudX`/`HudY`), Esc or right click puts it back. **Reset inputs** moved to the Help page to make room.
 - Other hotkey: set `HudKey` in `FatAlbert_Settings.txt` (local storage) while the game is closed, e.g. `HudKey=Ctrl+Shift+H` (key names are `VRage.Input.MyKeys`).
 - It's a draw-only screen set up like the game's own HUD screen: it never takes focus or input, and it hides when the game's HUD is hidden.
@@ -75,7 +75,7 @@ Three lines at the left of the screen: the ship and trip, YES/NO with the reason
 
 Fat Albert, a loud launchmaster, comments in chat through `Shared/Personality.cs`. His lines are in `Source/Personality.txt`, compiled into the DLL. Lines show only on your own screen.
 
-- Setting: **Chat** button on the Help page (steps Off, Quiet, Normal, Chatty), or `/fat chat off|quiet|normal|chatty`. Saved as `Personality=` in `FatAlbert_Settings.txt`. Default Normal.
+- Setting: the **Chat** dropdown at the top right of the window (Off, Quiet, Normal, Chatty), or `/fat chat off|quiet|normal|chatty`. Saved as `Personality=` in `FatAlbert_Settings.txt`. Default Normal.
 - Chat name: `/fat name <new name>` (up to `Personality.MaxNameLength`, 24 characters); `/fat name` alone goes back to "Fat Albert". Saved as `DisplayName=`, and saved again on `Personality.Changed`, so a rename from Wilson's window sticks too. His name shows in bright orange.
 - Timing comes from `Personality.cs`: one turn per cycle across all our plugins (after anyone speaks, the next ordinary line waits 2 min on Chatty, 5 on Normal, 15 on Quiet), important lines no sooner than 30 s after anyone's last line, the same event at most every 10 minutes.
 - No greeting: Wilson's roll call replaces it, using the `[rollcall]` lines (no code here).

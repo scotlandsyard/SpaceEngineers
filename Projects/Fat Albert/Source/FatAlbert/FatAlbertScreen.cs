@@ -229,7 +229,9 @@ public class FatAlbertScreen : MyGuiScreenBase
 
 	private void CreateControls()
 	{
-		PluginSwitcher.AddSwitcher(this, AddCaption("Fat Albert - can it make orbit?"));
+		MyGuiControlLabel caption = AddCaption("Fat Albert - can it make orbit?");
+		PluginSwitcher.AddSwitcher(this, caption);
+		Personality.AddChatSetting(this, caption);
 
 		AddLabel(Left, Row1Y, "Ship");
 		_shipCombo = AddCombo(-0.36f, Row1Y, 0.43f, 12, "Your ships within 5 km. The one you're sitting in comes first.");
@@ -385,25 +387,11 @@ public class FatAlbertScreen : MyGuiScreenBase
 				CloseScreen();
 			}).SetToolTip("Closes this window; then move the mouse to place the HUD and left click. Reset inputs is on the Help page.");
 		}
-		if (CurrentView == View.Help)
+		AddButton(0.105f, Settings.Hud ? "HUD: on" : "HUD: off", () =>
 		{
-			AddButton(0.105f, "Chat: " + Settings.Chattiness, () =>
-			{
-				int count = Enum.GetValues(typeof(Personality.Chattiness)).Length;
-				Personality.Chattiness level = (Personality.Chattiness)(((int)Settings.Chattiness + 1) % count);
-				Chatter.SetLevel(level);
-				ShowMessage($"Chat personality: {level}. {Chatter.LevelHint(level)}", GoodColor);
-				_recreatePending = true;
-			}).SetToolTip("How much Fat Albert talks in chat: Off, Quiet, Normal or Chatty. Click to step through them, or /fat chat quiet. Rename him with /fat name. Only you see the lines.");
-		}
-		else
-		{
-			AddButton(0.105f, Settings.Hud ? "HUD: on" : "HUD: off", () =>
-			{
-				Hud.Toggle();
-				_recreatePending = true;
-			}).SetToolTip($"Show the answer on your HUD while you fly. Hotkey {Hud.KeyName}, or /fat hud in chat.");
-		}
+			Hud.Toggle();
+			_recreatePending = true;
+		}).SetToolTip($"Show the answer on your HUD while you fly. Hotkey {Hud.KeyName}, or /fat hud in chat.");
 		if (CurrentView == View.Help)
 		{
 			AddButton(0.315f, "Back", () => SwitchView(s_viewBeforeHelp));
@@ -1526,7 +1514,7 @@ public class FatAlbertScreen : MyGuiScreenBase
 		"PARACHUTES\n" +
 		"With Parachutes ticked, a landing on a planet with air opens every parachute that has its canopy material (canvas) on board, using the game's own drag formula at sea level. The ship comes down at the parachutes' speed instead of the speed limit, so the braking burn is shorter, and the parachutes keep pulling while it brakes. If they alone get it down to 5 m/s or less, it lands even when the thrusters couldn't hold it up (lifting off again is another matter). Parachutes need air at least as thick as their opening level (0.2 for vanilla ones).\n\n" +
 		"HUD OVERLAY\n" +
-		"Three lines at the left of your screen with the answer for the ship you're flying (or the one picked last here) and the trip picked under Planet, rechecked every two seconds. Turn it on and off with Ctrl+Alt+F, /fat hud in chat, or the HUD button at the bottom of the other pages. It hides when you hide the game's HUD. To move it, press Move HUD: the window closes, the HUD follows your mouse, and a left click puts it there (Esc or a right click puts it back). Reset inputs is on this Help page. To use another key, change HudKey in FatAlbert_Settings.txt (for example HudKey=Ctrl+Shift+H) while the game is closed.\n\n" +
+		"Three lines at the left of your screen with the answer for the ship you're flying (or the one picked last here) and the trip picked under Planet, rechecked every two seconds. Turn it on and off with Ctrl+Alt+F, /fat hud in chat, or the HUD button below. It hides when you hide the game's HUD. To move it, press Move HUD: the window closes, the HUD follows your mouse, and a left click puts it there (Esc or a right click puts it back). Reset inputs is on this Help page. To use another key, change HudKey in FatAlbert_Settings.txt (for example HudKey=Ctrl+Shift+H) while the game is closed.\n\n" +
 		"CHAT PERSONALITY\n" +
-		"Fat Albert has a few words in chat about each answer: a clean climb, a close one, a ship with thrust to spare, too heavy, fuel or power running out, or the air getting too thin for the atmospheric thrusters. He only comments when the answer changes, not on every recheck, and his name shows in orange. The Chat button on this Help page steps through Off, Quiet (only when the ship is too heavy to lift off), Normal and Chatty; /fat chat quiet (or off, normal, chatty) in chat does the same. Our plugins take turns: after any of them speaks, the next ordinary line waits 2 minutes on Chatty, 5 on Normal and 15 on Quiet, a too-heavy warning waits at least 30 seconds, and the same comment isn't repeated within 10 minutes. To call him something else in chat, type /fat name and the new name (up to 24 characters); /fat name on its own puts his own name back. Only you see the lines.";
+		"Fat Albert has a few words in chat about each answer: a clean climb, a close one, a ship with thrust to spare, too heavy, fuel or power running out, or the air getting too thin for the atmospheric thrusters. He only comments when the answer changes, not on every recheck, and his name shows in orange. The Chat dropdown at the top right of this window sets Off, Quiet (only when the ship is too heavy to lift off), Normal or Chatty; /fat chat quiet (or off, normal, chatty) in chat does the same. Our plugins take turns: after any of them speaks, the next ordinary line waits 2 minutes on Chatty, 5 on Normal and 15 on Quiet, a too-heavy warning waits at least 30 seconds, and the same comment isn't repeated within 10 minutes. To call him something else in chat, type /fat name and the new name (up to 24 characters); /fat name on its own puts his own name back. Only you see the lines.";
 }
