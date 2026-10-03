@@ -20,7 +20,9 @@ namespace OreScout;
 /// Adds scan actions to ore detector blocks. Every scan starts at the detector and reaches only as far as
 /// the detector's own range, so it reveals nothing the vanilla ore detector couldn't already show.
 /// </summary>
-// AfterSimulation only until the greeting is said (about 10 s in); after that the session needs no updates.
+// AfterSimulation for the greeting (about 10 s in). After that the update returns straight away: calling
+// SetUpdateOrder from inside an update crashes the game, because MySession.UpdateComponents is still looping
+// over the set it removes us from.
 [MySessionComponentDescriptor(MyUpdateOrder.AfterSimulation)]
 public class OreScoutSession : MySessionComponentBase
 {
@@ -126,11 +128,10 @@ public class OreScoutSession : MySessionComponentBase
 
 	public override void UpdateAfterSimulation()
 	{
-		if (--_ticksUntilGreeting > 0)
+		if (_ticksUntilGreeting <= 0 || --_ticksUntilGreeting > 0)
 		{
 			return;
 		}
-		SetUpdateOrder(MyUpdateOrder.NoUpdate);
 		Personality.Say("greeting");
 	}
 
