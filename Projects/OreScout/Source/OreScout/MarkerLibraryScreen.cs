@@ -63,6 +63,16 @@ public class MarkerLibraryScreen : MyGuiScreenBase
 
 	private readonly HashSet<LibraryEntry> _marked = new HashSet<LibraryEntry>();
 
+	/// <summary>Everything that belongs to the library view; hidden while the Help page shows.</summary>
+	private readonly List<MyGuiControlBase> _libraryControls = new List<MyGuiControlBase>();
+
+	/// <summary>The Help page's text and its Back button; hidden until Help is pressed.</summary>
+	private readonly List<MyGuiControlBase> _helpControls = new List<MyGuiControlBase>();
+
+	private MyGuiControlMultilineText _helpText;
+
+	private bool _showHelp;
+
 	public MarkerLibraryScreen()
 		: base(new Vector2(0.5f, 0.5f), MyGuiConstants.SCREEN_BACKGROUND_COLOR, new Vector2(0.9f, 0.86f))
 	{
@@ -80,30 +90,24 @@ public class MarkerLibraryScreen : MyGuiScreenBase
 	public override void RecreateControls(bool constructor)
 	{
 		base.RecreateControls(constructor);
-		// The plugin switcher sits in the top-left corner (its list drops down over the left of the filter row), so the filter lives on the right.
-		PluginSwitcher.AddSwitcher(this, AddCaption("OreScout Marker Library"));
+		// The plugin switcher sits in the top-left corner and the shared chat setting in the top-right corner, both level
+		// with the caption. The filter row under them keeps clear of both: the switcher's list drops down over the left of
+		// it, and the Show dropdown sits just below the chat setting (y -0.34 puts its top edge on the chat setting's bottom).
+		MyGuiControlLabel caption = AddCaption("OreScout Marker Library");
+		PluginSwitcher.AddSwitcher(this, caption);
+		Personality.AddChatSetting(this, caption);
 
-		Controls.Add(new MyGuiControlLabel(new Vector2(0.16f, -0.345f), null, "Show:", null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_RIGHT_AND_VERTICAL_CENTER));
-		_filterBox = new MyGuiControlCombobox(new Vector2(0.42f, -0.345f), new Vector2(0.25f, 0.04f), originAlign: MyGuiDrawAlignEnum.HORISONTAL_RIGHT_AND_VERTICAL_CENTER, openAreaItemsCount: 12);
+		_libraryControls.Clear();
+		_helpControls.Clear();
+		_showHelp = false;
+
+		MyGuiControlLabel showLabel = new MyGuiControlLabel(new Vector2(0.16f, -0.34f), null, "Show:", null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_RIGHT_AND_VERTICAL_CENTER);
+		Controls.Add(showLabel);
+		_libraryControls.Add(showLabel);
+		_filterBox = new MyGuiControlCombobox(new Vector2(0.42f, -0.34f), new Vector2(0.25f, 0.04f), originAlign: MyGuiDrawAlignEnum.HORISONTAL_RIGHT_AND_VERTICAL_CENTER, openAreaItemsCount: 12);
 		_filterBox.ItemSelected += OnFilterSelected;
 		Controls.Add(_filterBox);
-
-		// OreScout only (personality): the chat personality setting, in the gap between the switcher and Show.
-		// The switcher is at most 0.22 wide from the left edge (it ends by x = -0.20), so this starts right of it.
-		Controls.Add(new MyGuiControlLabel(new Vector2(-0.10f, -0.345f), null, "Chat:", null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_RIGHT_AND_VERTICAL_CENTER));
-		MyGuiControlCombobox chatBox = new MyGuiControlCombobox(new Vector2(-0.09f, -0.345f), new Vector2(0.15f, 0.04f), originAlign: MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER, openAreaItemsCount: 4);
-		foreach (Personality.Chattiness level in Enum.GetValues(typeof(Personality.Chattiness)))
-		{
-			chatBox.AddItem((long)level, level.ToString(), sort: false);
-		}
-		chatBox.SelectItemByKey((long)OreScoutSettings.Chattiness, sendEvent: false);
-		chatBox.SetToolTip("How much OreScout chats: Off (silent), Quiet (important only), Normal, or Chatty. Saved for you, in every world. Rename it with /scout name <name>.");
-		chatBox.ItemSelected += () =>
-		{
-			OreScoutSettings.SetChattiness((Personality.Chattiness)chatBox.GetSelectedKey());
-			SetStatus($"Chat personality: {OreScoutSettings.Chattiness}.");
-		};
-		Controls.Add(chatBox);
+		_libraryControls.Add(_filterBox);
 
 		_table = new MyGuiControlTable
 		{
@@ -135,9 +139,11 @@ public class MarkerLibraryScreen : MyGuiScreenBase
 		_table.SetColumnAlign(ColumnFromReference, MyGuiDrawAlignEnum.HORISONTAL_RIGHT_AND_VERTICAL_CENTER);
 		_table.ItemDoubleClicked += (MyGuiControlTable table, MyGuiControlTable.EventArgs args) => ToggleMarkSelected();
 		Controls.Add(_table);
+		_libraryControls.Add(_table);
 
 		_status = new MyGuiControlLabel(new Vector2(-0.42f, 0.265f), null, _statusText, null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER);
 		Controls.Add(_status);
+		_libraryControls.Add(_status);
 
 		AddButton(-0.315f, 0.315f, "Export from GPS", ExportFromGps);
 		AddButton(-0.105f, 0.315f, "Mark / Unmark", ToggleMarkSelected);
@@ -146,14 +152,46 @@ public class MarkerLibraryScreen : MyGuiScreenBase
 		AddButton(-0.315f, 0.375f, "Measure From Row", MeasureFromSelected);
 		AddButton(-0.105f, 0.375f, "Measure From Me", MeasureFromMe);
 		AddButton(0.105f, 0.375f, "Delete", DeleteSelected);
-		AddButton(0.315f, 0.375f, "Close", () => CloseScreen());
+		// Help / Back share the bottom-right spot, like the other plugins. Esc closes the window.
+		AddButton(0.315f, 0.375f, "Help", () => SetHelp(true));
+
+		_helpText = new MyGuiControlMultilineText(new Vector2(0f, -0.315f), new Vector2(0.84f, 0.55f), null, "Blue", 0.8f, MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_TOP, null, drawScrollbarV: true, drawScrollbarH: false, MyGuiDrawAlignEnum.HORISONTAL_CENTER_AND_VERTICAL_TOP)
+		{
+			OriginAlign = MyGuiDrawAlignEnum.HORISONTAL_CENTER_AND_VERTICAL_TOP,
+			Visible = false
+		};
+		_helpText.AppendText(HelpText);
+		Controls.Add(_helpText);
+		_helpControls.Add(_helpText);
+		AddButton(0.315f, 0.375f, "Back", () => SetHelp(false), inHelp: true);
 
 		RefreshRows(null);
 	}
 
-	private void AddButton(float x, float y, string text, Action onClick)
+	/// <summary>
+	/// Shows the Help page in place of the library, or goes back. Controls are hidden and shown rather than the
+	/// window being rebuilt, so the table keeps its rows, sort and selection, and nothing is rebuilt from inside a click.
+	/// </summary>
+	private void SetHelp(bool show)
 	{
-		Controls.Add(new MyGuiControlButton(new Vector2(x, y), MyGuiControlButtonStyleEnum.Default, null, null, MyGuiDrawAlignEnum.HORISONTAL_CENTER_AND_VERTICAL_CENTER, null, new StringBuilder(text), 0.8f, MyGuiDrawAlignEnum.HORISONTAL_CENTER_AND_VERTICAL_CENTER, MyGuiControlHighlightType.WHEN_CURSOR_OVER, (MyGuiControlButton _) => onClick()));
+		_showHelp = show;
+		foreach (MyGuiControlBase control in _libraryControls)
+		{
+			control.Visible = !show;
+		}
+		foreach (MyGuiControlBase control in _helpControls)
+		{
+			control.Visible = show;
+		}
+	}
+
+	private MyGuiControlButton AddButton(float x, float y, string text, Action onClick, bool inHelp = false)
+	{
+		MyGuiControlButton button = new MyGuiControlButton(new Vector2(x, y), MyGuiControlButtonStyleEnum.Default, null, null, MyGuiDrawAlignEnum.HORISONTAL_CENTER_AND_VERTICAL_CENTER, null, new StringBuilder(text), 0.8f, MyGuiDrawAlignEnum.HORISONTAL_CENTER_AND_VERTICAL_CENTER, MyGuiControlHighlightType.WHEN_CURSOR_OVER, (MyGuiControlButton _) => onClick());
+		button.Visible = !inHelp;
+		Controls.Add(button);
+		(inHelp ? _helpControls : _libraryControls).Add(button);
+		return button;
 	}
 
 	/// <summary>Rebuilds the filter options and table rows, then reselects <paramref name="keepSelected"/> if it's still shown.</summary>
@@ -394,4 +432,20 @@ public class MarkerLibraryScreen : MyGuiScreenBase
 		}
 		return result;
 	}
+
+	private const string HelpText =
+		"WHAT IT DOES\n" +
+		"OreScout turns what an ore detector can see into GPS markers you can keep. Every scan starts at an ore detector block and reaches only as far as that detector's own range: set it with the Range slider in the detector's terminal (modded detectors with very long ranges are capped at 3 km). The detector must be intact, switched on and powered. Nothing is needed on the server, and the markers are only in your own GPS list.\n\n" +
+		"THE ACTIONS\n" +
+		"Drag an ore detector onto your toolbar and pick one of its OreScout actions. Scout Ore puts one marker on each ore of each asteroid or planet in range, showing the distance and about how much ore a ship drill would collect, in kg. Asteroid markers for the same ore within 1,500 m of each other share one marker, placed on the biggest deposit and marked with how many asteroids it covers. Scout Deposits puts a purple marker on every separate deposit in range, right on the ore, so you can choose which pocket to drill first. Clear Deposit Markers removes every Scout Deposits marker. Marker Library opens this window. Only one scan runs at a time, and stone is never reported.\n\n" +
+		"MARKERS\n" +
+		"Pink markers are ore from Scout Ore, purple ones are deposits. Scanning again updates markers instead of adding duplicates. Ore markers stay after the ore is mined out, because asteroids get reset; one is only replaced when a newer marker for the same ore appears close by. Deposit markers whose deposit is gone are removed. OreScout only ever changes the markers it made itself, so your own GPS points are safe.\n\n" +
+		"DETECTOR SETTINGS\n" +
+		"The first time you open a detector's toolbar actions, its Custom Data gets two sections, OreScout and OreScout Deposits. Ores is a comma-separated list (blank means every ore in the world). MinDepositVoxels is the smallest deposit to report, in cubic metres. YieldBonusPercent adds yield for modded drills, for example 50. MergeRadius (OreScout section) is how close asteroids must be to share a marker, in metres; 0 turns merging off. DepositSpacing (OreScout Deposits section) is how far apart ore can be and still count as one deposit. CreateGps and ShowChat turn the markers and the chat lines on or off.\n\n" +
+		"THE LIBRARY\n" +
+		"This window keeps ore markers out of your GPS list until you need them. Export from GPS moves your Scout Ore markers here (deposit markers stay in GPS). Show, at the top right, filters the list to one ore. Click a column header to sort, and click it again to reverse. From you is each marker's distance from where you are. Measure From Row makes the From marker column show every marker's distance from the selected one (its header takes that marker's name), which finds the ore nearest a spot; Measure From Me clears it. To bring markers back, select a row and press Mark / Unmark (or double-click it) to tick it with an X, then Import Marked; Import All Shown imports everything the filter shows. Markers already in your GPS list are skipped, and the distance is worked out again from where you are. Delete removes the selected row. Esc closes the window. The library is saved for each world in OreScout_Markers_<world>.xml in %AppData%\\SpaceEngineers\\Storage.\n\n" +
+		"COMMANDS\n" +
+		"/scout opens this window. /scout name and a name (up to 24 characters) changes what OreScout's chat lines show under; /scout name on its own puts OreScout back. /tim opens whichever of our plugin windows you used last, and the list at the top left of this window switches to another of our plugins.\n\n" +
+		"CHAT\n" +
+		"The Chat dropdown at the top right sets how much OreScout talks: Off, Quiet, Normal or Chatty. It's a cheerful prospector whose name shows in gold. It comments when you start a scan, when a scan finds ore (one line about the best find: rare ores, which are platinum, uranium, gold and silver, beat common ones, and nearer beats farther) or nothing, when you open the library, and when you export markers. It has no urgent lines, so on Quiet it only answers Wilson's roll call when Wilson is loaded. Our plugins take turns: after any of them speaks, the next ordinary line waits 2 minutes on Chatty, 5 on Normal and 15 on Quiet, and the same comment isn't repeated within 10 minutes. Only you see the lines. The chat level and name are saved for you in OreScout_Settings.txt and apply in every world.";
 }

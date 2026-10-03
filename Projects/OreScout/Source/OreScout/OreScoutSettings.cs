@@ -74,21 +74,15 @@ internal static class OreScoutSettings
 	}
 
 	/// <summary>
-	/// Hooked to Personality.Changed: saves the current display name, however it was changed ("/scout name" or
-	/// Wilson's window). Personality.DisplayName falls back to "OreScout" when unset, so that case is saved as blank.
+	/// Hooked to Personality.Changed: saves the chat level and display name as they are now, however they were changed
+	/// (the Chat dropdown, "/scout name", or Wilson's window). Personality.DisplayName falls back to "OreScout" when
+	/// unset, so that case is saved as blank.
 	/// </summary>
-	public static void SaveDisplayName()
+	public static void SaveChat()
 	{
+		Chattiness = Personality.Level;
 		string name = Personality.DisplayName;
 		DisplayName = string.IsNullOrWhiteSpace(name) || name == "OreScout" ? null : name;
-		Save();
-	}
-
-	/// <summary>Changes the chat personality, applies it right away and saves it.</summary>
-	public static void SetChattiness(Personality.Chattiness level)
-	{
-		Chattiness = level;
-		Personality.Level = level;
 		Save();
 	}
 }

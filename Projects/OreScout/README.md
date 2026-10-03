@@ -36,13 +36,13 @@ Rescanning updates markers in place. Scout Ore markers are kept when their ore i
 
 ## Marker library
 
-A window for keeping ore markers without cluttering your GPS list. Open it with the Marker Library action or `/scout` in chat. **Export from GPS** moves Scout Ore markers out of the GPS list into the library (deposit markers stay in GPS), and **Delete** removes the selected one. **Show** (top right) filters to one ore, **From you** gives each marker's distance from you, and **Measure From Row** fills the **From marker** column (renamed after that marker, e.g. **From Ice**) with distances from the selected marker (**Measure From Me** clears it). Tick markers with **Mark / Unmark** or a double-click, then **Import Marked**, or use **Import All Shown** to import everything the filter shows. Click a column header to sort. The library is saved per world name as `OreScout_Markers_<world>.xml` in `%AppData%\SpaceEngineers\Storage\`.
+A window for keeping ore markers without cluttering your GPS list. Open it with the Marker Library action or `/scout` in chat. **Export from GPS** moves Scout Ore markers out of the GPS list into the library (deposit markers stay in GPS), and **Delete** removes the selected one. **Show** (top right) filters to one ore, **From you** gives each marker's distance from you, and **Measure From Row** fills the **From marker** column (renamed after that marker, e.g. **From Ice**) with distances from the selected marker (**Measure From Me** clears it). Tick markers with **Mark / Unmark** or a double-click, then **Import Marked**, or use **Import All Shown** to import everything the filter shows. Click a column header to sort. **Help** (bottom right) explains everything in the window and the plugin; **Back** returns to the list, and Esc closes the window. The library is saved per world name as `OreScout_Markers_<world>.xml` in `%AppData%\SpaceEngineers\Storage\`.
 
 ## Chat personality
 
 OreScout is a relentlessly enthusiastic frontier prospector, and its name shows in gold in chat. It comments when you start a scan, when a scan finds ore (or nothing), when you open the marker library, and when you export markers into it. Each scan gets one comment, about the best find: rare ores (platinum, uranium, gold, silver) beat common ones, and nearer beats farther. It doesn't greet you on its own; if Wilson is loaded, OreScout answers his roll call shortly after the world loads.
 
-Set how much it talks with **Chat** at the top of the marker library window:
+Set how much it talks with the **Chat** dropdown at the top right of the marker library window (every window of our plugins has the same one):
 
 | Chat | What it says | Quiet time after any of our plugins speaks |
 |---|---|---|

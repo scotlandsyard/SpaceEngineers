@@ -115,7 +115,7 @@ public class OreScoutSession : MySessionComponentBase
 			Personality.Level = OreScoutSettings.Chattiness;
 			Personality.DisplayName = OreScoutSettings.DisplayName;
 			// Also fires when the player renames OreScout from Wilson's window.
-			Personality.Changed += OreScoutSettings.SaveDisplayName;
+			Personality.Changed += OreScoutSettings.SaveChat;
 			Personality.Register("OreScout");
 		}
 		catch (Exception ex)
@@ -159,7 +159,7 @@ public class OreScoutSession : MySessionComponentBase
 		catch
 		{
 		}
-		Personality.Changed -= OreScoutSettings.SaveDisplayName;
+		Personality.Changed -= OreScoutSettings.SaveChat;
 		Personality.Unregister();
 		MarkerLibrary.Unload();
 	}
