@@ -88,6 +88,23 @@ public class MarkerLibraryScreen : MyGuiScreenBase
 		_filterBox.ItemSelected += OnFilterSelected;
 		Controls.Add(_filterBox);
 
+		// OreScout only (personality): the chat personality setting, in the gap between the switcher and Show.
+		// The switcher is at most 0.22 wide from the left edge (it ends by x = -0.20), so this starts right of it.
+		Controls.Add(new MyGuiControlLabel(new Vector2(-0.10f, -0.345f), null, "Chat:", null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_RIGHT_AND_VERTICAL_CENTER));
+		MyGuiControlCombobox chatBox = new MyGuiControlCombobox(new Vector2(-0.09f, -0.345f), new Vector2(0.15f, 0.04f), originAlign: MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER, openAreaItemsCount: 4);
+		foreach (Personality.Chattiness level in Enum.GetValues(typeof(Personality.Chattiness)))
+		{
+			chatBox.AddItem((long)level, level.ToString(), sort: false);
+		}
+		chatBox.SelectItemByKey((long)OreScoutSettings.Chattiness, sendEvent: false);
+		chatBox.SetToolTip("How much OreScout chats: Off (silent), Quiet (important only), Normal, or Chatty. Saved for you, in every world.");
+		chatBox.ItemSelected += () =>
+		{
+			OreScoutSettings.SetChattiness((Personality.Chattiness)chatBox.GetSelectedKey());
+			SetStatus($"Chat personality: {OreScoutSettings.Chattiness}.");
+		};
+		Controls.Add(chatBox);
+
 		_table = new MyGuiControlTable
 		{
 			Position = new Vector2(0f, -0.315f),
@@ -237,9 +254,16 @@ public class MarkerLibraryScreen : MyGuiScreenBase
 
 	private void ExportFromGps()
 	{
+		DateTime started = DateTime.Now;
 		int moved = MarkerLibrary.ExportFromGps();
 		_statusText = moved == 0 ? "No OreScout ore markers in your GPS list to export." : $"Moved {moved} marker(s) from GPS into the library.";
 		RefreshRows(SelectedEntry());
+		// OreScout only (personality): comment on the best marker just saved, rare ores first, then the biggest.
+		LibraryEntry best = MarkerLibrary.Entries.Where(e => e.Saved >= started).OrderByDescending(e => OreScoutSession.RareOres.Contains(e.Label ?? "")).ThenByDescending(e => e.MassKg).FirstOrDefault();
+		if (best != null)
+		{
+			Personality.Say("marker_saved", "ore", best.Label);
+		}
 	}
 
 	private void ToggleMarkSelected()

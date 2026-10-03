@@ -20,7 +20,8 @@ namespace OreScout;
 /// Adds scan actions to ore detector blocks. Every scan starts at the detector and reaches only as far as
 /// the detector's own range, so it reveals nothing the vanilla ore detector couldn't already show.
 /// </summary>
-[MySessionComponentDescriptor(MyUpdateOrder.NoUpdate)]
+// AfterSimulation only until the greeting is said (about 10 s in); after that the session needs no updates.
+[MySessionComponentDescriptor(MyUpdateOrder.AfterSimulation)]
 public class OreScoutSession : MySessionComponentBase
 {
 	private class ScanSettings
@@ -97,6 +98,14 @@ public class OreScoutSession : MySessionComponentBase
 
 	private HashSet<string> _cachedWorldOres;
 
+	// The game runs 60 updates a second, so this is about 10 seconds after the world loads.
+	private const int GreetingDelayTicks = 600;
+
+	private int _ticksUntilGreeting = GreetingDelayTicks;
+
+	/// <summary>The ores that get the excited rare_ore_found lines instead of ore_found.</summary>
+	internal static readonly HashSet<string> RareOres = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Platinum", "Uranium", "Gold", "Silver" };
+
 	public override void BeforeStart()
 	{
 		try
@@ -105,10 +114,46 @@ public class OreScoutSession : MySessionComponentBase
 			MyAPIGateway.TerminalControls.CustomActionGetter += CustomActionGetter;
 			MyAPIGateway.Utilities.MessageEntered += OnMessageEntered;
 			PluginSwitcher.Register("OreScout", OpenMarkerLibrary);
+			OreScoutSettings.Load();
+			Personality.Level = OreScoutSettings.Chattiness;
+			Personality.Register("OreScout");
 		}
 		catch (Exception ex)
 		{
 			MyLog.Default.WriteLineAndConsole($"[OreScout] BeforeStart failed: {ex}");
+		}
+	}
+
+	public override void UpdateAfterSimulation()
+	{
+		if (--_ticksUntilGreeting > 0)
+		{
+			return;
+		}
+		SetUpdateOrder(MyUpdateOrder.NoUpdate);
+		Personality.Say("greeting");
+	}
+
+	/// <summary>
+	/// One comment per scan: the best find, where a rare ore beats a common one and nearer beats farther.
+	/// Called on the game thread (scan results arrive through StartBackground's completion callback).
+	/// </summary>
+	private static void CommentOnScan(List<OreDeposit> found, Vector3D origin)
+	{
+		if (found.Count == 0)
+		{
+			Personality.Say("nothing_found");
+			return;
+		}
+		OreDeposit best = found.OrderByDescending(d => RareOres.Contains(d.OreName)).ThenBy(d => Vector3D.DistanceSquared(origin, d.Position)).First();
+		string distance = GpsMarkers.FormatDistance(Vector3D.Distance(origin, best.Position));
+		if (RareOres.Contains(best.OreName))
+		{
+			Personality.Say("rare_ore_found", "ore", best.OreName, "distance", distance);
+		}
+		else
+		{
+			Personality.Say("ore_found", "ore", best.OreName, "distance", distance);
 		}
 	}
 
@@ -124,6 +169,7 @@ public class OreScoutSession : MySessionComponentBase
 		catch
 		{
 		}
+		Personality.Unregister();
 		MarkerLibrary.Unload();
 	}
 
@@ -258,6 +304,7 @@ public class OreScoutSession : MySessionComponentBase
 			{
 				MyAPIGateway.Utilities.ShowMessage(ChatSender, $"{type.Title} within {GpsMarkers.FormatDistance(radius)} of {detectedBy}...");
 			}
+			Personality.Say("scan_started");
 			if (targets.Count == 0 || materials.Count == 0)
 			{
 				FinishScan(type, settings, origin, radius, detectedBy, new List<OreDeposit>());
@@ -307,6 +354,7 @@ public class OreScoutSession : MySessionComponentBase
 		try
 		{
 			List<OreDeposit> kept = deposits.Where(d => d.VolumeM3 >= settings.MinDepositVoxels && Vector3D.Distance(origin, d.Position) <= radius).ToList();
+			CommentOnScan(kept, origin);
 			if (settings.ShowChat)
 			{
 				if (kept.Count == 0)
@@ -418,6 +466,7 @@ public class OreScoutSession : MySessionComponentBase
 		try
 		{
 			MyGuiSandbox.AddScreen(new MarkerLibraryScreen());
+			Personality.Say("menu_opened");
 		}
 		catch (Exception ex)
 		{
