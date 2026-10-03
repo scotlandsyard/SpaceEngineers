@@ -120,7 +120,7 @@ public class BaRMaidSession : MySessionComponentBase
 			MaidSettings.Load();
 			Personality.Level = MaidSettings.Chattiness;
 			Personality.DisplayName = MaidSettings.DisplayName;
-			// Also fires when the player renames her from Wilson's window.
+			// Fires for the chat dropdown and for renames from Wilson's window, so both are saved there.
 			Personality.Changed += OnPersonalityChanged;
 			Personality.Register(ChatSender);
 			_started = true;
@@ -611,14 +611,6 @@ public class BaRMaidSession : MySessionComponentBase
 		}
 	}
 
-	/// <summary>Sets how much BaR Maid talks, and saves it.</summary>
-	internal void SetPersonality(Personality.Chattiness level)
-	{
-		MaidSettings.Chattiness = level;
-		Personality.Level = level;
-		MaidSettings.Save();
-	}
-
 	/// <summary>Sets the name her chat lines show under (null or blank = BaR Maid). Saved through OnPersonalityChanged.</summary>
 	internal void SetChatName(string name)
 	{
@@ -629,6 +621,7 @@ public class BaRMaidSession : MySessionComponentBase
 	{
 		string name = Personality.DisplayName;
 		MaidSettings.DisplayName = name == ChatSender ? null : name;
+		MaidSettings.Chattiness = Personality.Level;
 		MaidSettings.Save();
 	}
 

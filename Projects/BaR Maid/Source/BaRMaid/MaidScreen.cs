@@ -147,7 +147,9 @@ public class MaidScreen : MyGuiScreenBase
 	public override void RecreateControls(bool constructor)
 	{
 		base.RecreateControls(constructor);
-		PluginSwitcher.AddSwitcher(this, AddCaption("BaR Maid"));
+		MyGuiControlLabel caption = AddCaption("BaR Maid");
+		PluginSwitcher.AddSwitcher(this, caption);
+		Personality.AddChatSetting(this, caption);
 
 		Controls.Add(new MyGuiControlLabel(new Vector2(-0.42f, -0.325f), null, "Group", null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER));
 		_groupCombo = new MyGuiControlCombobox(new Vector2(-0.35f, -0.325f), new Vector2(0.43f, 0.04f), null, null, 12, null, false, null, MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER);
@@ -408,7 +410,7 @@ public class MaidScreen : MyGuiScreenBase
 		case View.Help:
 			return "Scroll for more. Back returns to the view you were on.";
 		case View.Settings:
-			return "Select a setting, then Lower / Raise (hold Shift for 10x). Double-click steps it. Changes every system in the group (chat personality and name are just yours).";
+			return "Select a setting, then Lower / Raise (hold Shift for 10x). Double-click steps it. Changes every system in the group (the chat name is just yours).";
 		case View.WeldPriority:
 		case View.GrindPriority:
 			return "Read only: change the order in the Build and Repair block's terminal. The mod only saves order changes made there.";
@@ -924,8 +926,6 @@ public class MaidScreen : MyGuiScreenBase
 		return rows;
 	}
 
-	private const string PersonalityKey = "p:personality";
-
 	private const string ChatNameKey = "p:name";
 
 	/// <summary>Sets the name BaR Maid's chat lines show under; blank goes back to "BaR Maid".</summary>
@@ -937,27 +937,11 @@ public class MaidScreen : MyGuiScreenBase
 		RefreshAll();
 	}
 
-	private static string PersonalityHint(Personality.Chattiness level)
-	{
-		switch (level)
-		{
-		case Personality.Chattiness.Off:
-			return "BaR Maid stays silent.";
-		case Personality.Chattiness.Quiet:
-			return "Only speaks up when something needs you.";
-		case Personality.Chattiness.Chatty:
-			return "Comments on everything.";
-		default:
-			return "Comments now and then.";
-		}
-	}
-
 	private static List<RowData> SettingRows(MaidGroup group)
 	{
 		List<IMyShipWelder> systems = group.LiveSystems.ToList();
 		List<RowData> rows = new List<RowData>();
 		// BaR Maid's own setting comes first. It's yours alone, not the group's.
-		rows.Add(Row(PersonalityKey, null, "BaR Maid: chat personality (yours, every group)", MaidSettings.Chattiness.ToString()));
 		rows.Add(Row(ChatNameKey, null, "BaR Maid: chat name (type it below)", Personality.DisplayName));
 		IMyShipWelder first = systems.FirstOrDefault();
 		if (first == null)
@@ -981,16 +965,6 @@ public class MaidScreen : MyGuiScreenBase
 	{
 		MaidGroup group = CurrentGroup;
 		string key = _table.SelectedRow?.UserData as string;
-		if (key == PersonalityKey)
-		{
-			int count = Enum.GetValues(typeof(Personality.Chattiness)).Length;
-			Personality.Chattiness level = (Personality.Chattiness)(((int)MaidSettings.Chattiness + direction + count) % count);
-			Session.SetPersonality(level);
-			ShowMessage($"Chat personality: {level}. {PersonalityHint(level)}", GoodColor);
-			_rowsSignature = null;
-			RefreshAll();
-			return;
-		}
 		if (key == ChatNameKey)
 		{
 			ShowMessage("Type a name in the box below and press Set chat name (blank = BaR Maid).", WarningColor);
