@@ -355,6 +355,13 @@ public class DockedShip
 	public int BlockCount;
 }
 
+/// <summary>Settings for the plugin itself, the same in every world.</summary>
+public class PreferencesFile
+{
+	/// <summary>How much Stockpile Manager says in chat: Off, Quiet, Normal or Chatty.</summary>
+	public string Personality = "Normal";
+}
+
 public class GridsFile
 {
 	public List<GridSnapshot> Grids = new List<GridSnapshot>();

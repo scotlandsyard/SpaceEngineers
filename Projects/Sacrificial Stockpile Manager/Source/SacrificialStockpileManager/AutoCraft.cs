@@ -42,6 +42,18 @@ internal static class AutoCraft
 
 	private static bool? s_barMaidLoaded;
 
+	// What this run did that's worth a chat line (Shared/Personality.cs); at most one is said per run.
+
+	private static string s_quotaMet;
+
+	private static string s_craftItem;
+
+	private static double s_craftAmount;
+
+	private static string s_disassembleItem;
+
+	private static double s_disassembleAmount;
+
 	/// <summary>True when the BaR Maid plugin is loaded in this game, so its repair orders go before quotas.</summary>
 	public static bool YieldsToBaRMaid => s_barMaidLoaded ??= AppDomain.CurrentDomain.GetAssemblies().Any(a => a.GetName().Name == "BaRMaid");
 
@@ -89,6 +101,11 @@ internal static class AutoCraft
 		}
 		bool isServer = MyAPIGateway.Multiplayer?.IsServer ?? true;
 		double cooldown = isServer ? ServerCooldownSeconds : ClientCooldownSeconds;
+		s_quotaMet = null;
+		s_craftItem = null;
+		s_craftAmount = 0.0;
+		s_disassembleItem = null;
+		s_disassembleAmount = 0.0;
 		foreach (KeyValuePair<long, List<long>> entry in construct.Units.ToList())
 		{
 			bool core = entry.Key == construct.CoreUnit;
@@ -116,6 +133,18 @@ internal static class AutoCraft
 			// This runs after the quotas so a freshly switched assembler gets its queue before it's judged empty.
 			RestoreFinishedDisassemblers(construct, unit, now, cooldown);
 		}
+		if (s_quotaMet != null)
+		{
+			Personality.Say("quota_met", "item", s_quotaMet);
+		}
+		else if (s_craftItem != null)
+		{
+			Personality.Say("quota_crafting", "count", Items.Amount(s_craftAmount), "item", s_craftItem);
+		}
+		else if (s_disassembleItem != null)
+		{
+			Personality.Say("disassembling", "item", s_disassembleItem);
+		}
 	}
 
 	private static void CheckQuotas(Construct construct, Unit unit, double now, double cooldown)
@@ -126,6 +155,17 @@ internal static class AutoCraft
 		{
 			string key = quota.Item;
 			unit.Totals.TryGetValue(key, out double have);
+			if (quota.HasMin && quota.Min > 0.0)
+			{
+				// quota_met is for a quota that was short and is now met; the first look only sets the baseline.
+				string shortKey = unit.Id + ":" + key;
+				bool isShort = have < quota.Min - 1e-6;
+				if (!isShort && construct.QuotaShort.TryGetValue(shortKey, out bool wasShort) && wasShort)
+				{
+					s_quotaMet ??= Items.Name(key);
+				}
+				construct.QuotaShort[shortKey] = isShort;
+			}
 			MyBlueprintDefinitionBase blueprint = Items.Blueprint(key);
 			if (quota.HasMax && have > quota.Max)
 			{
@@ -209,6 +249,11 @@ internal static class AutoCraft
 			receiver.AddQueueItemRequest(blueprint, (MyFixedPoint)runs);
 			construct.CraftCooldown[cooldownKey] = now + cooldown;
 			unit.Notes[key] = $"Queued {Items.Amount(runs * perRun)}{batch}";
+			if (runs * perRun > s_craftAmount)
+			{
+				s_craftAmount = runs * perRun;
+				s_craftItem = Items.Name(key);
+			}
 			construct.AddLog($"Queued {Items.Amount(runs * perRun)} {Items.Name(key)} on {receiver.CustomName} (quota {Items.Amount(quota.Min)})");
 		}
 	}
@@ -271,6 +316,11 @@ internal static class AutoCraft
 		construct.CraftCooldown[cooldownKey] = now + cooldown;
 		s_queueChanged[disassembler.EntityId] = now;
 		construct.AddLog($"Queued {Items.Amount(runs * perRun)} {Items.Name(key)} for disassembly on {disassembler.CustomName}");
+		if (runs * perRun > s_disassembleAmount)
+		{
+			s_disassembleAmount = runs * perRun;
+			s_disassembleItem = Items.Name(key);
+		}
 		return $"Disassembling {Items.Amount(runs * perRun + queued)}";
 	}
 

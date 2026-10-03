@@ -57,6 +57,9 @@ Set in the Overview. All are off for a new grid except Clean production blocks, 
 | Disassemble surplus | Disassemble what's above an item's maximum (Items & quotas) |
 | Keep bottles filled | Take bottles that aren't full to a gas tank to refill, and put them back when full (needs Automation) |
 | Blocks shared with me | Off: only blocks you own are managed. On: blocks shared with your faction or everyone, and unowned blocks, are managed too |
+| Personality (all grids) | How much Stockpile Manager says in chat: Off, Quiet, Normal (default) or Chatty. Not per grid: the same in every world |
+
+**Personality.** Stockpile Manager has a voice: a solemn high priest of logistics who treats containers like sacred reliquaries. It comments in chat (on your screen only, nothing is sent to anyone) when it greets you after loading, when the menu opens, after a Sort now or a big sorting pass, when it fills a block to its minimums, when it queues quota work, when a quota is met, when it disassembles surplus, when a grid's storage fills up, and when a grid goes out of range. Quiet keeps only the full-storage warning. Lines come from `Source/Personality.txt` through the shared `Shared/Personality.cs`, which also spaces them out (at most one line every 45 seconds on Normal, 15 on Chatty, and the same event not again for 3 minutes). The setting is stored in `SacrificialStockpileManager_Preferences.xml` in local storage.
 
 **Whose blocks.** The game lets a player use blocks shared with their faction, blocks shared with everyone, and blocks nobody owns. By default the plugin only manages blocks the player owns. It never takes from, puts into or queues on anyone else's block, and never writes to their screens. The server checks every move and queue request against the player's access either way, so the plugin can't do more than the player could by hand.
 

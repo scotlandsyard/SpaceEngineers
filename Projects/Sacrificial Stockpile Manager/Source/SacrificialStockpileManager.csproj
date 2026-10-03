@@ -49,5 +49,7 @@
   <ItemGroup>
     <Compile Include="../../../Shared/PluginSwitcher.cs" Link="Shared/PluginSwitcher.cs" />
     <Compile Include="../../../Shared/AssemblerModes.cs" Link="Shared/AssemblerModes.cs" />
+    <Compile Include="../../../Shared/Personality.cs" Link="Shared/Personality.cs" />
+    <EmbeddedResource Include="Personality.txt" LogicalName="Personality.txt" />
   </ItemGroup>
 </Project>

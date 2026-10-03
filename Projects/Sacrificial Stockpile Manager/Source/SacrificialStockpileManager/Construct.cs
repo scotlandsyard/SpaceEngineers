@@ -109,6 +109,17 @@ internal class Construct
 	/// <summary>The same for each docked ship, by unit.</summary>
 	public Dictionary<long, Dictionary<string, string>> UnitNotes = new Dictionary<long, Dictionary<string, string>>();
 
+	// For the chat lines (Shared/Personality.cs), which comment on changes, not on states.
+
+	/// <summary>Items sent into storage since the running Sort now or unload started.</summary>
+	public double OneShotSorted;
+
+	/// <summary>Whether storage was full at the last look; null before the first look.</summary>
+	public bool? WasFull;
+
+	/// <summary>Per unit and quota item ("unit:item"): whether it was short at the last autocraft pass.</summary>
+	public readonly Dictionary<string, bool> QuotaShort = new Dictionary<string, bool>();
+
 	/// <summary>Per item key: game time before which autocraft won't queue it again (waits for the server).</summary>
 	public readonly Dictionary<string, double> CraftCooldown = new Dictionary<string, double>();
 

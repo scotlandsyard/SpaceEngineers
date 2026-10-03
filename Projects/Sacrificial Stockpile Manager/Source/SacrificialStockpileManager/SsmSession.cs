@@ -55,6 +55,18 @@ public class SsmSession : MySessionComponentBase
 
 	private const int SaveTicks = 60 * 120;
 
+	/// <summary>Ticks after the world loads before Stockpile Manager greets, so the line isn't lost in the load.</summary>
+	private const int GreetingTicks = 600;
+
+	/// <summary>Name shown in chat for the plugin's in-character lines (Shared/Personality.cs).</summary>
+	private const string CharacterName = "Stockpile Manager";
+
+	/// <summary>Storage at least this full counts as full, for the containers_full line.</summary>
+	private const double FullFill = 0.98;
+
+	/// <summary>An automatic pass has to move at least this many items to be worth a sorted line (Sort now always is).</summary>
+	private const double SortedWorthSaying = 100.0;
+
 	internal static SsmSession Instance { get; private set; }
 
 	internal static double Now => MyAPIGateway.Session?.ElapsedPlayTime.TotalSeconds ?? 0.0;
@@ -120,6 +132,8 @@ public class SsmSession : MySessionComponentBase
 			MyAPIGateway.TerminalControls.CustomActionGetter += CustomActionGetter;
 			MyAPIGateway.Utilities.MessageEntered += OnMessageEntered;
 			PluginSwitcher.Register("Stockpile Manager", () => OpenMenu(null));
+			Personality.Level = Store.Chattiness;
+			Personality.Register(CharacterName);
 			_started = true;
 		}
 		catch (Exception ex)
@@ -137,6 +151,7 @@ public class SsmSession : MySessionComponentBase
 				MyAPIGateway.TerminalControls.CustomActionGetter -= CustomActionGetter;
 				MyAPIGateway.Utilities.MessageEntered -= OnMessageEntered;
 				PluginSwitcher.Unregister();
+				Personality.Unregister();
 				Store.Unload();
 			}
 			catch (Exception ex)
@@ -158,6 +173,10 @@ public class SsmSession : MySessionComponentBase
 		try
 		{
 			StepDiscovery();
+			if (_tick == GreetingTicks)
+			{
+				Personality.Say("greeting");
+			}
 			if (_tick % StepTicks == 0)
 			{
 				StepConstruct();
@@ -278,6 +297,7 @@ public class SsmSession : MySessionComponentBase
 			RefreshNow();
 			long gridKey = PickGrid(fromBlock);
 			MyGuiSandbox.AddScreen(new SsmScreen(gridKey, fromBlock));
+			Personality.Say("menu_opened");
 		}
 		catch (Exception ex)
 		{
@@ -428,10 +448,22 @@ public class SsmSession : MySessionComponentBase
 			construct.MainGrid = main;
 			construct.Grids = grids;
 		}
+		string outOfRange = null;
 		foreach (IMyGridTerminalSystem gone in _constructs.Keys.Where(t => !_found.ContainsKey(t)).ToList())
 		{
+			// A grid that left the sync range is closed on this client. One that docked or merged isn't, and one
+			// closed close by was more likely ground down or deleted.
+			Construct construct = _constructs[gone];
+			if (outOfRange == null && construct.MainGrid != null && construct.MainGrid.Closed && construct.Snapshot != null && FarAway(construct.Snapshot.Position))
+			{
+				outOfRange = construct.Snapshot.Name;
+			}
 			_constructs.Remove(gone);
 			changed = true;
+		}
+		if (outOfRange != null)
+		{
+			Personality.Say("grid_out_of_range", "grid", outOfRange);
 		}
 		if (changed)
 		{
@@ -439,6 +471,14 @@ public class SsmSession : MySessionComponentBase
 			_list.AddRange(_constructs.Values.OrderBy(c => c.MainGrid.CustomName, StringComparer.OrdinalIgnoreCase));
 			ConstructsVersion++;
 		}
+	}
+
+	/// <summary>True when a position is far enough from the player for a grid there to have left the sync range.</summary>
+	private static bool FarAway(Vector3D position)
+	{
+		double sync = MyAPIGateway.Session?.SessionSettings?.SyncDistance ?? 3000;
+		Vector3D player = MyAPIGateway.Session?.Player?.GetPosition() ?? Vector3D.Zero;
+		return Vector3D.Distance(player, position) > sync * 0.5;
 	}
 
 	// ---- Work ----
@@ -463,10 +503,7 @@ public class SsmSession : MySessionComponentBase
 			GridRules rules = Store.GridRules(construct.Snapshot);
 			if (now >= construct.NextEngine)
 			{
-				construct.NextEngine = now + EngineSeconds;
-				StockEngine engine = StockEngine.Run(construct, rules, now);
-				construct.Warnings = engine.Warnings;
-				FinishOneShots(construct, engine, now);
+				RunEngine(construct, rules, now);
 			}
 			if (now >= construct.NextCraft)
 			{
@@ -498,12 +535,57 @@ public class SsmSession : MySessionComponentBase
 		double now = Now;
 		RefreshConstruct(construct, now);
 		GridRules rules = Store.GridRules(construct.Snapshot);
-		construct.NextEngine = now + EngineSeconds;
-		StockEngine engine = StockEngine.Run(construct, rules, now);
-		construct.Warnings = engine.Warnings;
-		FinishOneShots(construct, engine, now);
+		RunEngine(construct, rules, now);
 		construct.NextCraft = now + CraftSeconds;
 		AutoCraft.Run(construct, now);
+	}
+
+	/// <summary>One stock engine pass, then at most one chat line about it.</summary>
+	private static void RunEngine(Construct construct, GridRules rules, double now)
+	{
+		construct.NextEngine = now + EngineSeconds;
+		bool oneShot = construct.RunOnceUntil > 0.0 || construct.UnloadUntil > 0.0;
+		StockEngine engine = StockEngine.Run(construct, rules, now);
+		construct.Warnings = engine.Warnings;
+		construct.OneShotSorted += oneShot ? engine.Sorted : 0.0;
+		double oneShotSorted = construct.OneShotSorted;
+		FinishOneShots(construct, engine, now);
+		bool oneShotDone = oneShot && construct.RunOnceUntil <= 0.0 && construct.UnloadUntil <= 0.0;
+		if (oneShotDone)
+		{
+			construct.OneShotSorted = 0.0;
+		}
+		// Sort now and unloads are commented on when they finish; ordinary passes only when they moved a lot.
+		if (oneShotDone && oneShotSorted >= 1.0)
+		{
+			Personality.Say("sorted", "count", Items.Amount(oneShotSorted));
+		}
+		else if (!oneShot && engine.Sorted >= SortedWorthSaying)
+		{
+			Personality.Say("sorted", "count", Items.Amount(engine.Sorted));
+		}
+		else if (engine.Restocked != null)
+		{
+			Personality.Say("restocked", "block", engine.Restocked);
+		}
+		CheckFull(construct);
+	}
+
+	/// <summary>Says containers_full when the grid's storage becomes full. The first look after load only sets the baseline.</summary>
+	private static void CheckFull(Construct construct)
+	{
+		if (construct.Snapshot == null)
+		{
+			return;
+		}
+		Construct.StorageVolume(construct.Snapshot, out double used, out double max);
+		// Once full, it counts as full until it's clearly emptier, so hovering at the limit isn't news every pass.
+		bool full = max > 0.0 && used / max >= (construct.WasFull == true ? FullFill - 0.08 : FullFill);
+		if (construct.WasFull == false && full)
+		{
+			Personality.Say("containers_full", "grid", construct.Snapshot.Name);
+		}
+		construct.WasFull = full;
 	}
 
 	// ---- Sort now / Unload docked ships ----

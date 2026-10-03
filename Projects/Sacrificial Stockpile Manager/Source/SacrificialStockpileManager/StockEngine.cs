@@ -111,6 +111,14 @@ internal class StockEngine
 
 	public int Transfers => _transfers;
 
+	/// <summary>How many items this pass sent into storage (sorting, draining, unloading, trimming).</summary>
+	public double Sorted { get; private set; }
+
+	/// <summary>The block this pass brought up to its minimums with the most items, for the restocked line; or null.</summary>
+	public string Restocked { get; private set; }
+
+	private double _restockedAmount;
+
 	private bool Budget => _transfers < MaxTransfersPerPass;
 
 	private StockEngine(Construct construct, bool move, double now)
@@ -426,11 +434,17 @@ internal class StockEngine
 				{
 					continue;
 				}
-				string problem = Fill(destination, limit.Item, limit.Min - Have(destination, limit.Item));
+				double before = Have(destination, limit.Item);
+				string problem = Fill(destination, limit.Item, limit.Min - before);
 				double have = Have(destination, limit.Item);
 				if (have < limit.Min - Epsilon)
 				{
 					Warnings.Add($"{destination.Block.Name}: {Items.Name(limit.Item)} {Items.Amount(have)} of {Items.Amount(limit.Min)} - {problem ?? "not enough available"}");
+				}
+				else if (have - before > _restockedAmount)
+				{
+					_restockedAmount = have - before;
+					Restocked = destination.Block.Name;
 				}
 			}
 		}
@@ -835,6 +849,7 @@ internal class StockEngine
 				break;
 			}
 		}
+		Sorted += sent;
 		return sent;
 	}
 
