@@ -51,6 +51,9 @@
 
   <!-- BaR Maid's chat lines, read by Shared/Personality.cs. -->
   <ItemGroup>
-    <EmbeddedResource Include="Personality.txt" LogicalName="Personality.txt" />
+    <EmbeddedText Include="Personality.txt" />
   </ItemGroup>
+
+  <!-- Turns the line files into C# constants, so PluginHub's source-only build still has them. -->
+  <Import Project="../../../Shared/EmbedText.targets" />
 </Project>

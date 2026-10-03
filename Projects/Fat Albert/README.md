@@ -73,7 +73,7 @@ Three lines at the left of the screen: the ship and trip, YES/NO with the reason
 
 ## Chat personality
 
-Fat Albert, a loud launchmaster, comments in chat through `Shared/Personality.cs`. His lines are in `Source/Personality.txt`, embedded in the DLL. Lines show only on your own screen.
+Fat Albert, a loud launchmaster, comments in chat through `Shared/Personality.cs`. His lines are in `Source/Personality.txt`, compiled into the DLL. Lines show only on your own screen.
 
 - Setting: **Chat** button on the Help page (steps Off, Quiet, Normal, Chatty), or `/fat chat off|quiet|normal|chatty`. Saved as `Personality=` in `FatAlbert_Settings.txt`. Default Normal.
 - Chat name: `/fat name <new name>` (up to `Personality.MaxNameLength`, 24 characters); `/fat name` alone goes back to "Fat Albert". Saved as `DisplayName=`, and saved again on `Personality.Changed`, so a rename from Wilson's window sticks too. His name shows in bright orange.

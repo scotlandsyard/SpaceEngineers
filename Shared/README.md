@@ -65,10 +65,14 @@ Modes are only ever filled in, never swapped, so two plugins can't fight over an
 Gives a plugin a voice: short in-character lines in chat when something happens, under the character's name in its own colour. Lines only show on your own screen; nothing is sent to the server or other players.
 
 How a plugin uses it:
-1. Link the file, and embed the plugin's lines (kept next to its csproj):
+1. Link the file, and compile in the plugin's lines (`Personality.txt`, kept next to its csproj) with `EmbedText.targets`:
    ```xml
-   <EmbeddedResource Include="Personality.txt" LogicalName="Personality.txt" />
+   <ItemGroup>
+     <EmbeddedText Include="Personality.txt" />
+   </ItemGroup>
+   <Import Project="../../../Shared/EmbedText.targets" />
    ```
+   Every build turns `Personality.txt` into `Personality.txt.cs`, a string constant. Commit that file too: Pulsar's PluginHub compiles only `.cs` files, so an embedded resource would be missing there. Edit the `.txt` file, never the generated one.
 2. In `BeforeStart`, set `Personality.Level` and `Personality.DisplayName` from the plugin's saved settings, subscribe a save to `Personality.Changed`, then call `Personality.Register("Character name")`. In `UnloadData`, call `Personality.Unregister()`.
 3. Add a **Personality** setting to the plugin's settings page: Off, Quiet, Normal (the default) or Chatty. Save it with the plugin's other settings and set `Personality.Level` when it changes.
 4. Add a **name** field next to it: the name the character's lines show under. Set `Personality.DisplayName` when it changes (null or blank means the character's own name), and save `Personality.DisplayName` whenever `Personality.Changed` fires, because the player can also rename the character from Wilson's window. A chat command such as `/<command> name <new name>` can set it the same way.

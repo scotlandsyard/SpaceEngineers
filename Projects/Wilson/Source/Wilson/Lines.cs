@@ -60,67 +60,60 @@ internal static class Lines
 		s_exchanges.Clear();
 		s_lastOwn.Clear();
 		ExchangeCount = 0;
-		using (Stream stream = typeof(Lines).Assembly.GetManifestResourceStream(ResourceName))
+		// Wilson.txt is compiled in as a constant by Shared/EmbedText.targets.
+		using (StringReader reader = new StringReader(TimShared.EmbeddedText.Wilson))
 		{
-			if (stream == null)
+			List<string> own = null;
+			Exchange exchange = null;
+			string text;
+			while ((text = reader.ReadLine()) != null)
 			{
-				MyLog.Default.WriteLineAndConsole($"[Wilson] No {ResourceName} embedded");
-				return;
-			}
-			using (StreamReader reader = new StreamReader(stream))
-			{
-				List<string> own = null;
-				Exchange exchange = null;
-				string text;
-				while ((text = reader.ReadLine()) != null)
+				text = text.Trim();
+				if (text.Length == 0 || text.StartsWith("#"))
 				{
-					text = text.Trim();
-					if (text.Length == 0 || text.StartsWith("#"))
+					continue;
+				}
+				if (text.StartsWith("[") && text.EndsWith("]"))
+				{
+					string key = text.Substring(1, text.Length - 2).Trim().TrimStart('!').Trim();
+					own = null;
+					exchange = null;
+					if (key.StartsWith(ExchangePrefix, StringComparison.OrdinalIgnoreCase))
 					{
-						continue;
-					}
-					if (text.StartsWith("[") && text.EndsWith("]"))
-					{
-						string key = text.Substring(1, text.Length - 2).Trim().TrimStart('!').Trim();
-						own = null;
-						exchange = null;
-						if (key.StartsWith(ExchangePrefix, StringComparison.OrdinalIgnoreCase))
+						exchange = new Exchange(key.Substring(ExchangePrefix.Length).Trim());
+						if (!s_exchanges.TryGetValue(exchange.Trigger, out List<Exchange> list))
 						{
-							exchange = new Exchange(key.Substring(ExchangePrefix.Length).Trim());
-							if (!s_exchanges.TryGetValue(exchange.Trigger, out List<Exchange> list))
-							{
-								list = new List<Exchange>();
-								s_exchanges[exchange.Trigger] = list;
-							}
-							list.Add(exchange);
-							ExchangeCount++;
+							list = new List<Exchange>();
+							s_exchanges[exchange.Trigger] = list;
 						}
-						else if (!s_own.TryGetValue(key, out own))
-						{
-							own = new List<string>();
-							s_own[key] = own;
-						}
-						continue;
+						list.Add(exchange);
+						ExchangeCount++;
 					}
-					if (text.StartsWith("- "))
+					else if (!s_own.TryGetValue(key, out own))
 					{
-						text = text.Substring(2).Trim();
+						own = new List<string>();
+						s_own[key] = own;
 					}
-					if (own != null)
+					continue;
+				}
+				if (text.StartsWith("- "))
+				{
+					text = text.Substring(2).Trim();
+				}
+				if (own != null)
+				{
+					own.Add(text);
+				}
+				else if (exchange != null)
+				{
+					int colon = text.IndexOf(':');
+					if (colon > 0 && colon < text.Length - 1)
 					{
-						own.Add(text);
+						exchange.Lines.Add(new ExchangeLine(text.Substring(0, colon).Trim(), text.Substring(colon + 1).Trim()));
 					}
-					else if (exchange != null)
+					else
 					{
-						int colon = text.IndexOf(':');
-						if (colon > 0 && colon < text.Length - 1)
-						{
-							exchange.Lines.Add(new ExchangeLine(text.Substring(0, colon).Trim(), text.Substring(colon + 1).Trim()));
-						}
-						else
-						{
-							MyLog.Default.WriteLineAndConsole($"[Wilson] {ResourceName}: no speaker in '{text}'");
-						}
+						MyLog.Default.WriteLineAndConsole($"[Wilson] {ResourceName}: no speaker in '{text}'");
 					}
 				}
 			}

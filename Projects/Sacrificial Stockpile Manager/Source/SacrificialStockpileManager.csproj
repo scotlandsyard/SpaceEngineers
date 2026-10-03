@@ -50,6 +50,9 @@
     <Compile Include="../../../Shared/PluginSwitcher.cs" Link="Shared/PluginSwitcher.cs" />
     <Compile Include="../../../Shared/AssemblerModes.cs" Link="Shared/AssemblerModes.cs" />
     <Compile Include="../../../Shared/Personality.cs" Link="Shared/Personality.cs" />
-    <EmbeddedResource Include="Personality.txt" LogicalName="Personality.txt" />
+    <EmbeddedText Include="Personality.txt" />
   </ItemGroup>
+
+  <!-- Turns the line files into C# constants, so PluginHub's source-only build still has them. -->
+  <Import Project="../../../Shared/EmbedText.targets" />
 </Project>

@@ -340,43 +340,43 @@ internal static class Personality
 	private static void LoadLines()
 	{
 		s_events.Clear();
-		using (Stream stream = typeof(Personality).Assembly.GetManifestResourceStream(ResourceName))
+		// Personality.txt is compiled in as the constant EmbeddedText.Personality (Shared/EmbedText.targets). It's
+		// looked up by name because Wilson also compiles this file and has no Personality.txt.
+		string lines = typeof(Personality).Assembly.GetType("TimShared.EmbeddedText")?.GetField("Personality")?.GetValue(null) as string;
+		if (lines == null)
 		{
-			if (stream == null)
+			MyLog.Default.WriteLineAndConsole($"[{s_name}] Personality: no {ResourceName} compiled in");
+			return;
+		}
+		using (StringReader reader = new StringReader(lines))
+		{
+			Event current = null;
+			string text;
+			while ((text = reader.ReadLine()) != null)
 			{
-				MyLog.Default.WriteLineAndConsole($"[{s_name}] Personality: no {ResourceName} embedded");
-				return;
-			}
-			using (StreamReader reader = new StreamReader(stream))
-			{
-				Event current = null;
-				string text;
-				while ((text = reader.ReadLine()) != null)
+				text = text.Trim();
+				if (text.Length == 0 || text.StartsWith("#"))
 				{
-					text = text.Trim();
-					if (text.Length == 0 || text.StartsWith("#"))
-					{
-						continue;
-					}
-					if (text.StartsWith("[") && text.EndsWith("]"))
-					{
-						string key = text.Substring(1, text.Length - 2).Trim();
-						bool important = key.StartsWith("!");
-						key = key.TrimStart('!').Trim();
-						if (!s_events.TryGetValue(key, out current))
-						{
-							current = new Event();
-							s_events[key] = current;
-						}
-						current.Important |= important;
-						continue;
-					}
-					if (text.StartsWith("- "))
-					{
-						text = text.Substring(2).Trim();
-					}
-					current?.Lines.Add(text);
+					continue;
 				}
+				if (text.StartsWith("[") && text.EndsWith("]"))
+				{
+					string key = text.Substring(1, text.Length - 2).Trim();
+					bool important = key.StartsWith("!");
+					key = key.TrimStart('!').Trim();
+					if (!s_events.TryGetValue(key, out current))
+					{
+						current = new Event();
+						s_events[key] = current;
+					}
+					current.Important |= important;
+					continue;
+				}
+				if (text.StartsWith("- "))
+				{
+					text = text.Substring(2).Trim();
+				}
+				current?.Lines.Add(text);
 			}
 		}
 	}

@@ -48,6 +48,9 @@
 
   <!-- Wilson's own lines and the exchanges he stages between the other characters. -->
   <ItemGroup>
-    <EmbeddedResource Include="Wilson.txt" LogicalName="Wilson.txt" />
+    <EmbeddedText Include="Wilson.txt" />
   </ItemGroup>
+
+  <!-- Turns the line files into C# constants, so PluginHub's source-only build still has them. -->
+  <Import Project="../../../Shared/EmbedText.targets" />
 </Project>
