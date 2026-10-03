@@ -36,6 +36,9 @@ internal class MaidGroup
 
 	public bool IsDefault;
 
+	/// <summary>A stand-in for a construct whose systems are all out of groups: no systems, only there for Setup.</summary>
+	public bool OutOfGroups;
+
 	public IMyGridTerminalSystem TerminalSystem;
 
 	public readonly List<IMyShipWelder> Systems = new List<IMyShipWelder>();

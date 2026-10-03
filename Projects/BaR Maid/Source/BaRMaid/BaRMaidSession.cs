@@ -549,7 +549,34 @@ public class BaRMaidSession : MySessionComponentBase
 				group.Assemblers.Add(assembler);
 			}
 		}
+
+		// Every system here is out of groups (Group=None). List the construct anyway, as a group with no systems,
+		// so its blocks can still be reached in Setup and assigned to a group again.
+		if (local.Count == 0)
+		{
+			string key = mainGrid.EntityId + "|" + OutOfGroupsKey;
+			if (!_groups.TryGetValue(key, out MaidGroup holder))
+			{
+				holder = new MaidGroup { Key = key };
+			}
+			holder.Name = OutOfGroupsName;
+			holder.IsDefault = false;
+			holder.OutOfGroups = true;
+			holder.GridName = mainGrid.CustomName;
+			holder.TerminalSystem = terminal;
+			holder.ConstructBlocks = constructBlocks;
+			holder.Systems.Clear();
+			holder.Assemblers.Clear();
+			holder.AutoQueue = false;
+			rebuilt[key] = holder;
+		}
 	}
+
+	/// <summary>Key suffix and name of a construct's stand-in group when all its systems are out of groups. The
+	/// key can't clash with a typed group name: those are upper-cased, and this has a lower-case letter.</summary>
+	private const string OutOfGroupsKey = "<out of groups>";
+
+	internal const string OutOfGroupsName = "not in a group (see Setup)";
 
 	/// <summary>
 	/// Watches each group for moments worth a chat line: a big build starting, floating items to collect, and

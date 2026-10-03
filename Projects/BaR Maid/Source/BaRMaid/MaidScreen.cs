@@ -399,6 +399,10 @@ public class MaidScreen : MyGuiScreenBase
 		{
 			return "No Build and Repair systems you can access are in range. Is the SKO Nanobot Build and Repair mod loaded?";
 		}
+		if (group.OutOfGroups && s_view != View.Help && s_view != View.Settings)
+		{
+			return "Every Build and Repair system on this grid is out of groups. In Setup: groups, select one and Assign it (blank = Default).";
+		}
 		switch (s_view)
 		{
 		case View.Help:
@@ -439,6 +443,11 @@ public class MaidScreen : MyGuiScreenBase
 		MaidGroup group = CurrentGroup;
 		if (group == null)
 		{
+			return;
+		}
+		if (group.OutOfGroups)
+		{
+			ShowMessage("No system here is in a group. Assign one in Setup: groups first.", WarningColor);
 			return;
 		}
 		Session.SetAutoQueue(group, !group.AutoQueue);
