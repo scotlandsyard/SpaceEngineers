@@ -115,7 +115,7 @@ Everything runs on your client. Nothing is needed on the server.
 
 ## Switching between our plugins
 
-If any of our other plugins are loaded too (BaR Maid, OreScout, Sacrificial Stockpile Manager, Script to Plugin), the top-left corner of the window has a dropdown with this plugin's name. Pick another plugin there to close this window and open that plugin's. Type `/tim` in chat to open whichever of these windows you used last. See [Shared/README.md](../../Shared/README.md).
+If any of our other plugins are loaded too (such as BaR Maid, Fat Albert, OreScout or Script to Plugin), the top-left corner of the window has a dropdown with this plugin's name. Pick another plugin there to close this window and open that plugin's. Type `/tim` in chat to open whichever of these windows you used last. See [Shared/README.md](../../Shared/README.md).
 
 ## Building
 
