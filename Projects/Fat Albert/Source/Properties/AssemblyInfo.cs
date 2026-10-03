@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 
 [assembly: AssemblyTitle("FatAlbert")]
-[assembly: AssemblyDescription("Inventory management, sorting, restocking and autocrafting for Space Engineers, set up in an in-game menu")]
+[assembly: AssemblyDescription("Checks whether a Space Engineers ship can lift off and climb out of a planet's gravity, with the fuel and power it has")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("FatAlbert")]
@@ -13,5 +13,5 @@ using System.Runtime.Versioning;
 [assembly: AssemblyTrademark("")]
 [assembly: ComVisible(false)]
 [assembly: Guid("8D8CF32D-BA88-49FE-BD1D-E1B4730B66B3")]
-[assembly: AssemblyFileVersion("1.0.0.0")]
-[assembly: AssemblyVersion("1.0.0.0")]
+[assembly: AssemblyFileVersion("1.0.1.0")]
+[assembly: AssemblyVersion("1.0.1.0")]

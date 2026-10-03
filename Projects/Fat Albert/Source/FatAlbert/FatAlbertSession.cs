@@ -26,6 +26,9 @@ public class FatAlbertSession : MySessionComponentBase
 
 	private const string MenuActionId = "FatAlbert_OpenMenu";
 
+	/// <summary>Ticks after the world loads before Fat Albert says hello, so the line isn't lost in the load.</summary>
+	private const int GreetingTicks = 600;
+
 	internal static FatAlbertSession Instance { get; private set; }
 
 	internal static double Now => MyAPIGateway.Session?.ElapsedPlayTime.TotalSeconds ?? 0.0;
@@ -33,6 +36,8 @@ public class FatAlbertSession : MySessionComponentBase
 	private IMyTerminalAction _menuAction;
 
 	private bool _started;
+
+	private int _tick;
 
 	public override void BeforeStart()
 	{
@@ -52,6 +57,8 @@ public class FatAlbertSession : MySessionComponentBase
 			MyAPIGateway.TerminalControls.CustomActionGetter += CustomActionGetter;
 			MyAPIGateway.Utilities.MessageEntered += OnMessageEntered;
 			PluginSwitcher.Register(Plugin.Name, () => OpenMenu(null));
+			Personality.Level = Settings.Chattiness;
+			Personality.Register(ChatSender);
 			_started = true;
 		}
 		catch (Exception ex)
@@ -69,6 +76,7 @@ public class FatAlbertSession : MySessionComponentBase
 				MyAPIGateway.TerminalControls.CustomActionGetter -= CustomActionGetter;
 				MyAPIGateway.Utilities.MessageEntered -= OnMessageEntered;
 				PluginSwitcher.Unregister();
+				Personality.Unregister();
 				Settings.Save();
 			}
 			catch (Exception ex)
@@ -78,6 +86,8 @@ public class FatAlbertSession : MySessionComponentBase
 		}
 		Hud.Unload();
 		ShipReader.Clear();
+		Chatter.Reset();
+		_tick = 0;
 		PlanetNames.Unload();
 		_started = false;
 		Instance = null;
@@ -111,6 +121,11 @@ public class FatAlbertSession : MySessionComponentBase
 			Hud.Toggle();
 			return;
 		}
+		if (words.Length > 1 && words[1].Equals("chat", StringComparison.OrdinalIgnoreCase))
+		{
+			SetChatLevel(words.Length > 2 ? words[2] : null);
+			return;
+		}
 		OpenMenu(null);
 	}
 
@@ -122,12 +137,28 @@ public class FatAlbertSession : MySessionComponentBase
 		}
 		try
 		{
+			if (++_tick == GreetingTicks)
+			{
+				Personality.Say("greeting");
+			}
 			Hud.Update();
 		}
 		catch (Exception ex)
 		{
 			MyLog.Default.WriteLineAndConsole($"[Fat Albert] HUD update: {ex}");
 		}
+	}
+
+	/// <summary>/fat chat [off|quiet|normal|chatty]: sets how much Fat Albert talks, or says what it's set to.</summary>
+	private static void SetChatLevel(string word)
+	{
+		if (word == null || !Enum.TryParse(word, true, out Personality.Chattiness level) || !Enum.IsDefined(typeof(Personality.Chattiness), level))
+		{
+			MyAPIGateway.Utilities.ShowMessage(ChatSender, $"Chat personality is {Settings.Chattiness}. Change it with /fat chat off, quiet, normal or chatty.");
+			return;
+		}
+		Chatter.SetLevel(level);
+		MyAPIGateway.Utilities.ShowMessage(ChatSender, $"Chat personality: {level}. {Chatter.LevelHint(level)}");
 	}
 
 	internal void OpenMenu(IMyTerminalBlock fromBlock)
@@ -140,6 +171,7 @@ public class FatAlbertSession : MySessionComponentBase
 		{
 			long key = fromBlock?.CubeGrid != null ? ShipReader.MainGrid(fromBlock.CubeGrid).EntityId : 0;
 			MyGuiSandbox.AddScreen(new FatAlbertScreen(key));
+			Personality.Say("menu_opened");
 		}
 		catch (Exception ex)
 		{

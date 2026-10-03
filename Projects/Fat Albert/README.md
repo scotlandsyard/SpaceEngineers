@@ -66,10 +66,21 @@ With **Parachutes** ticked, a visit to a planet with air opens every parachute t
 
 Three lines at the left of the screen: the ship and trip, YES/NO with the reason, and thrust/weight, spare mass and what's left in the tanks and batteries. It uses the ship you're sitting in (else the one picked last in the window) and the trip picked under **Planet**, rechecked every two seconds on a background thread.
 
-- Toggle: **Ctrl+Alt+F**, `/fat hud`, or the **HUD** button in the window. Remembered between sessions.
+- Toggle: **Ctrl+Alt+F**, `/fat hud`, or the **HUD** button in the window (every page except Help). Remembered between sessions.
 - Move: **Move HUD** in the window (the window closes first). The HUD follows the mouse; left click keeps it there (saved as `HudX`/`HudY`), Esc or right click puts it back. **Reset inputs** moved to the Help page to make room.
 - Other hotkey: set `HudKey` in `FatAlbert_Settings.txt` (local storage) while the game is closed, e.g. `HudKey=Ctrl+Shift+H` (key names are `VRage.Input.MyKeys`).
 - It's a draw-only screen set up like the game's own HUD screen: it never takes focus or input, and it hides when the game's HUD is hidden.
+
+## Chat personality
+
+Fat Albert, a loud launchmaster, comments in chat through `Shared/Personality.cs`. His lines are in `Source/Personality.txt`, embedded in the DLL. Lines show only on your own screen.
+
+- Setting: **Chat** button on the Help page (steps Off, Quiet, Normal, Chatty), or `/fat chat off|quiet|normal|chatty`. Saved as `Personality=` in `FatAlbert_Settings.txt`. Default Normal.
+- `greeting` about 10 seconds after the world loads, `menu_opened` when the window opens.
+- One line per answer (`Chatter.cs`), for the window's main answer and the HUD's. A line is only considered when the answer for that ship and trip changes, so rechecks of the same answer stay quiet:
+  - Made it: `barely_made_it` if the ship couldn't be 10% heavier and still make it, `overpowered` if it could still make it at 3 times its mass, otherwise `check_pass`.
+  - `too_heavy` (with `{mass}`; marked important, so it's said even on Quiet), `out_of_fuel` (a gas ran out), `out_of_power` (batteries flat, reactors out of uranium, or a stall while power was short), `thin_air` (a stall with power to spare: the atmospheric thrusters ran out of air).
+  - No line for no gravity, mass not read, no thrusters, can't land, or too slow.
 
 ## How the climb is worked out
 
@@ -91,7 +102,7 @@ Not counted: power used by the rest of the ship, ice in O2/H2 generators, ships 
 | What | Name |
 |---|---|
 | Assembly / namespace | `FatAlbert` |
-| Chat commands | `/fat`, `/fatalbert`, `/fat hud` |
+| Chat commands | `/fat`, `/fatalbert`, `/fat hud`, `/fat chat <level>` |
 | HUD hotkey | Ctrl+Alt+F (`HudKey` setting) |
 | Toolbar action | `FatAlbert_OpenMenu` |
 | Settings file (local storage) | `FatAlbert_Settings.txt` |

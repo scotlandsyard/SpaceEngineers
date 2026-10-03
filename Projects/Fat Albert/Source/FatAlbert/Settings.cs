@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using Sandbox.ModAPI;
+using TimShared;
 using VRage.Utils;
 using VRageMath;
 
@@ -40,6 +41,9 @@ internal static class Settings
 	public static float HudX = 0.02f;
 
 	public static float HudY = 0.18f;
+
+	/// <summary>How much Fat Albert talks in chat.</summary>
+	public static Personality.Chattiness Chattiness = Personality.Chattiness.Normal;
 
 	public static double? Distance
 	{
@@ -119,6 +123,10 @@ internal static class Settings
 			{
 				HudY = (float)MathHelper.Clamp(y, 0.0, 0.95);
 			}
+			if (values.TryGetValue("Personality", out string level) && Enum.TryParse(level, true, out Personality.Chattiness parsed) && Enum.IsDefined(typeof(Personality.Chattiness), parsed))
+			{
+				Chattiness = parsed;
+			}
 			if (values.TryGetValue("View", out string view) && int.TryParse(view, out int index))
 			{
 				View = index;
@@ -146,6 +154,7 @@ internal static class Settings
 				writer.WriteLine("HudKey=" + HudKey);
 				writer.WriteLine("HudX=" + HudX.ToString(CultureInfo.InvariantCulture));
 				writer.WriteLine("HudY=" + HudY.ToString(CultureInfo.InvariantCulture));
+				writer.WriteLine("Personality=" + Chattiness);
 			}
 		}
 		catch (Exception ex)

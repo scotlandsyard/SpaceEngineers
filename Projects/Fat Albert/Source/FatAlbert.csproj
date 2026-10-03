@@ -46,5 +46,11 @@
   <!-- Shared with our other plugins: one copy in the repo's Shared folder, compiled into each plugin. -->
   <ItemGroup>
     <Compile Include="../../../Shared/PluginSwitcher.cs" Link="Shared/PluginSwitcher.cs" />
+    <Compile Include="../../../Shared/Personality.cs" Link="Shared/Personality.cs" />
+  </ItemGroup>
+
+  <!-- Fat Albert's chat lines, read by Shared/Personality.cs. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Personality.txt" LogicalName="Personality.txt" />
   </ItemGroup>
 </Project>

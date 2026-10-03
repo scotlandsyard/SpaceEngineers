@@ -153,6 +153,7 @@ internal static class Hud
 			try
 			{
 				ShowResult(ship, plan, planetName, result);
+				Chatter.Comment(ship, plan, result);
 			}
 			catch (Exception ex)
 			{
