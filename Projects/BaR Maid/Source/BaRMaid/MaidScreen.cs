@@ -391,7 +391,7 @@ public class MaidScreen : MyGuiScreenBase
 		case View.Help:
 			return "Scroll for more. Back returns to the view you were on.";
 		case View.Settings:
-			return "Select a setting, then Lower / Raise (hold Shift for 10x). Double-click steps it. Changes every system in the group.";
+			return "Select a setting, then Lower / Raise (hold Shift for 10x). Double-click steps it. Changes every system in the group (chat personality is just yours).";
 		case View.WeldPriority:
 		case View.GrindPriority:
 			return "Read only: change the order in the Build and Repair block's terminal. The mod only saves order changes made there.";
@@ -899,10 +899,29 @@ public class MaidScreen : MyGuiScreenBase
 		return rows;
 	}
 
+	private const string PersonalityKey = "p:personality";
+
+	private static string PersonalityHint(Personality.Chattiness level)
+	{
+		switch (level)
+		{
+		case Personality.Chattiness.Off:
+			return "BaR Maid stays silent.";
+		case Personality.Chattiness.Quiet:
+			return "Only speaks up when something needs you.";
+		case Personality.Chattiness.Chatty:
+			return "Comments on everything.";
+		default:
+			return "Comments now and then.";
+		}
+	}
+
 	private static List<RowData> SettingRows(MaidGroup group)
 	{
 		List<IMyShipWelder> systems = group.LiveSystems.ToList();
 		List<RowData> rows = new List<RowData>();
+		// BaR Maid's own setting comes first. It's yours alone, not the group's.
+		rows.Add(Row(PersonalityKey, null, "BaR Maid: chat personality (yours, every group)", MaidSettings.Chattiness.ToString()));
 		IMyShipWelder first = systems.FirstOrDefault();
 		if (first == null)
 		{
@@ -925,6 +944,16 @@ public class MaidScreen : MyGuiScreenBase
 	{
 		MaidGroup group = CurrentGroup;
 		string key = _table.SelectedRow?.UserData as string;
+		if (key == PersonalityKey)
+		{
+			int count = Enum.GetValues(typeof(Personality.Chattiness)).Length;
+			Personality.Chattiness level = (Personality.Chattiness)(((int)MaidSettings.Chattiness + direction + count) % count);
+			Session.SetPersonality(level);
+			ShowMessage($"Chat personality: {level}. {PersonalityHint(level)}", GoodColor);
+			_rowsSignature = null;
+			RefreshAll();
+			return;
+		}
 		BarSetting setting = key != null && key.StartsWith("s:") ? BarSetting.All.FirstOrDefault(s => "s:" + s.Id == key) : null;
 		if (group == null || setting == null)
 		{

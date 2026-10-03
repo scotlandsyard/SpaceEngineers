@@ -51,6 +51,7 @@ internal static class MaidHelp
 		"- Rescan: looks for systems and assemblers again straight away (it also does this every 5 seconds).",
 		"- Setup: Assign to group / Remove from groups as above. Turn on / off switches the selected block on or off. Assembler: Main / Co-op / Manual sets the selected assembler's mode.",
 		"- BaR settings: select a setting, then press Lower / Previous or Raise / Next. Hold Shift for steps 10 times bigger. Double-click a setting to step it forward. The change goes to every system in the group, just as if you had changed each one in its terminal. Settings the server has locked stay as they are, and the status line says so. A value shown as '(systems differ)' means the systems in the group don't all have the same value.",
+		"- Chat personality (top of BaR settings): how much BaR Maid talks in chat. Off, Quiet (only when something needs you), Normal or Chatty. It's your own setting, the same for every group, and nobody else sees the lines.",
 		"",
 		"# Good to know",
 		"- Only assemblers that are on, intact, in assembly mode and accessible to you are used.",

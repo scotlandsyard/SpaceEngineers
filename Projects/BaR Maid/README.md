@@ -29,6 +29,8 @@ The window closes with the X in its corner or with Esc. Tables update every half
 
 **BaR settings** lists the Build and Repair settings the server's mod settings allow: search, work and weld mode, projections, colours, janitor options, grind order, push options, work area size and offset, sound and effects, and script control. Select one and press **Lower / Previous** or **Raise / Next** (hold Shift for 10x steps), or double-click it to step it forward. The change is made on every system in the group through the mod's own terminal properties, so it syncs exactly like a terminal change, and settings the server has locked don't move. **Weld priority** and **Grind priority** are read-only: the mod only saves order changes made in its own terminal list.
 
+The first row of **BaR settings** is BaR Maid's own **chat personality**: Off, Quiet, Normal (the default) or Chatty. With it on, BaR Maid makes short remarks in chat. It mentions when it queues components, when a component can't be built by any assembler in the group, when a group has nothing missing any more, when auto-queue is on but no assembler is set to Main or Co-op, when a big build starts, and when there are floating items to collect. Quiet keeps only the ones that need you (can't build, no assembler). The lines show only on your screen. This setting is yours alone, the same for every group, and is saved in the plugin's local storage, not in Custom Data. See [Shared/README.md](../../Shared/README.md) for how often it talks.
+
 ### Toolbar actions
 
 Build and Repair blocks get four actions:
@@ -118,7 +120,7 @@ Everything runs on your client. Nothing is needed on the server.
 
 ## Switching between our plugins
 
-If any of our other plugins are loaded too (BaR Maid, OreScout, Sacrificial Stockpile Manager, Script to Plugin), the top-left corner of the window has a dropdown with this plugin's name. Pick another plugin there to close this window and open that plugin's. Type `/tim` in chat to open whichever of these windows you used last. See [Shared/README.md](../../Shared/README.md).
+If any of our other plugins are loaded too (Fat Albert, OreScout, Sacrificial Stockpile Manager, Script to Plugin), the top-left corner of the window has a dropdown with this plugin's name. Pick another plugin there to close this window and open that plugin's. Type `/tim` in chat to open whichever of these windows you used last. See [Shared/README.md](../../Shared/README.md).
 
 ## Building
 

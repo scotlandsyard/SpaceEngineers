@@ -49,6 +49,15 @@ internal class MaidGroup
 
 	public double NextQueueCheck;
 
+	/// <summary>What the systems were doing at the last look, for BaR Maid's chat lines (see BaRMaidSession.ObserveGroups).</summary>
+	public bool Observed;
+
+	public int LastWeldTargets;
+
+	public int LastFloating;
+
+	public int LastMissing;
+
 	public readonly List<string> Log = new List<string>();
 
 	/// <summary>What happened the last time each component was queued (or why it couldn't be).</summary>
@@ -157,6 +166,10 @@ internal class MaidGroup
 		List<IMyAssembler> countIn = ConstructAssemblers();
 		// Set up Main and Co-op only once there's really something to order, so assemblers aren't changed for nothing.
 		List<IMyAssembler> receivers = null;
+		// One chat line per pass at most: the biggest order, and the first component nothing can build.
+		int biggest = 0;
+		string biggestName = null;
+		string starved = null;
 		foreach (KeyValuePair<MyDefinitionId, int> item in missing)
 		{
 			if (item.Value <= 0 || (_lastAttempt.TryGetValue(item.Key, out double last) && now < last))
@@ -180,16 +193,30 @@ internal class MaidGroup
 				Notes[item.Key] = $"Queued {queued} at {DateTime.Now:HH:mm:ss}";
 				AddLog($"Queued {queued} x {ComponentName(item.Key)}");
 				kinds++;
+				if (queued > biggest)
+				{
+					biggest = queued;
+					biggestName = ComponentName(item.Key);
+				}
 			}
 			else if (problem != null)
 			{
 				_lastAttempt[item.Key] = now + ProblemRetrySeconds;
 				Notes[item.Key] = problem;
+				starved ??= ComponentName(item.Key);
 			}
 			else
 			{
 				Notes.Remove(item.Key);
 			}
+		}
+		if (starved != null)
+		{
+			Personality.Say("starved", "item", starved, "group", Name);
+		}
+		if (biggestName != null)
+		{
+			Personality.Say("queued", "count", biggest.ToString("N0"), "item", biggestName, "group", Name);
 		}
 		return kinds;
 	}

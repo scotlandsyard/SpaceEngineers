@@ -48,6 +48,18 @@ public class BaRMaidSession : MySessionComponentBase
 	/// <summary>Seconds between two auto-queue checks of the same group.</summary>
 	private const double QueueIntervalSeconds = 3.0;
 
+	/// <summary>Ticks between looks at what each group's systems are doing, for BaR Maid's chat lines.</summary>
+	private const int ObserveTicks = 120;
+
+	/// <summary>Ticks after the world loads before BaR Maid says hello, so the line isn't lost in the load.</summary>
+	private const int GreetingTicks = 600;
+
+	/// <summary>A build counts as big when this many blocks need welding (the mod sends players at most 24)...</summary>
+	private const int BigJobTargets = 20;
+
+	/// <summary>...having been under this many a moment before.</summary>
+	private const int BigJobStartsBelow = 5;
+
 	internal static BaRMaidSession Instance { get; private set; }
 
 	internal static double Now => MyAPIGateway.Session?.ElapsedPlayTime.TotalSeconds ?? 0.0;
@@ -95,6 +107,9 @@ public class BaRMaidSession : MySessionComponentBase
 			MyAPIGateway.TerminalControls.CustomActionGetter += CustomActionGetter;
 			MyAPIGateway.Utilities.MessageEntered += OnMessageEntered;
 			PluginSwitcher.Register("BaR Maid", () => OpenMenu(null));
+			MaidSettings.Load();
+			Personality.Level = MaidSettings.Chattiness;
+			Personality.Register(ChatSender);
 			_started = true;
 		}
 		catch (Exception ex)
@@ -112,6 +127,7 @@ public class BaRMaidSession : MySessionComponentBase
 				MyAPIGateway.TerminalControls.CustomActionGetter -= CustomActionGetter;
 				MyAPIGateway.Utilities.MessageEntered -= OnMessageEntered;
 				PluginSwitcher.Unregister();
+				Personality.Unregister();
 			}
 			catch
 			{
@@ -134,6 +150,14 @@ public class BaRMaidSession : MySessionComponentBase
 			if (_tick % QueueStepTicks == 0)
 			{
 				StepAutoQueue();
+			}
+			if (_tick == GreetingTicks)
+			{
+				Personality.Say("greeting");
+			}
+			if (_tick % ObserveTicks == 0)
+			{
+				ObserveGroups();
 			}
 		}
 		catch (Exception ex)
@@ -250,6 +274,7 @@ public class BaRMaidSession : MySessionComponentBase
 		{
 			RefreshNow();
 			MyGuiSandbox.AddScreen(new MaidScreen(PickGroupKey(fromBlock)));
+			Personality.Say("menu_opened");
 		}
 		catch (Exception ex)
 		{
@@ -501,6 +526,47 @@ public class BaRMaidSession : MySessionComponentBase
 		}
 	}
 
+	/// <summary>
+	/// Watches each group for moments worth a chat line: a big build starting, floating items to collect, and
+	/// everything missing being sorted out. Only changes count, so a line isn't repeated while nothing happens.
+	/// </summary>
+	private void ObserveGroups()
+	{
+		foreach (MaidGroup group in _sortedGroups)
+		{
+			int welds = group.WeldTargets().Count;
+			int floating = group.CollectTargets().Count;
+			int missing = group.MissingComponents().Count;
+			if (group.Observed)
+			{
+				if (group.LastWeldTargets < BigJobStartsBelow && welds >= BigJobTargets)
+				{
+					Personality.Say("big_job", "count", welds.ToString(), "group", group.Name);
+				}
+				if (group.LastFloating == 0 && floating > 0)
+				{
+					Personality.Say("floating_items", "count", floating.ToString(), "group", group.Name);
+				}
+				if (group.LastMissing > 0 && missing == 0)
+				{
+					Personality.Say("all_done", "group", group.Name);
+				}
+			}
+			group.Observed = true;
+			group.LastWeldTargets = welds;
+			group.LastFloating = floating;
+			group.LastMissing = missing;
+		}
+	}
+
+	/// <summary>Sets how much BaR Maid talks, and saves it.</summary>
+	internal void SetPersonality(Personality.Chattiness level)
+	{
+		MaidSettings.Chattiness = level;
+		Personality.Level = level;
+		MaidSettings.Save();
+	}
+
 	internal MaidGroup FindGroup(string key)
 	{
 		return key != null && _groups.TryGetValue(key, out MaidGroup group) ? group : null;
@@ -552,6 +618,15 @@ public class BaRMaidSession : MySessionComponentBase
 			{
 				_queueCursor = (_queueCursor + i + 1) % _sortedGroups.Count;
 				group.NextQueueCheck = now + QueueIntervalSeconds;
+				if (group.UsableAssemblers().Count == 0)
+				{
+					// Only worth a word when there's something to build.
+					if (group.MissingComponents().Count > 0)
+					{
+						Personality.Say("no_assemblers", "group", group.Name);
+					}
+					return;
+				}
 				group.QueueMissing(now);
 				return;
 			}

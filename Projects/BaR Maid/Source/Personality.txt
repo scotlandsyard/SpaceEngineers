@@ -1,0 +1,41 @@
+# BaR Maid's chat lines, read by Shared/Personality.cs (see Shared/README.md).
+# [key] starts an event, [!key] marks it important (said even on Quiet). One line per thing she may say.
+# PLACEHOLDER LINES: the real ones are being written. Keep the keys and placeholders.
+#
+# Placeholders each event fills in:
+#   every group event: {group}
+#   queued: {count} {item}   (the biggest order of that pass)
+#   starved: {item}          (a component no assembler in the group can make)
+#   big_job, floating_items: {count}
+
+[greeting]
+BaR Maid reporting for duty.
+BaR Maid here. Your nanobots are in good hands.
+
+[menu_opened]
+You rang?
+What can I do for you?
+
+[queued]
+Queued {count} {item} for {group}.
+{count} {item} on order for {group}.
+
+[!starved]
+{group} needs {item}, but no assembler there can make it.
+I can't get {item} built for {group}: no assembler can make it.
+
+[all_done]
+{group} has everything it needs.
+Nothing missing in {group}. All tidy.
+
+[!no_assemblers]
+{group} is missing parts, but I have no Main or Co-op assembler to build them.
+Auto-queue is on for {group}, but no assembler there is set to Main or Co-op.
+
+[big_job]
+Big job for {group}: {count} blocks to weld.
+{group} just started a large build.
+
+[floating_items]
+Floating items near {group}. The nanobots will tidy up.
+{count} loose items around {group}.
