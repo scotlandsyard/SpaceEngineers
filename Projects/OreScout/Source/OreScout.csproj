@@ -9,6 +9,11 @@
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
     <!-- Silence obsolete/unused-field warnings carried over from the decompiled code. -->
     <NoWarn>$(NoWarn);CS0618;CS0649;CS0169;CS0414</NoWarn>
+    <!-- The DLL is shared publicly: build no debug-symbol file, so the DLL doesn't record a path to one, and map
+         source paths to "." so no folder from this computer ends up inside the DLL. -->
+    <DebugType>none</DebugType>
+    <PathMap>$(MSBuildProjectDirectory)=.</PathMap>
+    <Deterministic>true</Deterministic>
   </PropertyGroup>
 
   <!--
