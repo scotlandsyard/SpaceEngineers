@@ -229,8 +229,11 @@ public class BlockSnapshot
 
 	private Dictionary<string, double> _output;
 
+	// Worked out from Items and Output; the XML keeps only those strings (XmlSerializer can't write dictionaries).
+	[XmlIgnore]
 	public Dictionary<string, double> ItemAmounts => _items ??= SacrificialStockpileManager.Items.Decode(Items);
 
+	[XmlIgnore]
 	public Dictionary<string, double> OutputAmounts => _output ??= SacrificialStockpileManager.Items.Decode(Output);
 
 	public bool HasInventory => MaxVolume > 0.0 || !string.IsNullOrEmpty(Items) || !string.IsNullOrEmpty(Output);
@@ -307,6 +310,7 @@ public class GridSnapshot
 	}
 
 	/// <summary>Every item on the grid, all inventories included.</summary>
+	[XmlIgnore]
 	public Dictionary<string, double> Totals
 	{
 		get
