@@ -53,6 +53,8 @@ public class ScriptScreen : MyGuiScreenBase
 
 	private MyGuiControlButton _helpButton;
 
+	private MyGuiControlTextbox _nameBox;
+
 	private string _rowsSignature;
 
 	private string _outputSignature;
@@ -112,7 +114,7 @@ public class ScriptScreen : MyGuiScreenBase
 		PluginSwitcher.AddSwitcher(this, AddCaption("Script to Plugin"));
 
 		Controls.Add(new MyGuiControlLabel(new Vector2(-0.42f, -0.355f), null, "Scripts", null, 0.8f, "White", MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER));
-		AddPersonalityCombo(new Vector2(0.05f, -0.355f));
+		AddChatControls(new Vector2(0.05f, -0.355f));
 		_table = new MyGuiControlTable
 		{
 			Position = new Vector2(-0.42f, -0.33f),
@@ -163,12 +165,32 @@ public class ScriptScreen : MyGuiScreenBase
 		RefreshAll();
 	}
 
-	/// <summary>How much Script to Plugin talks in chat: a dropdown whose right edge is at rightCenter, with its label before it.</summary>
-	private void AddPersonalityCombo(Vector2 rightCenter)
+	/// <summary>
+	/// Script to Plugin's chat settings, ending at rightCenter: the name its lines show under, and how much it talks.
+	/// </summary>
+	private void AddChatControls(Vector2 rightCenter)
 	{
-		const float width = 0.13f;
-		Controls.Add(new MyGuiControlLabel(new Vector2(rightCenter.X - width - 0.01f, rightCenter.Y), null, "Chat personality", null, 0.7f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_RIGHT_AND_VERTICAL_CENTER));
-		MyGuiControlCombobox combo = new MyGuiControlCombobox(rightCenter, new Vector2(width, 0.04f), null, null, 4, null, false, null, MyGuiDrawAlignEnum.HORISONTAL_RIGHT_AND_VERTICAL_CENTER);
+		const float comboWidth = 0.11f;
+		const float nameWidth = 0.13f;
+		const float gap = 0.01f;
+		float nameRight = rightCenter.X - comboWidth - gap;
+		Controls.Add(new MyGuiControlLabel(new Vector2(nameRight - nameWidth - gap, rightCenter.Y), null, "Chat as", null, 0.7f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_RIGHT_AND_VERTICAL_CENTER));
+		_nameBox = new MyGuiControlTextbox(new Vector2(nameRight - nameWidth / 2f, rightCenter.Y), Personality.DisplayName, Personality.MaxNameLength)
+		{
+			Size = new Vector2(nameWidth, 0.04f)
+		};
+		_nameBox.SetToolTip("The name Script to Plugin's chat lines show under. Press Enter to keep it; clear it to go back to Script to Plugin. Also: /stp name <name>.");
+		_nameBox.EnterPressed += _ => CommitName();
+		_nameBox.FocusChanged += (control, focus) =>
+		{
+			if (!focus)
+			{
+				CommitName();
+			}
+		};
+		Controls.Add(_nameBox);
+
+		MyGuiControlCombobox combo = new MyGuiControlCombobox(rightCenter, new Vector2(comboWidth, 0.04f), null, null, 4, null, false, null, MyGuiDrawAlignEnum.HORISONTAL_RIGHT_AND_VERTICAL_CENTER);
 		Personality.Chattiness[] levels = (Personality.Chattiness[])Enum.GetValues(typeof(Personality.Chattiness));
 		foreach (Personality.Chattiness level in levels)
 		{
@@ -183,6 +205,31 @@ public class ScriptScreen : MyGuiScreenBase
 			ShowMessage($"Chat personality: {level}. {PersonalityHint(level)}", GoodColor);
 		};
 		Controls.Add(combo);
+	}
+
+	private void CommitName()
+	{
+		if (Session == null || _nameBox == null)
+		{
+			return;
+		}
+		string before = Personality.DisplayName;
+		Session.SetDisplayName(_nameBox.Text);
+		string after = Personality.DisplayName;
+		_nameBox.Text = after;
+		if (after != before)
+		{
+			ShowMessage($"Chat lines now show as {after}.", GoodColor);
+		}
+	}
+
+	/// <summary>Shows a rename made elsewhere (Wilson's window, /stp name) unless the player is typing in the box.</summary>
+	private void RefreshNameBox()
+	{
+		if (_nameBox != null && !_nameBox.HasFocus && _nameBox.Text != Personality.DisplayName)
+		{
+			_nameBox.Text = Personality.DisplayName;
+		}
 	}
 
 	private static string PersonalityHint(Personality.Chattiness level)
@@ -253,6 +300,7 @@ public class ScriptScreen : MyGuiScreenBase
 		}
 		RefreshRows();
 		RefreshOutput();
+		RefreshNameBox();
 		VirtualProgram selected = Selected;
 		_onOffButton.Text = selected == null ? "On / Off" : selected.Entry.Enabled ? "Switch off" : "Switch on";
 		_helpButton.Text = s_showHelp ? "Back" : "Help";

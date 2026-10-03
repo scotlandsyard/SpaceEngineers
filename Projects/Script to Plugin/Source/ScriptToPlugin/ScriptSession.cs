@@ -47,10 +47,10 @@ public class ScriptSession : MySessionComponentBase
 	private const int SaveIntervalTicks = 60 * 60;
 
 	/// <summary>
-	/// Ticks after the world loads before Script to Plugin says hello. Until then, the scripts compiling and starting
-	/// with the world aren't commented on one by one.
+	/// Ticks after the world loads during which the scripts compiling and starting with the world aren't commented on.
+	/// Errors are still said.
 	/// </summary>
-	private const int GreetingTicks = 600;
+	private const int LoadingTicks = 600;
 
 	internal static ScriptSession Instance { get; private set; }
 
@@ -91,11 +91,8 @@ public class ScriptSession : MySessionComponentBase
 	/// <summary>The first script that started this tick, so several starting together get one line.</summary>
 	private string _startedThisTick;
 
-	/// <summary>A problem from while the world was loading, said in place of the greeting.</summary>
-	private Action _loadProblem;
-
-	/// <summary>True once the world has finished loading and the greeting is due or done.</summary>
-	private bool Settled => Tick >= GreetingTicks;
+	/// <summary>True once the world has finished loading.</summary>
+	private bool Settled => Tick >= LoadingTicks;
 
 	public override void BeforeStart()
 	{
@@ -117,6 +114,8 @@ public class ScriptSession : MySessionComponentBase
 			PluginSwitcher.Register("Script to Plugin", () => OpenMenu(null));
 			ScriptSettings.Load();
 			Personality.Level = ScriptSettings.Chattiness;
+			Personality.DisplayName = ScriptSettings.DisplayName;
+			Personality.Changed += OnPersonalityChanged;
 			Personality.Register(ChatSender);
 			MySession.OnUnloading += OnSessionUnloading;
 			_started = true;
@@ -179,6 +178,7 @@ public class ScriptSession : MySessionComponentBase
 				MyAPIGateway.TerminalControls.CustomActionGetter -= CustomActionGetter;
 				MyAPIGateway.Utilities.MessageEntered -= OnMessageEntered;
 				PluginSwitcher.Unregister();
+				Personality.Changed -= OnPersonalityChanged;
 				Personality.Unregister();
 			}
 			catch
@@ -219,18 +219,6 @@ public class ScriptSession : MySessionComponentBase
 					Personality.Say("script_started", "script", _startedThisTick);
 				}
 				_startedThisTick = null;
-			}
-			if (Tick == GreetingTicks)
-			{
-				if (_loadProblem != null)
-				{
-					_loadProblem();
-					_loadProblem = null;
-				}
-				else
-				{
-					Personality.Say("greeting");
-				}
 			}
 			if (Tick >= _nextSaveTick)
 			{
@@ -274,28 +262,26 @@ public class ScriptSession : MySessionComponentBase
 
 	internal void OnScriptCompileError(VirtualProgram program)
 	{
-		string name = program.Entry.Name;
-		if (Settled)
-		{
-			Personality.Say("compile_error", "script", name);
-		}
-		else
-		{
-			_loadProblem = _loadProblem ?? (() => Personality.Say("compile_error", "script", name));
-		}
+		Personality.Say("compile_error", "script", program.Entry.Name);
 	}
 
 	internal void OnScriptCrashed(VirtualProgram program)
 	{
-		string name = program.Entry.Name;
-		if (Settled)
-		{
-			Personality.Say("script_crashed", "script", name);
-		}
-		else
-		{
-			_loadProblem = _loadProblem ?? (() => Personality.Say("script_crashed", "script", name));
-		}
+		Personality.Say("script_crashed", "script", program.Entry.Name);
+	}
+
+	/// <summary>Sets the name Script to Plugin's chat lines show under; blank goes back to its own name.</summary>
+	internal void SetDisplayName(string name)
+	{
+		// Saved by OnPersonalityChanged, which also catches renames from Wilson's window.
+		Personality.DisplayName = name;
+	}
+
+	private void OnPersonalityChanged()
+	{
+		string name = Personality.DisplayName;
+		ScriptSettings.DisplayName = name == null || name == ChatSender ? null : name;
+		ScriptSettings.Save();
 	}
 
 	internal void OnScriptStarted(VirtualProgram program)
@@ -429,10 +415,20 @@ public class ScriptSession : MySessionComponentBase
 
 	private void OnMessageEntered(string messageText, ref bool sendToOthers)
 	{
-		if (messageText != null && messageText.Trim().Equals(ChatCommand, StringComparison.OrdinalIgnoreCase))
+		string text = messageText?.Trim() ?? "";
+		if (text.Equals(ChatCommand, StringComparison.OrdinalIgnoreCase))
 		{
 			sendToOthers = false;
 			OpenMenu(null);
+			return;
+		}
+		// /stp name <new name>; /stp name alone goes back to Script to Plugin.
+		string nameCommand = ChatCommand + " name";
+		if (text.Equals(nameCommand, StringComparison.OrdinalIgnoreCase) || text.StartsWith(nameCommand + " ", StringComparison.OrdinalIgnoreCase))
+		{
+			sendToOthers = false;
+			SetDisplayName(text.Substring(nameCommand.Length));
+			MyAPIGateway.Utilities.ShowMessage(ChatSender, $"Chat lines now show as {Personality.DisplayName}.");
 		}
 	}
 

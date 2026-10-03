@@ -18,6 +18,9 @@ internal static class ScriptSettings
 	/// <summary>How much Script to Plugin talks in chat.</summary>
 	public static Personality.Chattiness Chattiness = Personality.Chattiness.Normal;
 
+	/// <summary>The name Script to Plugin's chat lines show under; null for its own name.</summary>
+	public static string DisplayName;
+
 	public static void Load()
 	{
 		try
@@ -43,6 +46,10 @@ internal static class ScriptSettings
 			{
 				Chattiness = parsed;
 			}
+			if (values.TryGetValue("Name", out string name))
+			{
+				DisplayName = Personality.CleanName(name);
+			}
 		}
 		catch (Exception ex)
 		{
@@ -57,6 +64,7 @@ internal static class ScriptSettings
 			using (TextWriter writer = MyAPIGateway.Utilities.WriteFileInLocalStorage(FileName, typeof(ScriptSettings)))
 			{
 				writer.WriteLine("Personality=" + Chattiness);
+				writer.WriteLine("Name=" + (DisplayName ?? ""));
 			}
 		}
 		catch (Exception ex)

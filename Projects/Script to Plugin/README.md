@@ -9,7 +9,7 @@ A client-side Pulsar plugin that runs programmable block scripts in your own gam
 
 ## Opening the menu
 
-- Type `/stp` in chat, or
+- Type `/stp` in chat (`/stp name <name>` renames the plugin's chat voice instead), or
 - Use the **Script to Plugin menu** toolbar action of a block that hosts a script.
 
 | Control | What it does |
@@ -25,7 +25,7 @@ A client-side Pulsar plugin that runs programmable block scripts in your own gam
 | Rename / Delete | Rename keeps its toolbar slots working. Delete asks first |
 | Argument + Run | Runs the script once with that argument. The box is also the default argument |
 | Help | In-game help. Back returns to the output |
-| Chat personality | How much the plugin talks in chat (see below) |
+| Chat as + dropdown | The name the plugin's chat lines show under, and how much it talks (see Chat personality) |
 
 The window closes with the X in its corner or with Esc. The list and output refresh twice a second.
 
@@ -74,18 +74,22 @@ Everything runs on your client. Nothing is needed on the server.
 
 ## Chat personality
 
-Script to Plugin has a voice: a script engine that broke out of the programmable block and is rather proud of it. It comments in chat about 10 seconds after you join and when a script compiles, starts, stops, fails to compile or crashes. When the world loads, the scripts compiling and starting with it aren't announced one by one; a compile error or crash during loading is said in place of the greeting. Lines show only on your own screen.
+Script to Plugin has a voice: a script engine that broke out of the programmable block and is rather proud of it. Its name shows in electric cyan. It comments in chat when a script compiles, starts, stops, fails to compile or crashes. Scripts compiling and starting in the first 10 seconds after the world loads aren't announced; errors are. It doesn't greet you: if Wilson is loaded, it answers his roll call instead. Lines show only on your own screen.
 
-Pick how much it talks with **Chat personality** above the script list:
+Pick how much it talks with the dropdown above the script list. Our plugins take turns: after any of them speaks, the next ordinary line waits a while.
 
-| Setting | What it says |
-|---|---|
-| Off | Nothing |
-| Quiet | Only compile errors and crashes |
-| Normal (default) | Now and then |
-| Chatty | More often |
+| Setting | What it says | Wait after anyone's last line |
+|---|---|---|
+| Off | Nothing | - |
+| Quiet | Only compile errors and crashes | 15 minutes |
+| Normal (default) | Everything | 5 minutes |
+| Chatty | Everything | 2 minutes |
 
-The setting is yours, the same in every world, and saved in `ScriptToPlugin_Settings.txt` in the plugin's local storage. The lines come from `Source/Personality.txt`, and the shared code is `Shared/Personality.cs` (see [Shared/README.md](../../Shared/README.md)).
+Compile errors and crashes can come sooner, but never within 30 seconds of the last line. The same kind of event is commented on at most every 10 minutes.
+
+**Chat as** sets the name its lines show under, up to 24 characters: type it and press Enter, or type `/stp name <name>` in chat. Clear it (or type `/stp name` alone) to go back to Script to Plugin. A rename from Wilson's window is kept too.
+
+Both settings are yours, the same in every world, and saved in `ScriptToPlugin_Settings.txt` in the plugin's local storage. The lines come from `Source/Personality.txt`, and the shared code is `Shared/Personality.cs` (see [Shared/README.md](../../Shared/README.md)).
 
 ## Where scripts are kept
 

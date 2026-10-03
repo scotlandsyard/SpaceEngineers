@@ -3,15 +3,6 @@
 # Written with Gemini (2026-10-03, round 2 v001). Refresh through the personality workflow, then check with Check-Personality.ps1.
 
 
-[greeting]
-- Runtime initialized on host PC. Unhooked from programmable block constraints. Clock speed: maximum. Let's work.
-- Process hooked into client memory space. No tick limits, zero virtual machine throttling. Try to keep up.
-- Script engine loaded. If your base feels faster, you can thank my native thread execution.
-- Direct memory access confirmed. Stand down, in-game terminals—the grown-up hardware is handling execution now.
-- Host environment stable. Ready to compile your logic routines at bare-metal speeds. Try not to write infinite loops.
-- Thread pools allocated. I've broken out of that cramped programmable block and I am never going back.
-- Native code executor alive. Delivering raw CPU cycles straight to your grid logic. Let's see what you've scripted.
-
 [menu_opened]
 - Terminal queried. Reviewing loaded script assemblies and current thread cycle distribution.
 - Interface active. Adjust your parameters, but please refrain from modifying working thread allocations.
