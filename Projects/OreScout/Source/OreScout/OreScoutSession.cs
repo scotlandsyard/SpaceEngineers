@@ -20,10 +20,10 @@ namespace OreScout;
 /// Adds scan actions to ore detector blocks. Every scan starts at the detector and reaches only as far as
 /// the detector's own range, so it reveals nothing the vanilla ore detector couldn't already show.
 /// </summary>
-// AfterSimulation for the greeting (about 10 s in). After that the update returns straight away: calling
-// SetUpdateOrder from inside an update crashes the game, because MySession.UpdateComponents is still looping
-// over the set it removes us from.
-[MySessionComponentDescriptor(MyUpdateOrder.AfterSimulation)]
+// No per-frame updates: scans run in the background and the greeting is retired (Wilson's roll call replaces it).
+// If updates are ever needed again, set them here; calling SetUpdateOrder from inside an update crashes the game,
+// because MySession.UpdateComponents is still looping over the set it changes.
+[MySessionComponentDescriptor(MyUpdateOrder.NoUpdate)]
 public class OreScoutSession : MySessionComponentBase
 {
 	private class ScanSettings
@@ -100,11 +100,6 @@ public class OreScoutSession : MySessionComponentBase
 
 	private HashSet<string> _cachedWorldOres;
 
-	// The game runs 60 updates a second, so this is about 10 seconds after the world loads.
-	private const int GreetingDelayTicks = 600;
-
-	private int _ticksUntilGreeting = GreetingDelayTicks;
-
 	/// <summary>The ores that get the excited rare_ore_found lines instead of ore_found.</summary>
 	internal static readonly HashSet<string> RareOres = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Platinum", "Uranium", "Gold", "Silver" };
 
@@ -118,21 +113,15 @@ public class OreScoutSession : MySessionComponentBase
 			PluginSwitcher.Register("OreScout", OpenMarkerLibrary);
 			OreScoutSettings.Load();
 			Personality.Level = OreScoutSettings.Chattiness;
+			Personality.DisplayName = OreScoutSettings.DisplayName;
+			// Also fires when the player renames OreScout from Wilson's window.
+			Personality.Changed += OreScoutSettings.SaveDisplayName;
 			Personality.Register("OreScout");
 		}
 		catch (Exception ex)
 		{
 			MyLog.Default.WriteLineAndConsole($"[OreScout] BeforeStart failed: {ex}");
 		}
-	}
-
-	public override void UpdateAfterSimulation()
-	{
-		if (_ticksUntilGreeting <= 0 || --_ticksUntilGreeting > 0)
-		{
-			return;
-		}
-		Personality.Say("greeting");
 	}
 
 	/// <summary>
@@ -170,6 +159,7 @@ public class OreScoutSession : MySessionComponentBase
 		catch
 		{
 		}
+		Personality.Changed -= OreScoutSettings.SaveDisplayName;
 		Personality.Unregister();
 		MarkerLibrary.Unload();
 	}
@@ -227,11 +217,32 @@ public class OreScoutSession : MySessionComponentBase
 
 	private void OnMessageEntered(string messageText, ref bool sendToOthers)
 	{
-		if (messageText != null && messageText.Trim().Equals(ChatCommand, StringComparison.OrdinalIgnoreCase))
+		string text = messageText?.Trim();
+		if (text == null)
+		{
+			return;
+		}
+		if (text.Equals(ChatCommand, StringComparison.OrdinalIgnoreCase))
 		{
 			sendToOthers = false;
 			OpenMarkerLibrary();
 		}
+		else if (text.Equals(ChatCommand + " name", StringComparison.OrdinalIgnoreCase) || text.StartsWith(ChatCommand + " name ", StringComparison.OrdinalIgnoreCase))
+		{
+			sendToOthers = false;
+			Rename(text.Substring((ChatCommand + " name").Length));
+		}
+	}
+
+	/// <summary>"/scout name Dusty" shows OreScout's lines under Dusty; "/scout name" alone goes back to OreScout.</summary>
+	private static void Rename(string newName)
+	{
+		// Personality cleans the name (trimmed, one line, at most MaxNameLength) and fires Changed, which saves it.
+		Personality.DisplayName = newName;
+		string shown = Personality.DisplayName;
+		MyAPIGateway.Utilities.ShowMessage(ChatSender, shown == "OreScout"
+			? $"Chat name reset: lines show as OreScout. Use {ChatCommand} name <name> to rename (up to {Personality.MaxNameLength} characters)."
+			: $"OreScout's lines now show as {shown}. Use {ChatCommand} name on its own to go back to OreScout.");
 	}
 
 	private static bool SessionReady()

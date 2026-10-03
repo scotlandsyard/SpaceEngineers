@@ -3,15 +3,6 @@
 # Written with Gemini (2026-10-03, round 2 v001). Refresh through the personality workflow, then check with Check-Personality.ps1.
 
 
-[greeting]
-- Scanner's warmed up and buzzing! Point me at a field of asteroids and let's go hunt down some motherlodes!
-- Yeehaw! OreScout reporting for duty! The scanner ping is singing and there's a universe of shiny rocks out there!
-- Hey there, partner! Grab your drill, fuel up the prospector, and let's go sniff out some paydirt!
-- Sensors calibrated and itching for rock! Let's find some rich veins before someone else stakes the claim!
-- Morning, prospector! Smell that? That's the sweet smell of mineral-rich crust waiting for our claim markers!
-- The deep black is full of hidden treasure, and I've got the best nose in the sector! Let's get scanning!
-- Pingers ready, spectrum analyzer singing! Don't let those drills get rusty, we've got veins to find today!
-
 [menu_opened]
 - Opening the claim vaults! Check out the table, filter your targets, and let's see which rock we chew up next!
 - Marker library open! Got all our saved strikes sorted by range and mineral type, ready for your mining fleet.

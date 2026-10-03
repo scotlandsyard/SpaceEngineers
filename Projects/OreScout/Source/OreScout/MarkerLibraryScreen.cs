@@ -97,7 +97,7 @@ public class MarkerLibraryScreen : MyGuiScreenBase
 			chatBox.AddItem((long)level, level.ToString(), sort: false);
 		}
 		chatBox.SelectItemByKey((long)OreScoutSettings.Chattiness, sendEvent: false);
-		chatBox.SetToolTip("How much OreScout chats: Off (silent), Quiet (important only), Normal, or Chatty. Saved for you, in every world.");
+		chatBox.SetToolTip("How much OreScout chats: Off (silent), Quiet (important only), Normal, or Chatty. Saved for you, in every world. Rename it with /scout name <name>.");
 		chatBox.ItemSelected += () =>
 		{
 			OreScoutSettings.SetChattiness((Personality.Chattiness)chatBox.GetSelectedKey());

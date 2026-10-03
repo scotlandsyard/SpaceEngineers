@@ -18,6 +18,9 @@ internal static class OreScoutSettings
 	/// <summary>How much OreScout talks in chat.</summary>
 	public static Personality.Chattiness Chattiness = Personality.Chattiness.Normal;
 
+	/// <summary>The name OreScout's chat lines show under, or null for "OreScout".</summary>
+	public static string DisplayName;
+
 	public static void Load()
 	{
 		try
@@ -43,6 +46,10 @@ internal static class OreScoutSettings
 			{
 				Chattiness = parsed;
 			}
+			if (values.TryGetValue("Name", out string name) && !string.IsNullOrWhiteSpace(name))
+			{
+				DisplayName = name;
+			}
 		}
 		catch (Exception ex)
 		{
@@ -57,12 +64,24 @@ internal static class OreScoutSettings
 			using (TextWriter writer = MyAPIGateway.Utilities.WriteFileInLocalStorage(FileName, typeof(OreScoutSettings)))
 			{
 				writer.WriteLine("Personality=" + Chattiness);
+				writer.WriteLine("Name=" + (DisplayName ?? ""));
 			}
 		}
 		catch (Exception ex)
 		{
 			MyLog.Default.WriteLineAndConsole($"[OreScout] Could not save settings: {ex.Message}");
 		}
+	}
+
+	/// <summary>
+	/// Hooked to Personality.Changed: saves the current display name, however it was changed ("/scout name" or
+	/// Wilson's window). Personality.DisplayName falls back to "OreScout" when unset, so that case is saved as blank.
+	/// </summary>
+	public static void SaveDisplayName()
+	{
+		string name = Personality.DisplayName;
+		DisplayName = string.IsNullOrWhiteSpace(name) || name == "OreScout" ? null : name;
+		Save();
 	}
 
 	/// <summary>Changes the chat personality, applies it right away and saves it.</summary>

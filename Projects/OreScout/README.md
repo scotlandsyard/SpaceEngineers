@@ -40,9 +40,22 @@ A window for keeping ore markers without cluttering your GPS list. Open it with 
 
 ## Chat personality
 
-OreScout is a relentlessly enthusiastic frontier prospector. It says hello shortly after you load in, and comments in chat when you start a scan, when a scan finds ore (or nothing), when you open the marker library, and when you export markers into it. Each scan gets one comment, about the best find: rare ores (platinum, uranium, gold, silver) beat common ones, and nearer beats farther.
+OreScout is a relentlessly enthusiastic frontier prospector, and its name shows in gold in chat. It comments when you start a scan, when a scan finds ore (or nothing), when you open the marker library, and when you export markers into it. Each scan gets one comment, about the best find: rare ores (platinum, uranium, gold, silver) beat common ones, and nearer beats farther. It doesn't greet you on its own; if Wilson is loaded, OreScout answers his roll call shortly after the world loads.
 
-Set how much it talks with **Chat** at the top of the marker library window: **Off**, **Quiet** (important lines only), **Normal** (the default) or **Chatty**. The setting is yours alone and applies in every world. It's saved in `OreScout_Settings.txt` in `%AppData%\SpaceEngineers\Storage\`. Lines only appear on your own screen; nothing is sent to other players.
+Set how much it talks with **Chat** at the top of the marker library window:
+
+| Chat | What it says | Quiet time after any of our plugins speaks |
+|---|---|---|
+| Off | Nothing | - |
+| Quiet | Important lines only. OreScout has none, so it only answers Wilson's roll call. | 15 minutes |
+| Normal (default) | Everything | 5 minutes |
+| Chatty | Everything | 2 minutes |
+
+Our plugins share that rhythm: after one of them speaks, none of them says an ordinary line until the time above has passed. On every setting, the same kind of comment comes at most once every 10 minutes.
+
+To change the name its lines show under, type `/scout name <new name>` in chat (up to 24 characters). `/scout name` on its own goes back to OreScout. You can also rename it from Wilson's window.
+
+Both settings are yours alone and apply in every world. They're saved in `OreScout_Settings.txt` in `%AppData%\SpaceEngineers\Storage\`. Lines only appear on your own screen; nothing is sent to other players.
 
 ## Switching between our plugins
 
