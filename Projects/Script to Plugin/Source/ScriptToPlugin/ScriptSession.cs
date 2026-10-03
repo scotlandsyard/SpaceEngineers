@@ -46,6 +46,12 @@ public class ScriptSession : MySessionComponentBase
 	/// <summary>Ticks between saves of the script file while something changed (Storage changes all the time).</summary>
 	private const int SaveIntervalTicks = 60 * 60;
 
+	/// <summary>
+	/// Ticks after the world loads before Script to Plugin says hello. Until then, the scripts compiling and starting
+	/// with the world aren't commented on one by one.
+	/// </summary>
+	private const int GreetingTicks = 600;
+
 	internal static ScriptSession Instance { get; private set; }
 
 	internal static long LocalIdentityId => MyAPIGateway.Session?.Player?.IdentityId ?? 0L;
@@ -82,6 +88,15 @@ public class ScriptSession : MySessionComponentBase
 	/// <summary>Set once the scripts have saved at the start of unloading, so they aren't asked again too late.</summary>
 	private bool _savedOnUnload;
 
+	/// <summary>The first script that started this tick, so several starting together get one line.</summary>
+	private string _startedThisTick;
+
+	/// <summary>A problem from while the world was loading, said in place of the greeting.</summary>
+	private Action _loadProblem;
+
+	/// <summary>True once the world has finished loading and the greeting is due or done.</summary>
+	private bool Settled => Tick >= GreetingTicks;
+
 	public override void BeforeStart()
 	{
 		try
@@ -100,6 +115,9 @@ public class ScriptSession : MySessionComponentBase
 			MyAPIGateway.TerminalControls.CustomActionGetter += CustomActionGetter;
 			MyAPIGateway.Utilities.MessageEntered += OnMessageEntered;
 			PluginSwitcher.Register("Script to Plugin", () => OpenMenu(null));
+			ScriptSettings.Load();
+			Personality.Level = ScriptSettings.Chattiness;
+			Personality.Register(ChatSender);
 			MySession.OnUnloading += OnSessionUnloading;
 			_started = true;
 		}
@@ -161,6 +179,7 @@ public class ScriptSession : MySessionComponentBase
 				MyAPIGateway.TerminalControls.CustomActionGetter -= CustomActionGetter;
 				MyAPIGateway.Utilities.MessageEntered -= OnMessageEntered;
 				PluginSwitcher.Unregister();
+				Personality.Unregister();
 			}
 			catch
 			{
@@ -193,6 +212,26 @@ public class ScriptSession : MySessionComponentBase
 			{
 				_programs[i].Update(Tick);
 			}
+			if (_startedThisTick != null)
+			{
+				if (Settled)
+				{
+					Personality.Say("script_started", "script", _startedThisTick);
+				}
+				_startedThisTick = null;
+			}
+			if (Tick == GreetingTicks)
+			{
+				if (_loadProblem != null)
+				{
+					_loadProblem();
+					_loadProblem = null;
+				}
+				else
+				{
+					Personality.Say("greeting");
+				}
+			}
 			if (Tick >= _nextSaveTick)
 			{
 				_nextSaveTick = Tick + SaveIntervalTicks;
@@ -213,6 +252,60 @@ public class ScriptSession : MySessionComponentBase
 		_dirty = true;
 		// Soon, but not on every keystroke's worth of changes.
 		_nextSaveTick = Math.Min(_nextSaveTick, Tick + 60);
+	}
+
+	// Chat lines (Shared/Personality.cs). All called on the game thread.
+
+	/// <summary>Sets how much Script to Plugin talks, and saves it.</summary>
+	internal void SetPersonality(Personality.Chattiness level)
+	{
+		ScriptSettings.Chattiness = level;
+		Personality.Level = level;
+		ScriptSettings.Save();
+	}
+
+	internal void OnScriptCompiled(VirtualProgram program)
+	{
+		if (Settled)
+		{
+			Personality.Say("compiled", "script", program.Entry.Name);
+		}
+	}
+
+	internal void OnScriptCompileError(VirtualProgram program)
+	{
+		string name = program.Entry.Name;
+		if (Settled)
+		{
+			Personality.Say("compile_error", "script", name);
+		}
+		else
+		{
+			_loadProblem = _loadProblem ?? (() => Personality.Say("compile_error", "script", name));
+		}
+	}
+
+	internal void OnScriptCrashed(VirtualProgram program)
+	{
+		string name = program.Entry.Name;
+		if (Settled)
+		{
+			Personality.Say("script_crashed", "script", name);
+		}
+		else
+		{
+			_loadProblem = _loadProblem ?? (() => Personality.Say("script_crashed", "script", name));
+		}
+	}
+
+	internal void OnScriptStarted(VirtualProgram program)
+	{
+		_startedThisTick = _startedThisTick ?? program.Entry.Name;
+	}
+
+	internal void OnScriptStopped(VirtualProgram program)
+	{
+		Personality.Say("script_stopped", "script", program.Entry.Name);
 	}
 
 	internal void SaveNow()
@@ -343,7 +436,8 @@ public class ScriptSession : MySessionComponentBase
 		}
 	}
 
-	internal void OpenMenu(string selectId)
+	/// <summary>Opens the menu. reopened is true when it comes back after an editor, which isn't worth a comment.</summary>
+	internal void OpenMenu(string selectId, bool reopened = false)
 	{
 		if (MyAPIGateway.Session?.Player == null)
 		{
@@ -352,6 +446,10 @@ public class ScriptSession : MySessionComponentBase
 		try
 		{
 			MyGuiSandbox.AddScreen(new ScriptScreen(selectId));
+			if (!reopened)
+			{
+				Personality.Say("menu_opened");
+			}
 		}
 		catch (Exception ex)
 		{

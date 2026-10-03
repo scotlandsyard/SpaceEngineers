@@ -139,7 +139,7 @@ internal static class ScriptEditors
 		{
 			ScriptScreen.QueueMessage(message, color);
 		}
-		ScriptSession.Instance?.OpenMenu(id);
+		ScriptSession.Instance?.OpenMenu(id, reopened: true);
 	}
 
 	/// <summary>The programmable block's code editor, with the same save rules: OK saves, closing with changes asks.</summary>

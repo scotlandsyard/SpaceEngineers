@@ -45,6 +45,9 @@ internal static class ScriptHelp
 		"# Limits",
 		"The same limits as a programmable block: 50,000 instructions per run, and a script stops if it throws an error. The list shows how long each script takes per tick, so you can see what it costs your frame rate.",
 		"",
+		"# Chat personality",
+		"Script to Plugin comments in chat now and then: when a script compiles, starts, stops, fails to compile or crashes. Only you see it. Choose how much it talks with Chat personality above the list: Off, Quiet (only compile errors and crashes), Normal or Chatty. The setting is yours and the same in every world.",
+		"",
 		"# Where scripts are kept",
 		"Scripts, Custom Data and Storage are saved on your computer, in the plugin's storage for this world. They're saved every minute, when the world is saved, and when you leave."
 	};

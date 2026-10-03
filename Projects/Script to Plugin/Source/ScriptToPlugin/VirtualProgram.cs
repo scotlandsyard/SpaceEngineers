@@ -283,6 +283,11 @@ internal class VirtualProgram
 		if (_compileFailed)
 		{
 			DetailedInfo = "Compile errors:\n" + string.Join("\n", messages);
+			_session.OnScriptCompileError(this);
+		}
+		else
+		{
+			_session.OnScriptCompiled(this);
 		}
 	}
 
@@ -342,7 +347,7 @@ internal class VirtualProgram
 		_igc = igc;
 		instance.IGC_ContextGetter = () => igc;
 		_instance = instance;
-		Execute(program =>
+		bool started = Execute(program =>
 		{
 			constructor.Invoke(program, null);
 			if (!program.HasMainMethod)
@@ -350,6 +355,10 @@ internal class VirtualProgram
 				throw new MissingMethodException("The script has no Main method.");
 			}
 		}, "Constructor");
+		if (started && _instance != null)
+		{
+			_session.OnScriptStarted(this);
+		}
 	}
 
 	/// <summary>Runs Main, like pressing Run on the programmable block. False when the script isn't running.</summary>
@@ -561,6 +570,7 @@ internal class VirtualProgram
 		Unload();
 		DetailedInfo = message;
 		MyLog.Default.WriteLineAndConsole($"[ScriptToPlugin] {Entry.Name}: {message}");
+		_session.OnScriptCrashed(this);
 	}
 
 	private void Unload()
@@ -593,6 +603,7 @@ internal class VirtualProgram
 			Unload();
 			Entry.Enabled = false;
 			DetailedInfo = "";
+			_session.OnScriptStopped(this);
 		}
 		_session.MarkDirty();
 	}

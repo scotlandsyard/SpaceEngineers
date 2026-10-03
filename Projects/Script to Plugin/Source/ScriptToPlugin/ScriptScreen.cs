@@ -112,6 +112,7 @@ public class ScriptScreen : MyGuiScreenBase
 		PluginSwitcher.AddSwitcher(this, AddCaption("Script to Plugin"));
 
 		Controls.Add(new MyGuiControlLabel(new Vector2(-0.42f, -0.355f), null, "Scripts", null, 0.8f, "White", MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER));
+		AddPersonalityCombo(new Vector2(0.05f, -0.355f));
 		_table = new MyGuiControlTable
 		{
 			Position = new Vector2(-0.42f, -0.33f),
@@ -160,6 +161,43 @@ public class ScriptScreen : MyGuiScreenBase
 		_outputSignature = null;
 		_outputKey = null;
 		RefreshAll();
+	}
+
+	/// <summary>How much Script to Plugin talks in chat: a dropdown whose right edge is at rightCenter, with its label before it.</summary>
+	private void AddPersonalityCombo(Vector2 rightCenter)
+	{
+		const float width = 0.13f;
+		Controls.Add(new MyGuiControlLabel(new Vector2(rightCenter.X - width - 0.01f, rightCenter.Y), null, "Chat personality", null, 0.7f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_RIGHT_AND_VERTICAL_CENTER));
+		MyGuiControlCombobox combo = new MyGuiControlCombobox(rightCenter, new Vector2(width, 0.04f), null, null, 4, null, false, null, MyGuiDrawAlignEnum.HORISONTAL_RIGHT_AND_VERTICAL_CENTER);
+		Personality.Chattiness[] levels = (Personality.Chattiness[])Enum.GetValues(typeof(Personality.Chattiness));
+		foreach (Personality.Chattiness level in levels)
+		{
+			combo.AddItem((long)level, level.ToString(), null, null, sort: false);
+		}
+		combo.SelectItemByKey((long)ScriptSettings.Chattiness, sendEvent: false);
+		combo.SetToolTip("How much Script to Plugin talks in chat. Off: never. Quiet: only compile errors and crashes. Normal: now and then. Chatty: often. Only you see it.");
+		combo.ItemSelected += () =>
+		{
+			Personality.Chattiness level = (Personality.Chattiness)combo.GetSelectedKey();
+			Session?.SetPersonality(level);
+			ShowMessage($"Chat personality: {level}. {PersonalityHint(level)}", GoodColor);
+		};
+		Controls.Add(combo);
+	}
+
+	private static string PersonalityHint(Personality.Chattiness level)
+	{
+		switch (level)
+		{
+		case Personality.Chattiness.Off:
+			return "Script to Plugin stays silent.";
+		case Personality.Chattiness.Quiet:
+			return "Only speaks up about compile errors and crashes.";
+		case Personality.Chattiness.Chatty:
+			return "Comments on everything.";
+		default:
+			return "Comments now and then.";
+		}
 	}
 
 	private MyGuiControlButton AddButton(float x, float y, string text, Action onClick)

@@ -25,6 +25,7 @@ A client-side Pulsar plugin that runs programmable block scripts in your own gam
 | Rename / Delete | Rename keeps its toolbar slots working. Delete asks first |
 | Argument + Run | Runs the script once with that argument. The box is also the default argument |
 | Help | In-game help. Back returns to the output |
+| Chat personality | How much the plugin talks in chat (see below) |
 
 The window closes with the X in its corner or with Esc. The list and output refresh twice a second.
 
@@ -71,6 +72,21 @@ Everything runs on your client. Nothing is needed on the server.
 - IGC only reaches the plugin's own scripts.
 - Scripts start again after a world load like a programmable block: the constructor runs with the saved Storage.
 
+## Chat personality
+
+Script to Plugin has a voice: a script engine that broke out of the programmable block and is rather proud of it. It comments in chat about 10 seconds after you join and when a script compiles, starts, stops, fails to compile or crashes. When the world loads, the scripts compiling and starting with it aren't announced one by one; a compile error or crash during loading is said in place of the greeting. Lines show only on your own screen.
+
+Pick how much it talks with **Chat personality** above the script list:
+
+| Setting | What it says |
+|---|---|
+| Off | Nothing |
+| Quiet | Only compile errors and crashes |
+| Normal (default) | Now and then |
+| Chatty | More often |
+
+The setting is yours, the same in every world, and saved in `ScriptToPlugin_Settings.txt` in the plugin's local storage. The lines come from `Source/Personality.txt`, and the shared code is `Shared/Personality.cs` (see [Shared/README.md](../../Shared/README.md)).
+
 ## Where scripts are kept
 
 Code, Custom Data, Storage, the default argument and the on/off state are saved in the plugin's local storage (under `%AppData%\SpaceEngineers\Storage`), one file per world, named after the world. They're saved a second after a change, every minute while scripts run, when you save the world, and when you leave. Nothing is stored in the world itself, so the scripts are yours and aren't shared with other players.
@@ -81,6 +97,6 @@ If any of our other plugins are loaded too (BaR Maid, Fat Albert, OreScout, Sacr
 
 ## Building
 
-The project also builds `Shared/PluginSwitcher.cs` from the repo's `Shared` folder, so build from a full clone of the repo. Set `Bin64` in `Source/ScriptToPlugin.csproj` if Space Engineers isn't in the default Steam location. Then run `dotnet build -c Release` in `Source`. The plugin is written to `Source/bin/Release/net481/ScriptToPlugin.dll`.
+The project also builds `Shared/PluginSwitcher.cs` and `Shared/Personality.cs` from the repo's `Shared` folder, so build from a full clone of the repo. Set `Bin64` in `Source/ScriptToPlugin.csproj` if Space Engineers isn't in the default Steam location. Then run `dotnet build -c Release` in `Source`. The plugin is written to `Source/bin/Release/net481/ScriptToPlugin.dll`.
 
 The plugin uses its own assembly name (`ScriptToPlugin`), namespace, action IDs (`ScriptToPlugin_*`), chat command (`/stp`) and storage file (`ScriptToPlugin_<world>.xml`), so it can't clash with the other plugins in this repo. It has no Custom Data section or GPS markers.
