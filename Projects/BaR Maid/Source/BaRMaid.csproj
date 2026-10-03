@@ -6,6 +6,11 @@
     <TargetFramework>net481</TargetFramework>
     <PlatformTarget>x64</PlatformTarget>
     <LangVersion>latest</LangVersion>
+    <!-- The DLL is shared publicly: build no debug-symbol file, so the DLL doesn't record a path to one, and map
+         source paths to "." so no folder from this computer ends up inside the DLL. -->
+    <DebugType>none</DebugType>
+    <PathMap>$(MSBuildProjectDirectory)=.</PathMap>
+    <Deterministic>true</Deterministic>
   </PropertyGroup>
 
   <!--
