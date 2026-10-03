@@ -1,9 +1,10 @@
 # OreScout
 
-A server-friendly ore scanner for the Pulsar plugin manager. It keeps the ore scans and the marker library, but every scan starts at a real ore detector block and reaches only as far as that detector's own range. It shows nothing the vanilla ore detector couldn't already reveal; it just turns what's in range into GPS markers you can keep.
+A server-friendly ore scouting plugin for the Pulsar plugin manager. It turns what your ore detector can see into GPS markers you can keep, sort and come back to.
 
+Every scan starts at a real ore detector block and reaches only as far as that detector's own range, and the detector has to be working. OreScout shows nothing the vanilla ore detector couldn't already reveal; it just makes it easier to keep track of.
 
-OreScout uses its own DLL name, action IDs, Custom Data sections, marker tag (`OS:`) and library file.
+Its markers carry a hidden `OS:` tag, so OreScout only ever updates or removes markers it made itself. Your own GPS points are never touched.
 
 ## Using it in game
 
@@ -35,13 +36,12 @@ Rescanning updates markers in place. Scout Ore markers are kept when their ore i
 
 ## Marker library
 
-**Export from GPS** moves Scout Ore markers out of the GPS list into the library (deposit markers stay in GPS), and **Delete** removes the selected one. **Show** (top right) filters to one ore, **From you** gives each marker's distance from you, and **Measure From Row** fills the **From marker** column (renamed after that marker, e.g. **From Ice**) with distances from the selected marker (**Measure From Me** clears it). Tick markers with **Mark / Unmark** or a double-click, then **Import Marked**, or use **Import All Shown** to import everything the filter shows. Click a column header to sort. The library is saved per world name as `OreScout_Markers_<world>.xml` in `%AppData%\SpaceEngineers\Storage\`.
+A window for keeping ore markers without cluttering your GPS list. Open it with the Marker Library action or `/scout` in chat. **Export from GPS** moves Scout Ore markers out of the GPS list into the library (deposit markers stay in GPS), and **Delete** removes the selected one. **Show** (top right) filters to one ore, **From you** gives each marker's distance from you, and **Measure From Row** fills the **From marker** column (renamed after that marker, e.g. **From Ice**) with distances from the selected marker (**Measure From Me** clears it). Tick markers with **Mark / Unmark** or a double-click, then **Import Marked**, or use **Import All Shown** to import everything the filter shows. Click a column header to sort. The library is saved per world name as `OreScout_Markers_<world>.xml` in `%AppData%\SpaceEngineers\Storage\`.
 
 ## Switching between our plugins
 
-If any of our other plugins are loaded too (BaR Maid, OreScout, Sacrificial Stockpile Manager, Script to Plugin), the top-left corner of the window has a dropdown with this plugin's name. Pick another plugin there to close this window and open that plugin's. Type `/tim` in chat to open whichever of these windows you used last. See [Shared/README.md](../../Shared/README.md).
+If any of our other plugins are loaded too (BaR Maid, Fat Albert, OreScout, Sacrificial Stockpile Manager, Script to Plugin), the top-left corner of the window has a dropdown with this plugin's name. Pick another plugin there to close this window and open that plugin's. Type `/tim` in chat to open whichever of these windows you used last. See [Shared/README.md](../../Shared/README.md).
 
 ## Building
 
 The project also builds `Shared/PluginSwitcher.cs` from the repo's `Shared` folder, so build from a full clone of the repo. Set `Bin64` in `Source/OreScout.csproj` if Space Engineers isn't in the default Steam location, then run `dotnet build -c Release` in `Source`. The plugin is written to `Source/bin/Release/net481/OreScout.dll`.
-
