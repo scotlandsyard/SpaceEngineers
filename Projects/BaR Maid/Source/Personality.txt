@@ -1,41 +1,73 @@
 # BaR Maid's chat lines, read by Shared/Personality.cs (see Shared/README.md).
-# [key] starts an event, [!key] marks it important (said even on Quiet). One line per thing she may say.
-# PLACEHOLDER LINES: the real ones are being written. Keep the keys and placeholders.
-#
-# Placeholders each event fills in:
-#   every group event: {group}
-#   queued: {count} {item}   (the biggest order of that pass)
-#   starved: {item}          (a component no assembler in the group can make)
-#   big_job, floating_items: {count}
+# [key] starts an event, [!key] marks it important (said even on Quiet). One line per thing to say.
+# Written with Gemini (2026-10-03, round 2 v001). Refresh through the personality workflow, then check with Check-Personality.ps1.
+
 
 [greeting]
-BaR Maid reporting for duty.
-BaR Maid here. Your nanobots are in good hands.
+- Well, look what Klang dragged in. Airlock's open, taps are hot, and the queue is clean. Try not to dent the bulkheads.
+- Welcome back, chief. I wiped down the conveyor junctions and set the welders on idle. Let's see your damage tab.
+- Lights are up and the scrubbers are humming. Grab a wrench or get out of my gangway, we've got hulls to fix.
+- Back in the pilot seat? Good. The assemblers are primed, the coffee is battery acid, and my patience is running thin.
+- Round two, is it? Just once I'd like you to undock without leaving half your armor plates plastered to the doorframe.
+- House rules remain unchanged: wipe your boots at the airlock, keep the slag off the deck, and pay your iron bill.
+- Assemblers are glowing, conveyor tubes are cleared. Let's make this shift quick before something violently snaps.
 
 [menu_opened]
-You rang?
-What can I do for you?
+- What'll it be, chief? Put your order in before the queue backs up out the airlock door.
+- Looking over the slate? If it's heavy armor plates, you better have the ingots to cover the tab.
+- Don't just stand there letting the cabin pressure drop. What components are we pouring today?
+- Menu's up. Pick your poison, set your limits, and let a woman get back to sweeping the plating.
+- If you're here to change the weld priority again, just make sure my bay gets first call at the tap.
+- Browsing the stock? I run an orderly house here—pick your batch or close the hatch.
+- Make it snappy. Every second you stare at this screen is a second an assembler sits cold and sober.
 
 [queued]
-Queued {count} {item} for {group}.
-{count} {item} on order for {group}.
+- Pouring a fresh round of {count} {item} for {group}. Don't spill 'em across the flight deck.
+- Taps are wide open. Slapped {count} {item} onto the priority ticket for {group}. Drink up.
+- You got it, hotshot. Queued up {count} {item} for {group}. Try not to blow these ones into scrap metal.
+- Order up for {group}: {count} {item} cooking on the front burners right now.
+- Put {count} {item} on your tab for {group}. If the iron runs dry, I'm shutting the kitchen down.
+- Pushing {count} {item} straight through the pipes for {group}. Keep your welders thirsty.
+- Just lined up {count} {item} for {group}. Tell your automated welders to mind their manners with 'em.
 
 [!starved]
-{group} needs {item}, but no assembler there can make it.
-I can't get {item} built for {group}: no assembler can make it.
+# Placeholder lines: Gemini wrote this event as "out of raw materials", but it fires when no assembler in
+# the group can make the item at all. Needs a rewrite from Gemini.
+- {group} needs {item}, but no assembler there can make it.
+- I can't get {item} built for {group}: no assembler can make it.
 
 [all_done]
-{group} has everything it needs.
-Nothing missing in {group}. All tidy.
+- Last weld finished, deck scrubbed, tools hung. {group} is shipshape and ready to roll.
+- All tabs closed and queues cleared. Every BaR block in {group} is fat, happy, and fully stocked.
+- Well, miracles happen—{group} is completely patched up. Try not to scrape the paint on the way out.
+- Not a missing plate in sight for {group}. Clean counters, silent welders, perfect order. Don't touch a thing.
+- The build in {group} is done. If you crash it into an asteroid within five minutes, I'm charging you double.
+- That wraps it up for {group}. All patched, all welded, no loose bolts. Go on, get out of my hair.
+- Work order fulfilled for {group}. Looks decent enough that I won't even complain about the conveyor scuffs.
 
 [!no_assemblers]
-{group} is missing parts, but I have no Main or Co-op assembler to build them.
-Auto-queue is on for {group}, but no assembler there is set to Main or Co-op.
+- Hey, genius! Auto-queue is running for {group}, but nobody turned the assemblers to Main or Co-op!
+- I can't brew parts out of thin air! Switch an assembler to Main or Co-op for {group} before I throw a rag at you!
+- You gave me a repair order for {group} with zero assemblers listening. Who runs this circus?
+- Hello? Is anyone actually working the line? Set an assembler to Main or Co-op for {group} already!
+- Auto-queue is spinning its wheels in {group}. Give me an active assembler or I'm taking my lunch break.
+- No assemblers hooked to {group}? That's brilliant. Just brilliant. Turn one on before Klang notices.
+- My weld list is stacked for {group}, but your assemblers are fast asleep. Set one to Co-op, pronto!
 
 [big_job]
-Big job for {group}: {count} blocks to weld.
-{group} just started a large build.
+- Sweet Klang above, {count} blocks busted in {group}? What did you do, kiss a dreadnought at full burn?
+- Look at this mess—{count} blocks needed in {group}! Grab a mop, boys, this is gonna be an all-nighter.
+- {count} blocks queued for {group}? Hope you brought deep pockets, because your repair tab just went sky-high.
+- Mother of iron... {count} blocks to weld in {group}. The assemblers are gonna need an ice bath after this.
+- Somebody had a rough landing. We've got {count} fresh welds lined up in {group}. Clear the gangway!
+- That's not a fender-bender, chief, that's {count} missing blocks in {group}. Firing up every burner we own.
+- {count} blocks torn up in {group}? Honestly, I leave you alone for ten minutes and the whole station falls apart.
 
 [floating_items]
-Floating items near {group}. The nanobots will tidy up.
-{count} loose items around {group}.
+- Who left {count} loose items rolling around the floor? Pick up your trash before someone trips!
+- I just waxed this deck and there are {count} random chunks floating in zero-g. Pick 'em up, packrats!
+- Floating scrap alert! {count} pieces adrift. If Klang uses 'em to smash a viewport, it's coming out of your pay.
+- You think I enjoy dodging {count} rogue components drifting past the airlock? Secure your cargo!
+- {count} loose items banging into the bulkheads. What is this, an orbital salvage yard? Stow them!
+- Tsk! Look at this clutter—{count} stray bits floating loose. I am running a station, not a garbage scow!
+- If I catch the clown who let {count} components drift out of the crates, they're getting weld-torch duty.

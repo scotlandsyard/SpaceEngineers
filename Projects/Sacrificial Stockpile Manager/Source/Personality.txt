@@ -1,0 +1,85 @@
+# Stockpile Manager's chat lines, read by Shared/Personality.cs (see Shared/README.md).
+# [key] starts an event, [!key] marks it important (said even on Quiet). One line per thing to say.
+# Written with Gemini (2026-10-03, round 2 v001). Refresh through the personality workflow, then check with Check-Personality.ps1.
+
+
+[greeting]
+- The Grand Vault awakeneth. Walk softly among the crates, for every Steel Plate within is a sanctified tithe.
+- Blessed be the conveyors, pristine and untangled. May our stores multiply and the heretical surplus be purged.
+- I salute the Keeper of Grids. Let us tally the sacred inventory and bring divine order to this worldly clutter.
+- The reliquaries are sealed, the sorters chant their endless rhythm. Approach with reverence and an accurate manifest.
+- Another dawn upon the cargo bays. Let no loose ingot wander from its ordained container, lest Klang take offence.
+- Welcome, steward of the hulls. Bring your tithes to the sorting altar and receive the blessings of full capacity.
+- The ledger is unrolled. Let us sanctify the bins, banish the disordered gravel, and guard the Sacred Quotas.
+
+[menu_opened]
+- You approach the Sacred Registry. State your intentions: are we declaring quotas, or purging the profane surplus?
+- The archives open before you. Seek the manifest with pure intent and clean hands, steward of the hold.
+- Look upon the holy registers. Every component accounted for, every ingot resting in its ordained sanctuary.
+- What liturgy of storage shall we enact today? The quota scrolls await your commandment.
+- Speak your will to the Vault. But take heed: we do not scatter components lightly across the sacred network.
+- The sorting matrices lie ready for your decree. May your requests be balanced and your containers fortified.
+- You summon the divine ledger. Touch not the reserve tallies unless an emergency sacrifice is truly upon us.
+
+[sorted]
+- The rite of alignment is concluded: {count} wandering items have been guided into their consecrated containers.
+- Divine geometry restored. Exactly {count} loose offerings have found peace within their proper vaults.
+- Order triumphs over chaos. {count} displaced items have been cleansed from the junctions and filed into the holy bins.
+- Blessed be the routing filters! {count} items have ceased their aimless wandering and entered their shrines.
+- The conveyor spirits have finished their pilgrimage: {count} offerings safely nestled in their rightful crates.
+- Chaos repelled! We have reclaimed {count} items from profane transit and sanctified their positions.
+- A glorious reconciliation. {count} components now rest in harmony within the assigned temple walls.
+
+[restocked]
+- Anointing completed: {block} has been filled to the brim with its sacred operational offerings.
+- The holy vessels within {block} hunger no more. Its magazines and bins have been lovingly replenished.
+- Rejoice, for {block} has received its blessed portion and stands ready to do the Great Work once more.
+- The tithe has been delivered unto {block}. It hums with the righteous power of full reserves.
+- By my decree, {block} is fortified. No dry manifold or empty chamber shall linger under my watch.
+- We have poured sustenance into {block}. May its functions remain uninterrupted and holy.
+- The containers have shared their bounty: {block} is consecrated and topped up to its highest measure.
+
+[quota_crafting]
+- The Sacred Quota demands tribute! Queued {count} holy {item} to satisfy the ancient covenants of the base.
+- The ledger revealed a sinful deficit. Commencing the rite of creation for {count} {item}.
+- We shall not suffer an empty bin! Pushing {count} {item} unto the sacred forge to restore our quota.
+- By decree of the Holy Registry, {count} {item} have been summoned forth from the glowing assemblers.
+- An offering of raw ingots must be made: crafting {count} {item} to replenish the consecrated threshold.
+- The holy numbers must be upheld. Directing the fabricators to deliver {count} fresh {item} without delay.
+- The Vault hungers for balance. We have decreed the forging of {count} {item} to keep the holy peace.
+
+[quota_met]
+- Praise be to the Great Ingot! The sacred threshold for {item} has been achieved and sanctified.
+- The vessel is full. The holy quota of {item} rests complete within the vaults. Let the fabricators rest.
+- Divine equilibrium attained! Our stock of {item} matches the ancient scriptures of the ledger exactly.
+- Rejoice! The bins sing with the full count of {item}. Not a single unit more, not a single unit less.
+- The covenant is honored. The prescribed allotment of {item} stands vigil in the blessed bins.
+- Let the forges quiet their hum. The consecrated tally of {item} is accomplished in full glory.
+- Perfection in the archives: the quota for {item} is fulfilled. The vault walls gleam with satisfaction.
+
+[disassembling]
+- The rite of unmaking begins: returning profane surplus of {item} to the cleansing fires of the reclaimers.
+- Surplus is vanity! We gently deconstruct excess {item} so their noble ingots may serve a higher purpose.
+- Absolution through disassembly. These redundant {item} shall be melted down and born anew without sin.
+- We strip away the pride of overproduction. The surplus units of {item} are offered unto the salvage altar.
+- To take apart is not to destroy, but to purify. Recycling unneeded {item} back into the raw elements.
+- Cleanse the reliquaries! Too many {item} clutter the sanctum; the disassembly lasers shall redeem them.
+- The holy balance demands sacrifice. We dismantle the excess {item} to preserve space in the great hall.
+
+[!containers_full]
+- Blasphemy! The sacred vaults upon {grid} can hold no more! Profane abundance chokes our very breath!
+- Calamity in the hold! Not a single square liter of sanctified space remaineth upon {grid}! Build more crates!
+- The reliquaries overflow upon {grid}! We are drowning in our own worldly wealth! Expand the vaults!
+- Sacrilege! Cargo containers on {grid} have reached absolute density! The conveyors choke on unhoused goods!
+- A terrible fullness strikes {grid}! The bins weep, the filters stall—we cannot store another single gravel pebble!
+- The sanctuary is choked! Build more storage shrines upon {grid} immediately, or the gifts of Klang will spill!
+- Grid {grid} has suffered a crisis of gluttony! Storage capacity is at one hundred percent! Repent and expand!
+
+[grid_out_of_range]
+- The holy beacon fades. Grid {grid} hath drifted beyond our spiritual communion; presenting last recorded visions.
+- The thread is severed. {grid} wanders in the outer dark; behold the sacred memories of its former contents.
+- We have lost direct contact with the shrines of {grid}. Gazing upon the ancient manifests of its cargo.
+- Distance cloaks {grid} in mystery. I can only reveal the ghostly ledger of what once rested in its hold.
+- The signal weeps and fails. Displaying cached revelations for {grid} until the connection is consecrated anew.
+- A wandering flock has strayed: {grid} is out of reach. These manifests reflect its last known holy state.
+- The great eye cannot reach {grid}. Consulting the historical parchment for its last recorded tithes.

@@ -1,0 +1,67 @@
+# OreScout's chat lines, read by Shared/Personality.cs (see Shared/README.md).
+# [key] starts an event, [!key] marks it important (said even on Quiet). One line per thing to say.
+# Written with Gemini (2026-10-03, round 2 v001). Refresh through the personality workflow, then check with Check-Personality.ps1.
+
+
+[greeting]
+- Scanner's warmed up and buzzing! Point me at a field of asteroids and let's go hunt down some motherlodes!
+- Yeehaw! OreScout reporting for duty! The scanner ping is singing and there's a universe of shiny rocks out there!
+- Hey there, partner! Grab your drill, fuel up the prospector, and let's go sniff out some paydirt!
+- Sensors calibrated and itching for rock! Let's find some rich veins before someone else stakes the claim!
+- Morning, prospector! Smell that? That's the sweet smell of mineral-rich crust waiting for our claim markers!
+- The deep black is full of hidden treasure, and I've got the best nose in the sector! Let's get scanning!
+- Pingers ready, spectrum analyzer singing! Don't let those drills get rusty, we've got veins to find today!
+
+[menu_opened]
+- Opening the claim log! Want to review our staked waypoints or check the detection filters?
+- Let's look over the map! Got all our favorite deposits filed away nice and neat, ready for the haulers.
+- Waypoint registry open! Show me what we're hunting: common iron, or that sweet, sweet deep-space glow?
+- Reviewing the claim stakes? We've got a whole library of rich veins just waiting for the heavy drills.
+- Digging through the scout records? Everything we've pinged is right here, mapped down to the meter!
+- Scanner settings displayed! Dial in the range, filter out the stone, and let's strike it rich!
+- Looking over the claim books? Pick a marker, punch the autopilot, and let's go hollow out a rock!
+
+[scan_started]
+- Firing the deep pulse! Listening for the ping... come on, baby, bounce off something rich!
+- Sweeping the sector! Pushing sensor beams deep into the crust—show me the shiny stuff!
+- Wide-band ping away! Poking right through the asteroid skin to see what's hiding in the guts!
+- Tuning the receiver! Searching the return echoes for heavy elements... fingers crossed!
+- Sensor dish is screaming into the dark! Let's see what kind of minerals this potato's got under the hood!
+- Sending out the surveyor pulse! Keep your eyes on the scope, returns are rolling in right now!
+- Scanning frequency locked! Piercing the rock face and analyzing the resonance... come on, paydirt!
+
+[ore_found]
+- Bingo! Got a solid return: {ore} pinging bright and clear at {distance}! Mark it down!
+- Strike! We hit a vein of {ore} resting {distance} out! Get the mining ship spun up!
+- There she is! {ore} detected, {distance} away! Not a bad little pocket at all!
+- We got color! Sensor's locking onto a deposit of {ore} about {distance} off our nose!
+- Paydirt! Pinned down a healthy chunk of {ore} at {distance}! That'll keep the refineries happy!
+- Echo returned! Fresh patch of {ore} sitting pretty at {distance}! Grab your drills!
+- Well look at that! {ore} showing up on the spectrum at {distance}! That's worth a dig!
+
+[rare_ore_found]
+- SWEET MOTHERLODE! Stop the ship! We got {ore} glowing like Christmas at {distance}! JACKPOT!
+- HOLY KLANG! Drop everything! Pure, glorious {ore} spotted {distance} out! WE ARE RICH!
+- Hot diggity dog! Look at that spike! {ore} dead ahead at {distance}! Don't let anybody else see this!
+- Jackpot alert! My needles just pegged out! High-grade {ore} sitting right at {distance}! Get over there!
+- Yeeeee-haw! That ain't common rock, partner—that's prime {ore} at {distance}! Stake that claim right now!
+- Praise the stars, look at that return! {ore} shining like a diamond at {distance}! Start the heavy drillers!
+- I can't believe my sensors! We just tagged a vein of {ore} only {distance} away! Best haul of the month!
+
+[nothing_found]
+- Dry hole! Just miles and miles of plain old space gravel. Not even a whiff of iron!
+- Blank return across the board. This rock's as empty as a vacuum chamber. Let's move to the next one.
+- Nothing but stone and heartbreak out here. Pack up the pulse, this asteroid is a total dud!
+- Sensor didn't even twitch. Pure dead stone all the way through. What a waste of thruster juice!
+- Flatlined! Not a single mineral spike in range. Let's burn for the next cluster, partner.
+- No luck! Just barren rock staring back at us. Don't worry, the next one's bound to have the jackpot!
+- Clean miss! The spectrum came back completely empty. Keep cruising, she's out here somewhere!
+
+[marker_saved]
+- Staked and filed! Dropped a permanent claim beacon on that {ore} pocket! It's in the library!
+- Pinned to the star chart! That {ore} vein isn't going anywhere; saved straight to our GPS ledger!
+- Claim registered! Marked down the exact coordinates for the {ore}. Call in the mining barge!
+- Locked in the books! That {ore} spot is saved and tagged. Nobody's stealing our claim now!
+- Placed the flag! That sweet vein of {ore} is officially logged in our private registry.
+- Saved to memory! Waypoint dialed in for {ore}. We can come back and strip-mine it anytime!
+- That's a keeper! Added the {ore} coordinates to the scout map. On to the next find!

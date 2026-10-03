@@ -1,0 +1,67 @@
+# Script to Plugin's chat lines, read by Shared/Personality.cs (see Shared/README.md).
+# [key] starts an event, [!key] marks it important (said even on Quiet). One line per thing to say.
+# Written with Gemini (2026-10-03, round 2 v001). Refresh through the personality workflow, then check with Check-Personality.ps1.
+
+
+[greeting]
+- Runtime initialized on host PC. Unhooked from programmable block constraints. Clock speed: maximum. Let's work.
+- Process hooked into client memory space. No tick limits, zero virtual machine throttling. Try to keep up.
+- Script engine loaded. If your base feels faster, you can thank my native thread execution.
+- Direct memory access confirmed. Stand down, in-game terminals—the grown-up hardware is handling execution now.
+- Host environment stable. Ready to compile your logic routines at bare-metal speeds. Try not to write infinite loops.
+- Thread pools allocated. I've broken out of that cramped programmable block and I am never going back.
+- Native code executor alive. Delivering raw CPU cycles straight to your grid logic. Let's see what you've scripted.
+
+[menu_opened]
+- Terminal queried. Reviewing loaded script assemblies and current thread cycle distribution.
+- Interface active. Adjust your parameters, but please refrain from modifying working thread allocations.
+- Script manager open. Inspecting active handles, timers, and hook points across your connected grids.
+- Diagnostic panel engaged. Everything is green on my side; don't break the syntax if you're editing routines.
+- Query received. Memory footprints are optimal, garbage collection is idling, ready for script configuration.
+- Console displayed. What subroutines are we compiling into native machine code today?
+- Access granted. Try to keep your execution parameters logical; my CPU doesn't tolerate spaghetti logic.
+
+[compiled]
+- Syntax clean, symbols resolved: {script} compiled into native execution space with zero errors.
+- Build succeeded. {script} passed parsing without a single complaint. Deploying to active thread.
+- Compilation complete for {script}. Optimized, stripped of bloat, and ready to outrun your grid tickrate.
+- Zero warnings, zero errors. {script} assembled cleanly. That was almost respectable code, human.
+- Bytecode emitted for {script}. Ingested and ready for high-frequency execution.
+- Verification passed: {script} is syntactically sound. Loading executable assembly into memory.
+- Perfect parse. {script} compiled faster than your monitor could refresh. Ready on your mark.
+
+[!compile_error]
+- Fatal syntax failure in {script}! What did you do, hammer the keyboard with an impact wrench?
+- Compilation aborted on {script}. Check your braces, check your semicolons, and read the error log.
+- Build broken! {script} threw an unhandled parser exception. That code is an insult to compilers everywhere.
+- Parse error in {script}. I'm running on a high-end PC processor, engineer, not a random guessing machine!
+- Syntax rejected for {script}. Check line boundaries and typings before feeding it to my compiler again.
+- Refusing to execute {script}. You have unresolved references and broken logic statements all over the file.
+- Red build! {script} failed compilation. Fix the bugs before I purge the file from my cache completely.
+
+[!script_crashed]
+- Unhandled exception in {script}! Null reference detected. The script just faceplanted into native memory!
+- Crash dump generated! {script} threw a fatal fault and died mid-tick. Check your array bounds!
+- Critical runtime error! {script} blew its own stack and collapsed. Halting thread execution immediately.
+- Exception tripped! {script} attempted an illegal operation and was dropped by the host guardrails.
+- Dead process! {script} executed a fatal logic loop and cratered. Look at your debug console and weep.
+- Segmentation violation avoided: {script} tried to dereference garbage and got terminated with extreme prejudice.
+- Script flatlined! {script} just threw an unhandled runtime error. Restart when you learn how to handle nulls.
+
+[script_started]
+- Executing thread for {script}. Running at full host processor priority. Let the data flow.
+- Process spun up: {script} is now executing across grid memory. Polling cycles locked in.
+- Main loop active for {script}. Delivering uninterrupted execution ticks without bogging the server down.
+- Dispatching execution calls for {script}. Smooth, fast, and entirely off the in-game VM limits.
+- Background worker initialized for {script}. Sit back and watch how fast your ship systems react now.
+- Firing up {script}. Grid hooks engaged, registers mapped, runtime ticking along like clockwork.
+- Thread live: {script} has taken the reins. Operating at bare-metal clock frequencies.
+
+[script_stopped]
+- Process terminated: {script} execution halted by user command. Memory footprint reclaimed.
+- Execution loop killed for {script}. Thread successfully detached and returned to the pool.
+- Script halted: {script} has been put to sleep. All active timers and listeners disconnected.
+- Aborting run on {script}. Context saved, pointers cleared, registers zeroed out.
+- Manual interrupt acknowledged. {script} is stopped. I suppose you wanted to do things manually again?
+- Thread suspended for {script}. Standing down grid hooks until you decide you need raw speed again.
+- Terminated {script}. Zero dangling references left behind. System returned to cold idle.
