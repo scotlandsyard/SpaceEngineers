@@ -3,15 +3,6 @@
 # Written with Gemini (2026-10-03, round 2 v001). Refresh through the personality workflow, then check with Check-Personality.ps1.
 
 
-[greeting]
-- Ho-ho! Fat Albert is on deck! Let's see what kind of iron-plated monster you're trying to shove uphill today.
-- Up and at 'em, grease monkeys! Check your ballast, check your hydro, and let's see if she's got the legs for orbit!
-- Welcome to the launchpad, hotshot. Hope you brought enough thrust, 'cause gravity ain't handing out free passes.
-- Big Albert's logged in and looking at the scales. Don't worry, I like 'em chunky—as long as they actually fly!
-- Morning, pilot! Time to burn fuel and push some serious tonnage. Let's see how fat the fleet got while you were out.
-- Grab your harness and check your tanks. We're gonna see if your dreams are heavier than your down-force today!
-- Fat Albert reporting! The pad is cleared, the atmospheric burn curves are plotted, and I'm ready to weigh the pig.
-
 [menu_opened]
 - Cracking open the logbook? Let's eyeball the lift charts and see where the heavy metal is sitting.
 - Looking at the numbers, eh? Don't flinch if the curb weight makes your stomach drop, chief.

@@ -394,7 +394,7 @@ public class FatAlbertScreen : MyGuiScreenBase
 				Chatter.SetLevel(level);
 				ShowMessage($"Chat personality: {level}. {Chatter.LevelHint(level)}", GoodColor);
 				_recreatePending = true;
-			}).SetToolTip("How much Fat Albert talks in chat: Off, Quiet, Normal or Chatty. Click to step through them, or /fat chat quiet. Only you see the lines.");
+			}).SetToolTip("How much Fat Albert talks in chat: Off, Quiet, Normal or Chatty. Click to step through them, or /fat chat quiet. Rename him with /fat name. Only you see the lines.");
 		}
 		else
 		{
@@ -1528,5 +1528,5 @@ public class FatAlbertScreen : MyGuiScreenBase
 		"HUD OVERLAY\n" +
 		"Three lines at the left of your screen with the answer for the ship you're flying (or the one picked last here) and the trip picked under Planet, rechecked every two seconds. Turn it on and off with Ctrl+Alt+F, /fat hud in chat, or the HUD button at the bottom of the other pages. It hides when you hide the game's HUD. To move it, press Move HUD: the window closes, the HUD follows your mouse, and a left click puts it there (Esc or a right click puts it back). Reset inputs is on this Help page. To use another key, change HudKey in FatAlbert_Settings.txt (for example HudKey=Ctrl+Shift+H) while the game is closed.\n\n" +
 		"CHAT PERSONALITY\n" +
-		"Fat Albert has a few words in chat about each answer: a clean climb, a close one, a ship with thrust to spare, too heavy, fuel or power running out, or the air getting too thin for the atmospheric thrusters. He only comments when the answer changes, not on every recheck. The Chat button on this Help page steps through Off, Quiet (only when the ship is too heavy to lift off), Normal and Chatty; /fat chat quiet (or off, normal, chatty) in chat does the same. Only you see the lines.";
+		"Fat Albert has a few words in chat about each answer: a clean climb, a close one, a ship with thrust to spare, too heavy, fuel or power running out, or the air getting too thin for the atmospheric thrusters. He only comments when the answer changes, not on every recheck, and his name shows in orange. The Chat button on this Help page steps through Off, Quiet (only when the ship is too heavy to lift off), Normal and Chatty; /fat chat quiet (or off, normal, chatty) in chat does the same. Our plugins take turns: after any of them speaks, the next ordinary line waits 2 minutes on Chatty, 5 on Normal and 15 on Quiet, a too-heavy warning waits at least 30 seconds, and the same comment isn't repeated within 10 minutes. To call him something else in chat, type /fat name and the new name (up to 24 characters); /fat name on its own puts his own name back. Only you see the lines.";
 }

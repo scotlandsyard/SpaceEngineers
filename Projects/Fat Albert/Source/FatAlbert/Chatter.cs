@@ -1,4 +1,5 @@
 using System.Linq;
+using Sandbox.ModAPI;
 using TimShared;
 
 namespace FatAlbert;
@@ -23,6 +24,23 @@ internal static class Chatter
 	{
 		Settings.Chattiness = level;
 		Personality.Level = level;
+		Settings.Save();
+	}
+
+	/// <summary>Renames him in chat; null or blank goes back to his own name.</summary>
+	public static void SetDisplayName(string name)
+	{
+		Personality.DisplayName = name;
+		// Changed only fires on a real change, so save here too.
+		SaveDisplayName();
+		MyAPIGateway.Utilities.ShowMessage(FatAlbertSession.ChatSender, $"Chat name: {Personality.DisplayName}. /fat name on its own puts it back.");
+	}
+
+	/// <summary>Saves the chat name; also runs when the player renames him from Wilson's window.</summary>
+	public static void SaveDisplayName()
+	{
+		string name = Personality.DisplayName;
+		Settings.DisplayName = name == null || name == FatAlbertSession.ChatSender ? "" : name;
 		Settings.Save();
 	}
 

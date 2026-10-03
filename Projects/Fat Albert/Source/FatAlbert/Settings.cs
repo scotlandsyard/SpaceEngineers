@@ -45,6 +45,9 @@ internal static class Settings
 	/// <summary>How much Fat Albert talks in chat.</summary>
 	public static Personality.Chattiness Chattiness = Personality.Chattiness.Normal;
 
+	/// <summary>The name Fat Albert's chat lines show under; empty means his own name.</summary>
+	public static string DisplayName = "";
+
 	public static double? Distance
 	{
 		get
@@ -127,6 +130,10 @@ internal static class Settings
 			{
 				Chattiness = parsed;
 			}
+			if (values.TryGetValue("DisplayName", out string displayName))
+			{
+				DisplayName = displayName;
+			}
 			if (values.TryGetValue("View", out string view) && int.TryParse(view, out int index))
 			{
 				View = index;
@@ -155,6 +162,7 @@ internal static class Settings
 				writer.WriteLine("HudX=" + HudX.ToString(CultureInfo.InvariantCulture));
 				writer.WriteLine("HudY=" + HudY.ToString(CultureInfo.InvariantCulture));
 				writer.WriteLine("Personality=" + Chattiness);
+				writer.WriteLine("DisplayName=" + DisplayName);
 			}
 		}
 		catch (Exception ex)

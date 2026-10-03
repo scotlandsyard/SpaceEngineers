@@ -76,7 +76,10 @@ Three lines at the left of the screen: the ship and trip, YES/NO with the reason
 Fat Albert, a loud launchmaster, comments in chat through `Shared/Personality.cs`. His lines are in `Source/Personality.txt`, embedded in the DLL. Lines show only on your own screen.
 
 - Setting: **Chat** button on the Help page (steps Off, Quiet, Normal, Chatty), or `/fat chat off|quiet|normal|chatty`. Saved as `Personality=` in `FatAlbert_Settings.txt`. Default Normal.
-- `greeting` about 10 seconds after the world loads, `menu_opened` when the window opens.
+- Chat name: `/fat name <new name>` (up to `Personality.MaxNameLength`, 24 characters); `/fat name` alone goes back to "Fat Albert". Saved as `DisplayName=`, and saved again on `Personality.Changed`, so a rename from Wilson's window sticks too. His name shows in bright orange.
+- Timing comes from `Personality.cs`: one turn per cycle across all our plugins (after anyone speaks, the next ordinary line waits 2 min on Chatty, 5 on Normal, 15 on Quiet), important lines no sooner than 30 s after anyone's last line, the same event at most every 10 minutes.
+- No greeting: Wilson's roll call replaces it, using the `[rollcall]` lines (no code here).
+- `menu_opened` when the window opens.
 - One line per answer (`Chatter.cs`), for the window's main answer and the HUD's. A line is only considered when the answer for that ship and trip changes, so rechecks of the same answer stay quiet:
   - Made it: `barely_made_it` if the ship couldn't be 10% heavier and still make it, `overpowered` if it could still make it at 3 times its mass, otherwise `check_pass`.
   - `too_heavy` (with `{mass}`; marked important, so it's said even on Quiet), `out_of_fuel` (a gas ran out), `out_of_power` (batteries flat, reactors out of uranium, or a stall while power was short), `thin_air` (a stall with power to spare: the atmospheric thrusters ran out of air).
@@ -102,7 +105,7 @@ Not counted: power used by the rest of the ship, ice in O2/H2 generators, ships 
 | What | Name |
 |---|---|
 | Assembly / namespace | `FatAlbert` |
-| Chat commands | `/fat`, `/fatalbert`, `/fat hud`, `/fat chat <level>` |
+| Chat commands | `/fat`, `/fatalbert`, `/fat hud`, `/fat chat <level>`, `/fat name <name>` |
 | HUD hotkey | Ctrl+Alt+F (`HudKey` setting) |
 | Toolbar action | `FatAlbert_OpenMenu` |
 | Settings file (local storage) | `FatAlbert_Settings.txt` |

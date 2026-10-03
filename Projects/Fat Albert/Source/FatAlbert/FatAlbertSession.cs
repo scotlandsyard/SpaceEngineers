@@ -25,10 +25,6 @@ public class FatAlbertSession : MySessionComponentBase
 	private static readonly string[] ChatCommands = { "/fat", "/fatalbert" };
 
 	private const string MenuActionId = "FatAlbert_OpenMenu";
-
-	/// <summary>Ticks after the world loads before Fat Albert says hello, so the line isn't lost in the load.</summary>
-	private const int GreetingTicks = 600;
-
 	internal static FatAlbertSession Instance { get; private set; }
 
 	internal static double Now => MyAPIGateway.Session?.ElapsedPlayTime.TotalSeconds ?? 0.0;
@@ -36,8 +32,6 @@ public class FatAlbertSession : MySessionComponentBase
 	private IMyTerminalAction _menuAction;
 
 	private bool _started;
-
-	private int _tick;
 
 	public override void BeforeStart()
 	{
@@ -58,6 +52,8 @@ public class FatAlbertSession : MySessionComponentBase
 			MyAPIGateway.Utilities.MessageEntered += OnMessageEntered;
 			PluginSwitcher.Register(Plugin.Name, () => OpenMenu(null));
 			Personality.Level = Settings.Chattiness;
+			Personality.DisplayName = Settings.DisplayName;
+			Personality.Changed += Chatter.SaveDisplayName;
 			Personality.Register(ChatSender);
 			_started = true;
 		}
@@ -77,6 +73,7 @@ public class FatAlbertSession : MySessionComponentBase
 				MyAPIGateway.Utilities.MessageEntered -= OnMessageEntered;
 				PluginSwitcher.Unregister();
 				Personality.Unregister();
+				Personality.Changed -= Chatter.SaveDisplayName;
 				Settings.Save();
 			}
 			catch (Exception ex)
@@ -87,7 +84,6 @@ public class FatAlbertSession : MySessionComponentBase
 		Hud.Unload();
 		ShipReader.Clear();
 		Chatter.Reset();
-		_tick = 0;
 		PlanetNames.Unload();
 		_started = false;
 		Instance = null;
@@ -126,6 +122,13 @@ public class FatAlbertSession : MySessionComponentBase
 			SetChatLevel(words.Length > 2 ? words[2] : null);
 			return;
 		}
+		if (words.Length > 1 && words[1].Equals("name", StringComparison.OrdinalIgnoreCase))
+		{
+			// Everything after "/fat name", spaces kept; nothing resets it to his own name.
+			int start = messageText.IndexOf(words[1], StringComparison.OrdinalIgnoreCase) + words[1].Length;
+			Chatter.SetDisplayName(messageText.Substring(start));
+			return;
+		}
 		OpenMenu(null);
 	}
 
@@ -137,10 +140,6 @@ public class FatAlbertSession : MySessionComponentBase
 		}
 		try
 		{
-			if (++_tick == GreetingTicks)
-			{
-				Personality.Say("greeting");
-			}
 			Hud.Update();
 		}
 		catch (Exception ex)
