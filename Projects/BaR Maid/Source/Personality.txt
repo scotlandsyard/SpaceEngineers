@@ -31,10 +31,13 @@
 - Just lined up {count} {item} for {group}. Tell your automated welders to mind their manners with 'em.
 
 [!starved]
-# Placeholder lines: Gemini wrote this event as "out of raw materials", but it fires when no assembler in
-# the group can make the item at all. Needs a rewrite from Gemini.
-- {group} needs {item}, but no assembler there can make it.
-- I can't get {item} built for {group}: no assembler can make it.
+- {item} isn't on the drink menu for {group}! Hook up the right assembler model or take it off the tab!
+- We don't pour {item} here! Check your assembler types in {group}, because none of 'em know that recipe!
+- None of the taps in {group} can brew {item}! You need a specialist assembler on the line for that part!
+- That order's rejected! No assembler assigned to {group} has the blueprint to forge {item}. Check the rig!
+- I can't serve {item} in {group}! Not with these basic assemblers. Wire up the proper fabricator, chief!
+- Off-menu order alert! No assembler in {group} knows how to build {item}. Swap in the right machine!
+- You're ordering fancy drinks from a dive tap! None of the assemblers in {group} can fabricate {item}!
 
 [all_done]
 - Last weld finished, deck scrubbed, tools hung. {group} is shipshape and ready to roll.
