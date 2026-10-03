@@ -4,6 +4,29 @@ Plugins for Space Engineers, loaded with the [Pulsar](https://github.com/SpaceGT
 
 All of them run on the client: they need nothing installed on the server and work in multiplayer through the same requests the game's own terminal sends.
 
+## Install
+
+There are two ways to get a plugin. Either way, you end up with a DLL to drop into Pulsar.
+
+**Download it (easiest)**
+
+1. Open [Releases](../../releases) and download the plugin's `.zip`. Each plugin has its own release, and its README is inside the zip.
+2. Close the game. Copy the `.dll` from the zip into `%AppData%\Pulsar\Legacy\Local`.
+3. Start the game with Pulsar, tick the plugin in the plugin list and restart when asked.
+
+**Build it yourself (if you'd rather not run a DLL from someone else)**
+
+Every line of code is in this repo, and the build uses only the .NET SDK and your own game files.
+
+1. Install the [.NET SDK](https://dotnet.microsoft.com/download) (the releases are built with .NET SDK 10) and have Space Engineers installed through Steam.
+2. Get the source: **Code > Download ZIP** above and unzip it, or `git clone` the repo.
+3. Open PowerShell in that folder and run `.\Build.ps1` to build every plugin, or `.\Build.ps1 "BaR Maid"` for one. If Windows blocks the script, run `powershell -ExecutionPolicy Bypass -File .\Build.ps1` instead.
+4. The DLLs land in the `Build` folder. Install them the same way as step 2 above.
+
+`Build.ps1` finds the game through Steam. If it can't, pass the folder: `.\Build.ps1 -Bin64 "D:\SteamLibrary\steamapps\common\SpaceEngineers\Bin64"`.
+
+**Checking a download against the source:** the builds are deterministic. Building the release's version of the source with the same game version gives a byte-for-byte identical DLL. `Build.ps1` prints each DLL's SHA256, and each release lists the SHA256 of its DLL, so you can compare them. A different .NET SDK version can produce a different hash with the same code. In that case, compare by building with the SDK version named in the release notes.
+
 ## Projects
 
 | Plugin | What it does | Open it with |
@@ -27,14 +50,13 @@ With more than one of these plugins loaded:
 
 Each plugin still works on its own; none of them needs another to be loaded. See [`Shared/`](Shared/) for how this works.
 
-## Building
+## Building by hand
 
-You need the .NET SDK and Space Engineers installed.
+`Build.ps1` (see [Install](#install)) is the simple way. To build one project yourself:
 
-1. If the game isn't in the default Steam location, set `Bin64` in the project's `.csproj`, or pass it on the command line: `dotnet build -c Release -p:Bin64="D:\SteamLibrary\steamapps\common\SpaceEngineers\Bin64"`.
-2. Run `dotnet build -c Release` in the project's `Source` folder.
-3. The plugin DLL is written to `Source/bin/Release/net481/`. Add it to Pulsar as a local plugin.
+1. Run `dotnet build -c Release` in the project's `Source` folder. If the game isn't in the default Steam location, add `-p:Bin64="D:\SteamLibrary\steamapps\common\SpaceEngineers\Bin64"`.
+2. The plugin DLL is written to `Source/bin/Release/net481/`.
 
-The projects target .NET Framework 4.8.1 (x64) and reference the game's DLLs straight from its `Bin64` folder, without copying them.
+The projects target .NET Framework 4.8.1 (x64) and reference the game's DLLs straight from its `Bin64` folder, without copying them. Release builds are deterministic and record no paths from the computer they were built on. `.gitattributes` fixes the line endings, so every checkout builds the same bytes.
 
 Code used by more than one project lives once in [`Shared/`](Shared/) and is linked into each project that uses it.

@@ -1,0 +1,6 @@
+# Same line endings in every checkout (and in GitHub's Download ZIP), so a plugin built from
+# this source comes out byte-for-byte the same as the released DLL.
+* text=auto eol=lf
+*.dll binary
+*.zip binary
+*.png binary
