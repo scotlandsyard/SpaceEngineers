@@ -94,6 +94,11 @@ public class MaidScreen : MyGuiScreenBase
 
 	private MyGuiControlTextbox _groupNameBox;
 
+	private MyGuiControlTextbox _chatNameBox;
+
+	/// <summary>Setup and BaR settings have a second row of controls above the bottom buttons, so the table is shorter.</summary>
+	private static bool HasSecondButtonRow => s_view == View.Setup || s_view == View.Settings;
+
 	private readonly List<string> _comboKeys = new List<string>();
 
 	private readonly Dictionary<string, IMyTerminalBlock> _rowBlocks = new Dictionary<string, IMyTerminalBlock>();
@@ -188,7 +193,7 @@ public class MaidScreen : MyGuiScreenBase
 			OriginAlign = MyGuiDrawAlignEnum.HORISONTAL_CENTER_AND_VERTICAL_TOP,
 			ColumnsCount = columns.Count,
 			// Setup has a second row of buttons, so its table is shorter.
-			VisibleRowsCount = s_view == View.Setup ? 11 : 14
+			VisibleRowsCount = HasSecondButtonRow ? 11 : 14
 		};
 		_table.SetCustomColumnWidths(columns.Select(c => c.Width).ToArray());
 		for (int i = 0; i < columns.Count; i++)
@@ -218,12 +223,13 @@ public class MaidScreen : MyGuiScreenBase
 		};
 		Controls.Add(_table);
 
-		_status = new MyGuiControlLabel(new Vector2(-0.42f, s_view == View.Setup ? 0.205f : 0.285f), null, "", null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER);
+		_status = new MyGuiControlLabel(new Vector2(-0.42f, HasSecondButtonRow ? 0.205f : 0.285f), null, "", null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER);
 		Controls.Add(_status);
 
 		// Four button slots per view; the window closes with the X in the corner or Esc.
 		_autoQueueButton = null;
 		_groupNameBox = null;
+		_chatNameBox = null;
 		switch (s_view)
 		{
 		case View.Setup:
@@ -246,6 +252,13 @@ public class MaidScreen : MyGuiScreenBase
 			AddButton(-0.105f, "Raise / Next >", () => ChangeSetting(+1));
 			AddButton(0.105f, "Rescan", Rescan);
 			AddButton(0.315f, "Help", ShowHelp);
+			// The name BaR Maid's chat lines show under. Yours alone, like the personality setting.
+			_chatNameBox = new MyGuiControlTextbox(new Vector2(-0.315f, 0.275f), Personality.DisplayName == BaRMaidSession.ChatSender ? "" : Personality.DisplayName, Personality.MaxNameLength)
+			{
+				Size = new Vector2(0.19f, 0.045f)
+			};
+			Controls.Add(_chatNameBox);
+			AddButton(-0.105f, "Set chat name", SetChatName, 0.275f);
 			break;
 		case View.Help:
 			_autoQueueButton = AddButton(-0.315f, "Auto-queue", ToggleAutoQueue);
@@ -391,7 +404,7 @@ public class MaidScreen : MyGuiScreenBase
 		case View.Help:
 			return "Scroll for more. Back returns to the view you were on.";
 		case View.Settings:
-			return "Select a setting, then Lower / Raise (hold Shift for 10x). Double-click steps it. Changes every system in the group (chat personality is just yours).";
+			return "Select a setting, then Lower / Raise (hold Shift for 10x). Double-click steps it. Changes every system in the group (chat personality and name are just yours).";
 		case View.WeldPriority:
 		case View.GrindPriority:
 			return "Read only: change the order in the Build and Repair block's terminal. The mod only saves order changes made there.";
@@ -901,6 +914,17 @@ public class MaidScreen : MyGuiScreenBase
 
 	private const string PersonalityKey = "p:personality";
 
+	private const string ChatNameKey = "p:name";
+
+	/// <summary>Sets the name BaR Maid's chat lines show under; blank goes back to "BaR Maid".</summary>
+	private void SetChatName()
+	{
+		Session.SetChatName(_chatNameBox?.Text);
+		ShowMessage($"Chat name: {Personality.DisplayName}.", GoodColor);
+		_rowsSignature = null;
+		RefreshAll();
+	}
+
 	private static string PersonalityHint(Personality.Chattiness level)
 	{
 		switch (level)
@@ -922,6 +946,7 @@ public class MaidScreen : MyGuiScreenBase
 		List<RowData> rows = new List<RowData>();
 		// BaR Maid's own setting comes first. It's yours alone, not the group's.
 		rows.Add(Row(PersonalityKey, null, "BaR Maid: chat personality (yours, every group)", MaidSettings.Chattiness.ToString()));
+		rows.Add(Row(ChatNameKey, null, "BaR Maid: chat name (type it below)", Personality.DisplayName));
 		IMyShipWelder first = systems.FirstOrDefault();
 		if (first == null)
 		{
@@ -952,6 +977,11 @@ public class MaidScreen : MyGuiScreenBase
 			ShowMessage($"Chat personality: {level}. {PersonalityHint(level)}", GoodColor);
 			_rowsSignature = null;
 			RefreshAll();
+			return;
+		}
+		if (key == ChatNameKey)
+		{
+			ShowMessage("Type a name in the box below and press Set chat name (blank = BaR Maid).", WarningColor);
 			return;
 		}
 		BarSetting setting = key != null && key.StartsWith("s:") ? BarSetting.All.FirstOrDefault(s => "s:" + s.Id == key) : null;

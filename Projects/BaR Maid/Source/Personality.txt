@@ -3,15 +3,6 @@
 # Written with Gemini (2026-10-03, round 2 v001). Refresh through the personality workflow, then check with Check-Personality.ps1.
 
 
-[greeting]
-- Well, look what Klang dragged in. Airlock's open, taps are hot, and the queue is clean. Try not to dent the bulkheads.
-- Welcome back, chief. I wiped down the conveyor junctions and set the welders on idle. Let's see your damage tab.
-- Lights are up and the scrubbers are humming. Grab a wrench or get out of my gangway, we've got hulls to fix.
-- Back in the pilot seat? Good. The assemblers are primed, the coffee is battery acid, and my patience is running thin.
-- Round two, is it? Just once I'd like you to undock without leaving half your armor plates plastered to the doorframe.
-- House rules remain unchanged: wipe your boots at the airlock, keep the slag off the deck, and pay your iron bill.
-- Assemblers are glowing, conveyor tubes are cleared. Let's make this shift quick before something violently snaps.
-
 [menu_opened]
 - What'll it be, chief? Put your order in before the queue backs up out the airlock door.
 - Looking over the slate? If it's heavy armor plates, you better have the ingots to cover the tab.

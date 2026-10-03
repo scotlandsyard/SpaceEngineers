@@ -18,6 +18,9 @@ internal static class MaidSettings
 	/// <summary>How much BaR Maid talks in chat.</summary>
 	public static Personality.Chattiness Chattiness = Personality.Chattiness.Normal;
 
+	/// <summary>The name her chat lines show under; null means "BaR Maid".</summary>
+	public static string DisplayName;
+
 	public static void Load()
 	{
 		try
@@ -43,6 +46,10 @@ internal static class MaidSettings
 			{
 				Chattiness = parsed;
 			}
+			if (values.TryGetValue("DisplayName", out string name))
+			{
+				DisplayName = Personality.CleanName(name);
+			}
 		}
 		catch (Exception ex)
 		{
@@ -57,6 +64,7 @@ internal static class MaidSettings
 			using (TextWriter writer = MyAPIGateway.Utilities.WriteFileInLocalStorage(FileName, typeof(MaidSettings)))
 			{
 				writer.WriteLine("Personality=" + Chattiness);
+				writer.WriteLine("DisplayName=" + DisplayName);
 			}
 		}
 		catch (Exception ex)

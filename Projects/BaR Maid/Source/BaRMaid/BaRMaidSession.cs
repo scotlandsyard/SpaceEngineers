@@ -51,9 +51,6 @@ public class BaRMaidSession : MySessionComponentBase
 	/// <summary>Ticks between looks at what each group's systems are doing, for BaR Maid's chat lines.</summary>
 	private const int ObserveTicks = 120;
 
-	/// <summary>Ticks after the world loads before BaR Maid says hello, so the line isn't lost in the load.</summary>
-	private const int GreetingTicks = 600;
-
 	/// <summary>A build counts as big when this many blocks need welding (the mod sends players at most 24)...</summary>
 	private const int BigJobTargets = 20;
 
@@ -109,6 +106,9 @@ public class BaRMaidSession : MySessionComponentBase
 			PluginSwitcher.Register("BaR Maid", () => OpenMenu(null));
 			MaidSettings.Load();
 			Personality.Level = MaidSettings.Chattiness;
+			Personality.DisplayName = MaidSettings.DisplayName;
+			// Also fires when the player renames her from Wilson's window.
+			Personality.Changed += OnPersonalityChanged;
 			Personality.Register(ChatSender);
 			_started = true;
 		}
@@ -127,6 +127,7 @@ public class BaRMaidSession : MySessionComponentBase
 				MyAPIGateway.TerminalControls.CustomActionGetter -= CustomActionGetter;
 				MyAPIGateway.Utilities.MessageEntered -= OnMessageEntered;
 				PluginSwitcher.Unregister();
+				Personality.Changed -= OnPersonalityChanged;
 				Personality.Unregister();
 			}
 			catch
@@ -150,10 +151,6 @@ public class BaRMaidSession : MySessionComponentBase
 			if (_tick % QueueStepTicks == 0)
 			{
 				StepAutoQueue();
-			}
-			if (_tick == GreetingTicks)
-			{
-				Personality.Say("greeting");
 			}
 			if (_tick % ObserveTicks == 0)
 			{
@@ -564,6 +561,19 @@ public class BaRMaidSession : MySessionComponentBase
 	{
 		MaidSettings.Chattiness = level;
 		Personality.Level = level;
+		MaidSettings.Save();
+	}
+
+	/// <summary>Sets the name her chat lines show under (null or blank = BaR Maid). Saved through OnPersonalityChanged.</summary>
+	internal void SetChatName(string name)
+	{
+		Personality.DisplayName = name;
+	}
+
+	private void OnPersonalityChanged()
+	{
+		string name = Personality.DisplayName;
+		MaidSettings.DisplayName = name == ChatSender ? null : name;
 		MaidSettings.Save();
 	}
 
