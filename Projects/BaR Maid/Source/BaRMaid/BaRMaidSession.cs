@@ -77,6 +77,19 @@ public class BaRMaidSession : MySessionComponentBase
 
 	private readonly List<IMyShipWelder> _foundSystems = new List<IMyShipWelder>();
 
+	// What the last discovery pass left out and why, for the Rescan report.
+	private readonly List<IMyShipWelder> _otherWelders = new List<IMyShipWelder>();
+
+	private readonly List<IMyShipWelder> _noAccess = new List<IMyShipWelder>();
+
+	private readonly List<IMyShipWelder> _noTerminal = new List<IMyShipWelder>();
+
+	private readonly List<IMyShipWelder> _outOfGroups = new List<IMyShipWelder>();
+
+	private int _gridsScanned;
+
+	private int _gridsSkipped;
+
 	private string _groupsSignature = "";
 
 	private int _pendingIndex = -1;
@@ -344,6 +357,9 @@ public class BaRMaidSession : MySessionComponentBase
 	{
 		_pendingGrids.Clear();
 		_foundSystems.Clear();
+		_otherWelders.Clear();
+		_gridsScanned = 0;
+		_gridsSkipped = 0;
 		MyAPIGateway.Entities.GetEntities(null, delegate (IMyEntity e)
 		{
 			if (e is IMyCubeGrid grid)
@@ -360,13 +376,15 @@ public class BaRMaidSession : MySessionComponentBase
 		// Skip closed grids, projections and build previews.
 		if (grid.Closed || !(grid is MyCubeGrid cubeGrid) || cubeGrid.Projector != null || cubeGrid.IsPreview)
 		{
+			_gridsSkipped++;
 			return;
 		}
+		_gridsScanned++;
 		foreach (MyCubeBlock block in cubeGrid.GetFatBlocks())
 		{
-			if (block is IMyShipWelder welder && BarApi.IsBar(welder))
+			if (block is IMyShipWelder welder)
 			{
-				_foundSystems.Add(welder);
+				(BarApi.IsBar(welder) ? _foundSystems : _otherWelders).Add(welder);
 			}
 		}
 	}
@@ -389,10 +407,18 @@ public class BaRMaidSession : MySessionComponentBase
 		// system but are constructs of their own, so their assemblers are never used for this one's systems.
 		Dictionary<long, Construct> constructs = new Dictionary<long, Construct>();
 		List<IMyCubeGrid> linked = new List<IMyCubeGrid>();
+		_noAccess.Clear();
+		_noTerminal.Clear();
+		_outOfGroups.Clear();
 		foreach (IMyShipWelder system in _foundSystems)
 		{
-			if (system.Closed || !system.HasLocalPlayerAccess())
+			if (system.Closed)
 			{
+				continue;
+			}
+			if (!system.HasLocalPlayerAccess())
+			{
+				_noAccess.Add(system);
 				continue;
 			}
 			linked.Clear();
@@ -407,6 +433,7 @@ public class BaRMaidSession : MySessionComponentBase
 				IMyGridTerminalSystem terminal = MyAPIGateway.TerminalActionsHelper.GetTerminalSystemForGrid(system.CubeGrid);
 				if (terminal == null)
 				{
+					_noTerminal.Add(system);
 					continue;
 				}
 				construct = new Construct { Terminal = terminal, Grids = new HashSet<IMyCubeGrid>(linked) };
@@ -479,6 +506,7 @@ public class BaRMaidSession : MySessionComponentBase
 			string name = MaidConfig.GetGroup(system);
 			if (MaidConfig.IsNoGroup(name))
 			{
+				_outOfGroups.Add(system);
 				continue;
 			}
 			bool isDefault = MaidConfig.IsDefaultGroup(name);
@@ -575,6 +603,39 @@ public class BaRMaidSession : MySessionComponentBase
 		string name = Personality.DisplayName;
 		MaidSettings.DisplayName = name == ChatSender ? null : name;
 		MaidSettings.Save();
+	}
+
+	/// <summary>
+	/// What the last discovery pass found, and why any Build and Repair system isn't in a group: one line for the
+	/// Rescan message. Every welder seen goes to the game log with the details.
+	/// </summary>
+	internal string DiscoveryReport()
+	{
+		StringBuilder log = new StringBuilder($"[BaRMaid] Rescan: {_gridsScanned} grid(s) scanned, {_gridsSkipped} skipped (projections/previews), {_foundSystems.Count} BaR system(s), {_otherWelders.Count} other welder(s), {_sortedGroups.Count} group(s)");
+		foreach (IMyShipWelder welder in _foundSystems.Concat(_otherWelders))
+		{
+			string reason = _otherWelders.Contains(welder) ? "not a BaR (no BuildAndRepair data)"
+				: _noAccess.Contains(welder) ? "no access"
+				: _noTerminal.Contains(welder) ? "no terminal system"
+				: _outOfGroups.Contains(welder) ? "Group=None"
+				: "in " + (_sortedGroups.FirstOrDefault(g => g.Systems.Contains(welder))?.Label ?? "no group (?)");
+			log.Append($"\n  {welder.CustomName} on {welder.CubeGrid.CustomName} ({welder.CubeGrid.EntityId}), {welder.BlockDefinition.SubtypeName}: {reason}");
+		}
+		MyLog.Default.WriteLineAndConsole(log.ToString());
+
+		StringBuilder text = new StringBuilder($"Found {_foundSystems.Count} BaR system(s) in {_sortedGroups.Count} group(s)");
+		AppendNames(text, "no access", _noAccess);
+		AppendNames(text, "Group=None (use Setup on another group, or delete that line in Custom Data)", _outOfGroups);
+		AppendNames(text, "no terminal system", _noTerminal);
+		return text.Append('.').ToString();
+	}
+
+	private static void AppendNames(StringBuilder text, string reason, List<IMyShipWelder> welders)
+	{
+		if (welders.Count > 0)
+		{
+			text.Append($"; {reason}: {string.Join(", ", welders.Take(3).Select(w => w.CustomName))}{(welders.Count > 3 ? $" +{welders.Count - 3}" : "")}");
+		}
 	}
 
 	internal MaidGroup FindGroup(string key)

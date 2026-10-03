@@ -468,7 +468,10 @@ public class MaidScreen : MyGuiScreenBase
 	private void Rescan()
 	{
 		Session.RefreshNow();
-		ShowMessage($"Found {Session.Groups.Count} group(s).");
+		// Also in chat, where it stays readable; the details go to the game log.
+		string report = Session.DiscoveryReport();
+		ShowMessage(report);
+		MyAPIGateway.Utilities.ShowMessage(BaRMaidSession.ChatSender, report);
 		RefreshAll();
 	}
 
