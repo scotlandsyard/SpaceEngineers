@@ -151,6 +151,15 @@ internal static class Personality
 	/// </summary>
 	public static MyGuiControlCombobox AddChatSetting(MyGuiScreenBase screen, MyGuiControlLabel caption)
 	{
+		return AddChatSetting(screen, caption, Level, level => Level = level, null);
+	}
+
+	/// <summary>
+	/// The same dropdown for a window that isn't a registered character, like Wilson's: shows current, and calls
+	/// picked with the new level instead of setting Level. toolTip replaces the standard one when given.
+	/// </summary>
+	public static MyGuiControlCombobox AddChatSetting(MyGuiScreenBase screen, MyGuiControlLabel caption, Chattiness current, Action<Chattiness> picked, string toolTip)
+	{
 		if (screen?.Size == null || caption == null)
 		{
 			return null;
@@ -161,9 +170,9 @@ internal static class Personality
 		{
 			combo.AddItem((long)level, "Chat: " + level, (int)level, null, sort: false);
 		}
-		combo.SelectItemByKey((long)Level, sendEvent: false);
-		combo.SetToolTip("How often this character talks in chat. Only you see the lines.\nOff: never. Quiet: about every 15 minutes, plus important moments. Normal: about every 5 minutes. Chatty: about every 2 minutes.");
-		combo.ItemSelected += () => Level = (Chattiness)combo.GetSelectedKey();
+		combo.SelectItemByKey((long)current, sendEvent: false);
+		combo.SetToolTip(toolTip ?? "How often this character talks in chat. Only you see the lines.\nOff: never. Quiet: about every 15 minutes, plus important moments. Normal: about every 5 minutes. Chatty: about every 2 minutes.");
+		combo.ItemSelected += () => picked((Chattiness)combo.GetSelectedKey());
 		screen.Controls.Add(combo);
 		return combo;
 	}
@@ -478,10 +487,16 @@ internal static class Personality
 			}
 			break;
 		case "rename":
-			// The player renamed us in Wilson's window. The plugin saves it from Changed; "here" confirms it.
+			// The player changed us in Wilson's Crew page: a new display name (empty for our own), and optionally a new
+			// level as text in the fifth element (missing or empty: unchanged). The plugin saves both from Changed;
+			// "here" confirms them. A plugin built before the level was added just reads the name.
 			if (forUs && parts.Length > 3)
 			{
 				DisplayName = parts[3] as string;
+				if (parts.Length > 4 && parts[4] is string levelText && levelText.Length > 0 && Enum.TryParse(levelText, true, out Chattiness level) && Enum.IsDefined(typeof(Chattiness), level))
+				{
+					Level = level;
+				}
 			}
 			break;
 		}

@@ -32,19 +32,23 @@ A turn is one character's line or one short exchange. After a turn, nobody says 
 
 Important moments (a starved assembler, a ship too heavy to lift, a crashed script, full containers) can break in, but never within 30 seconds of the last line. A character isn't asked about the same event again for 10 minutes, the same exchange trigger doesn't come round again for 30, and each character also keeps to its own chat setting's cycle.
 
-Set Wilson's setting with the **Wilson:** button in the window, or `/wilson off`, `/wilson quiet`, `/wilson normal` or `/wilson chatty`.
+Set Wilson's setting with the **Chat:** dropdown at the top right of his window (the same place as every plugin's chat setting), or `/wilson off`, `/wilson quiet`, `/wilson normal` or `/wilson chatty`.
 
 Each plugin's own chat setting still counts. A plugin set to Off sends Wilson nothing and is never in an exchange or the roll call; a plugin on Quiet only reports its important moments, says them in its own words, and answers the roll call.
 
-## Names
+## The Crew page: names and chat settings
 
-Every character can go by a name you choose. In the window, pick a character in the table, type a name under it and press **Rename**; **Own name** puts its own back. Each plugin keeps its name in its own settings, so the name stays when Wilson isn't loaded; Wilson keeps his own and Tim's. Lines that mention another character by name keep the original name.
+Every character can go by a name you choose, and every plugin character's chat setting can be set from here. On the Crew page, pick a character in the table:
+- Type a name under it and press **Rename**; **Own name** puts its own back.
+- The **Chat** dropdown under it sets how often that character talks, the same as the Chat dropdown at the top right of its own plugin's window. Tim follows Wilson's setting.
+
+Each plugin keeps its name and chat setting in its own settings, so they stay when Wilson isn't loaded; Wilson keeps his own and Tim's names. Lines that mention another character by name keep the original name.
 
 ## The window
 
-- **Characters:** Wilson, Tim and the five plugin characters: the name each goes by, its plugin, its chat setting and whether it can be in exchanges right now.
-- **Rename / Own name:** see Names above.
-- **What Wilson decided:** the latest events and what came of them (who spoke, which exchange played, or why it passed).
+- **Chat:** (top right): Wilson's own setting.
+- **Crew** (the main page): Wilson, Tim and the five plugin characters: the name each goes by, its colour in chat, its plugin, its chat setting and whether it can be in exchanges right now, with renaming and chat settings for the one picked.
+- **Decision log:** the latest events and what came of them (who spoke, which exchange played, or why it passed).
 - **Try an exchange** (or `/wilson try`): plays a random exchange now between the loaded characters, with made-up names and numbers, ignoring the timers.
 - **Roll call** (or `/wilson rollcall`): calls the roll again now.
 - **Help:** everything above, in game.

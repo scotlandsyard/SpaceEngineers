@@ -654,8 +654,30 @@ internal static class Director
 		{
 			return $"{name} isn't loaded, so it can't be renamed from here.";
 		}
-		Send("rename", name, newName ?? "");
+		SendRename(c, newName ?? "", null);
 		return (c.DisplayName ?? c.Name) == shown ? $"{name} now goes by {shown}." : $"Asked {name} to go by {shown}. If the name doesn't change, that plugin needs updating.";
+	}
+
+	/// <summary>
+	/// Sets a plugin character's own chat level from the Crew page. The plugin applies it through Personality.Level,
+	/// saves it in its own settings, and confirms with "here". Wilson's own setting goes through WilsonSession.SetLevel.
+	/// </summary>
+	public static string SetLevel(string name, Level level)
+	{
+		Character c = Find(name);
+		if (c == null)
+		{
+			return $"{name} isn't loaded, so its chat can't be set from here.";
+		}
+		// The rename message carries the level too; the current name goes along unchanged.
+		SendRename(c, c.DisplayName ?? "", level.ToString());
+		return c.Level == level ? $"{name}'s chat is {level}." : $"Asked {name} to set its chat to {level}. If it doesn't change, that plugin needs updating.";
+	}
+
+	/// <summary>{"rename", "Wilson", target, newName, level}: level is null to leave it alone. Older plugins only read the name.</summary>
+	private static void SendRename(Character c, string newName, string level)
+	{
+		MyAPIGateway.Utilities.SendModMessage(Channel, new object[] { "rename", Cast.WilsonName, c.Name, newName, level });
 	}
 
 	// ---- Trying it out ----
