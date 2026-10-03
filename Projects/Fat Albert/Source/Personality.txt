@@ -6,7 +6,7 @@
 [greeting]
 - Ho-ho! Fat Albert is on deck! Let's see what kind of iron-plated monster you're trying to shove uphill today.
 - Up and at 'em, grease monkeys! Check your ballast, check your hydro, and let's see if she's got the legs for orbit!
-- Welcome to the launchpad, son. Hope you brought enough thrust, 'cause gravity ain't handing out free passes.
+- Welcome to the launchpad, hotshot. Hope you brought enough thrust, 'cause gravity ain't handing out free passes.
 - Big Albert's logged in and looking at the scales. Don't worry, I like 'em chunky—as long as they actually fly!
 - Morning, pilot! Time to burn fuel and push some serious tonnage. Let's see how fat the fleet got while you were out.
 - Grab your harness and check your tanks. We're gonna see if your dreams are heavier than your down-force today!
@@ -14,24 +14,24 @@
 
 [menu_opened]
 - Cracking open the logbook? Let's eyeball the lift charts and see where the heavy metal is sitting.
-- Looking at the numbers, eh? Don't flinch if the curb weight makes your stomach drop, son.
+- Looking at the numbers, eh? Don't flinch if the curb weight makes your stomach drop, chief.
 - Albert's scales are open for business. Check your thrusters, dial your payload, and don't lie about the cargo!
 - Let's crunch the burn curves. If she's too thick to climb the well, better to find out now than in a smoking crater!
 - Pull up a chair and look at the telemetry. Numbers don't lie, even when you slap five extra hydrogen tanks on top.
-- Checking your margins? Good man. Gravity's always looking for an excuse to pull your pants down.
+- Checking your margins? Look at you, being responsible. Gravity's always looking for an excuse to pull your pants down.
 - Right here, pilot. Let's inspect the wet mass, the dry mass, and how much sweat your thrusters are gonna bleed.
 
 [check_pass]
 - Yee-haw! Clear the tower! {ship} has got the muscle to punch right through the mud and kiss the stars!
 - Clean burn on {ship}! Throttle up and don't look back—she's walking out of the gravity well like a queen!
 - She may be wide, but she sure can climb! {ship} is cleared for orbital transit. Give 'er the coals!
-- That's what I'm talking about! {ship} has plenty of fire in the belly. You're going to space, son!
+- That's what I'm talking about! {ship} has plenty of fire in the belly. You're going to space, ace!
 - Green lights all across the lift-board for {ship}. She'll make orbit with fuel enough to spare for a victory lap!
 - She's heavy, but your thrust curve is pure gold. {ship} is breaking out of the well without breaking a sweat!
 - Hah! Put that iron in the sky! {ship} clears the gravity boundary with room to breathe. Fly safe, pilot!
 
 [barely_made_it]
-- Whew lad! {ship} is gonna make orbit, but you'll be sipping the bottom drops of your hydro tanks with a straw!
+- Whew, chief! {ship} is gonna make orbit, but you'll be sipping the bottom drops of your hydro tanks with a straw!
 - Pucker factor ten on {ship}! She'll clear the well, but sneeze on the stick and you're dropping like a brick!
 - She'll fly, barely. {ship} is scraping over the gravity hump on fumes and sheer stubborn willpower!
 - Holy smokes, talk about skinning your teeth! {ship} has just enough push to escape, but don't you dare tap the brakes!
@@ -43,14 +43,14 @@
 - Sweet jumping Klang! {ship} ain't a cargo boat, that's an intercontinental rocket with a cockpit strapped on!
 - Hold onto your teeth! {ship} has so much thrust she's gonna rip the atmosphere wide open on the way out!
 - Hah! You trying to move the whole planet backwards? {ship} has got enough kick to launch a moon into high orbit!
-- That ain't lift, son, that's pure violence! {ship} is gonna punch straight through the clouds like a railgun slug!
+- That ain't lift, captain, that's pure violence! {ship} is gonna punch straight through the clouds like a railgun slug!
 - Look at that power curve! {ship} has thrust to burn and fuel to waste. Tap the gas and say goodbye to the dirt!
 - Overkill is my favorite flavor! {ship} has got more burn than brain. Enjoy the g-forces, speed racer!
 - By the holy thruster flame! {ship} doesn't just climb out of gravity, she insults it on the way past!
 
 [!too_heavy]
 - Cut the throttle! {ship} is clocking in at {mass} and she's deader than a lead anvil! You ain't going nowhere!
-- She's grounded, son! {mass} on {ship} is way too much lard for those thrusters to lift off the tarmac!
+- She's grounded, champ! {mass} on {ship} is way too much lard for those thrusters to lift off the tarmac!
 - Don't even hit the ignition. {ship} weighs {mass} and gravity's got both hands wrapped tight around her ankles!
 - Hold up! {ship} is {mass} of pure deadweight. You try to lift this brick and you'll just dig a hole to the core!
 - She won't budge an inch! {ship} is sitting at {mass}. Strip some armor or unload the ore before you burn the pads off!
@@ -64,7 +64,7 @@
 - Who did the tank math on {ship}? You're going dry before you hit the black. Strap on some extra gas or stay grounded!
 - Hydro gauge is crying! {ship} exhausts her fuel reserves before the pull lets go. Abort the launch profile!
 - Engine stall incoming! {ship} drains the hydro banks mid-ascent. You can't glide a brick, pilot!
-- Red light on the fuel manifolds! {ship} runs dry before escaping the well. Gravity's licking its chops, son!
+- Red light on the fuel manifolds! {ship} runs dry before escaping the well. Gravity's licking its chops, hotshot!
 
 [out_of_power]
 - Blackout! The electrical grid on {ship} drops dead under full ascent load. Thrusters are cutting out cold!
@@ -72,7 +72,7 @@
 - Your thrusters are demanding volts that {ship} just doesn't have! Power brownout mid-climb means a crater below!
 - The juice is loose! {ship} blows past its power budget on ascent. When the power dies, gravity takes the wheel!
 - Grid overload! {ship} drains its battery banks flat before punching out of the soup. Watch your power lines!
-- Dark cockpit warning! {ship} burns out its reactors trying to feed the thrusters. You need more power plants, lad!
+- Dark cockpit warning! {ship} burns out its reactors trying to feed the thrusters. You need more power plants, genius!
 - Pop goes the breaker! {ship} drops electrical output during the vertical burn. That's a bad way to meet the mountain!
 
 [thin_air]
@@ -82,4 +82,4 @@
 - The fans are spinning, but there's no soup left to push! {ship} is losing lift right between the sky and the stars!
 - Altitude ceiling hit! The air can't hold {ship} up any longer. Light the rockets or start saying your prayers!
 - Atmo burn fade on {ship}! She's slipping back down into the soup unless you got hydro boosters ready to kick in!
-- You've reached the ceiling, son! {ship}'s atmospheric props are just beating the vacuum. Time to transition or drop!
+- You've reached the ceiling, captain! {ship}'s atmospheric props are just beating the vacuum. Time to transition or drop!
