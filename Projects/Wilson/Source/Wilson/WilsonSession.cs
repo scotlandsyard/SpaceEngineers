@@ -14,7 +14,9 @@ namespace Wilson;
 [MySessionComponentDescriptor(MyUpdateOrder.AfterSimulation)]
 public class WilsonSession : MySessionComponentBase
 {
-	private const string ChatCommand = "/wilson";
+	private const string ChatCommand = Cast.WilsonCommand;
+
+	private const string TimCommand = "/tim";
 
 	private bool _started;
 
@@ -74,10 +76,19 @@ public class WilsonSession : MySessionComponentBase
 		}
 	}
 
-	/// <summary>/wilson opens the window; /wilson off|quiet|normal|chatty sets the level; /wilson try plays an exchange.</summary>
+	/// <summary>
+	/// /wilson opens the window; /wilson off|quiet|normal|chatty sets the level; /wilson try plays an exchange;
+	/// /wilson rollcall calls the roll again. /tim belongs to the plugin switcher; Wilson only watches for it, so
+	/// his guest Tim can drop by.
+	/// </summary>
 	private void OnMessageEntered(string messageText, ref bool sendToOthers)
 	{
 		string[] words = (messageText ?? "").Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+		if (words.Length == 1 && words[0].Equals(TimCommand, StringComparison.OrdinalIgnoreCase))
+		{
+			Director.OnTimCommand();
+			return;
+		}
 		if (words.Length == 0 || !words[0].Equals(ChatCommand, StringComparison.OrdinalIgnoreCase))
 		{
 			return;
@@ -93,13 +104,18 @@ public class WilsonSession : MySessionComponentBase
 			MyAPIGateway.Utilities.ShowMessage(Plugin.Name, Director.PlayAny());
 			return;
 		}
+		if (words[1].Equals("rollcall", StringComparison.OrdinalIgnoreCase))
+		{
+			MyAPIGateway.Utilities.ShowMessage(Plugin.Name, Director.RollCallNow());
+			return;
+		}
 		if (Enum.TryParse(words[1], true, out Level level) && Enum.IsDefined(typeof(Level), level))
 		{
 			SetLevel(level);
 			MyAPIGateway.Utilities.ShowMessage(Plugin.Name, $"{level}. {Settings.Hint(level)}");
 			return;
 		}
-		MyAPIGateway.Utilities.ShowMessage(Plugin.Name, $"Wilson is {Settings.Level}. /wilson opens his window; /wilson off, quiet, normal or chatty sets how much he does; /wilson try plays an exchange.");
+		MyAPIGateway.Utilities.ShowMessage(Plugin.Name, $"Wilson is {Settings.Level}. /wilson opens his window; /wilson off, quiet, normal or chatty sets how much he does; /wilson try plays an exchange; /wilson rollcall calls the roll.");
 	}
 
 	internal static void SetLevel(Level level)

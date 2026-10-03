@@ -39,9 +39,11 @@
   </ItemGroup>
 
   <!-- Shared with our other plugins: one copy in the repo's Shared folder, compiled into each plugin. Wilson is the
-       banter director, so he speaks the Shared/Personality.cs protocol himself instead of linking that file. -->
+       banter director: he speaks the director's side of the protocol himself (Director.cs) and only uses
+       Personality.cs for the shared rhythm, names and colours; he never registers as a plugin character. -->
   <ItemGroup>
     <Compile Include="../../../Shared/PluginSwitcher.cs" Link="Shared/PluginSwitcher.cs" />
+    <Compile Include="../../../Shared/Personality.cs" Link="Shared/Personality.cs" />
   </ItemGroup>
 
   <!-- Wilson's own lines and the exchanges he stages between the other characters. -->

@@ -34,8 +34,8 @@ internal sealed class Exchange
 }
 
 /// <summary>
-/// Reads Wilson.txt (an embedded resource). A [key] line starts Wilson's own lines for that key (greeting, idle,
-/// squabble), one per line. [exchange trigger=character.event] starts an exchange: one "Chat name: text" per line,
+/// Reads Wilson.txt (an embedded resource). A [key] line starts Wilson's own lines for that key (rollcall_open,
+/// rollcall_close, idle, squabble) or Tim's (tim), one per line. [exchange trigger=character.event] starts an exchange: one "Chat name: text" per line,
 /// in the order they're said. Blank lines and lines starting with # are skipped, and a leading "- " is dropped.
 /// </summary>
 internal static class Lines
@@ -144,7 +144,7 @@ internal static class Lines
 		}
 	}
 
-	/// <summary>One of Wilson's own lines for a key (greeting, idle, squabble), never the same one twice in a row.</summary>
+	/// <summary>One line for one of Wilson's or Tim's own keys, never the same one twice in a row; null if there are none.</summary>
 	public static string Own(string key)
 	{
 		if (!s_own.TryGetValue(key, out List<string> list) || list.Count == 0)
@@ -158,23 +158,6 @@ internal static class Lines
 			line = list[(list.IndexOf(line) + 1 + s_random.Next(list.Count - 1)) % list.Count];
 		}
 		s_lastOwn[key] = line;
-		return line;
-	}
-
-	/// <summary>Turns {name} into its value for each name/value pair.</summary>
-	public static string Fill(string line, string[] values)
-	{
-		if (values == null)
-		{
-			return line;
-		}
-		for (int i = 0; i + 1 < values.Length; i += 2)
-		{
-			if (values[i] != null)
-			{
-				line = line.Replace("{" + values[i] + "}", values[i + 1] ?? "");
-			}
-		}
 		return line;
 	}
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Sandbox.ModAPI;
+using TimShared;
 using VRage.Utils;
 
 namespace Wilson;
@@ -21,6 +22,11 @@ internal static class Settings
 	private const string FileName = "Wilson_Settings.txt";
 
 	public static Level Level = Level.Normal;
+
+	/// <summary>The player's names for Wilson and Tim; null for their own. The plugins keep their own names.</summary>
+	public static string WilsonName;
+
+	public static string TimName;
 
 	public static void Load()
 	{
@@ -47,6 +53,10 @@ internal static class Settings
 			{
 				Level = parsed;
 			}
+			values.TryGetValue("WilsonName", out string wilson);
+			WilsonName = Personality.CleanName(wilson);
+			values.TryGetValue("TimName", out string tim);
+			TimName = Personality.CleanName(tim);
 		}
 		catch (Exception ex)
 		{
@@ -61,12 +71,22 @@ internal static class Settings
 			using (TextWriter writer = MyAPIGateway.Utilities.WriteFileInLocalStorage(FileName, typeof(Settings)))
 			{
 				writer.WriteLine("Level=" + Level);
+				writer.WriteLine("WilsonName=" + (WilsonName ?? ""));
+				writer.WriteLine("TimName=" + (TimName ?? ""));
 			}
 		}
 		catch (Exception ex)
 		{
 			MyLog.Default.WriteLineAndConsole($"[Wilson] Could not save settings: {ex.Message}");
 		}
+	}
+
+	/// <summary>The same rhythm as the plugins on their own: one turn per cycle.</summary>
+	public static TimeSpan Cycle => Personality.Cycle(ToChattiness(Level));
+
+	public static Personality.Chattiness ToChattiness(Level level)
+	{
+		return (Personality.Chattiness)(int)level;
 	}
 
 	public static string Hint(Level level)
@@ -76,11 +96,11 @@ internal static class Settings
 		case Level.Off:
 			return "Wilson stays out of it: each plugin talks on its own, as if he weren't loaded.";
 		case Level.Quiet:
-			return "Wilson keeps the plugins to one voice at a time, says hello, and only now and then stages an exchange.";
+			return "One turn every 15 minutes, important moments only, no exchanges. Roll call on load.";
 		case Level.Chatty:
-			return "Wilson stages exchanges often, breaks up arguments, and shares a proverb after a quiet spell.";
+			return "One turn every 2 minutes; about half are exchanges. Roll call on load.";
 		default:
-			return "Wilson stages an exchange every so often, sometimes breaks up an argument, and rarely shares a proverb.";
+			return "One turn every 5 minutes; about a third are exchanges. Roll call on load.";
 		}
 	}
 }

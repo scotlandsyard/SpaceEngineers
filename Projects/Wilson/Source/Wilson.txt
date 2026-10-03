@@ -1,17 +1,51 @@
 # Wilson's lines and exchanges. This copy is built into Wilson.dll; edit it here, never in the private staging copy.
-# Written with Gemini (2026-10-03, round 2 v001). Exchanges: [exchange trigger=<character>.<event>], then 'Name: line' per speaker.
-# Characters: barmaid, fatalbert, stockpile, scripttoplugin, orescout, or any (any.greeting plays on world load).
+# Written with Gemini (2026-10-03, round 2 v001; roll call and Tim from batch 2 v001). Exchanges: [exchange trigger=<character>.<event>], then 'Name: line' per speaker.
+# Characters: barmaid, fatalbert, stockpile, scripttoplugin, orescout, or any (any.tim plays when the player types /tim).
+# Wilson's own keys: rollcall_open, rollcall_close ({command} = /wilson), idle, squabble. Tim's: tim.
 # Check with SpaceEngineers-Private\Personality\Check-Personality.ps1 "Wilson".
 
 
-[greeting]
-- Well now, look at the whole fence line lit up. Reckon the station's fixin' to get awful busy today.
-- Howdy there, neighbours. Mornin' sun's hittin' the solar panels just right. Mind the drift out there.
-- Hear that low hum through the deck plating? That's the sound of a good grid stretchin' its joints.
-- Afternoon, folks. Don't mind me, just over here patchin' up an old solar rotor that's had a squeak since Tuesday.
-- Well now, another fine day in the black. No meteor storms yet, so I call that an honest blessin'.
-- Step outside, take a look at the stars, and remember: nothin' in space moves faster than a dropped wrench.
-- Good to see all the radios chirpin'. Just make sure you folks don't run the battery banks completely flat.
+# Roll call and Tim: Gemini batch 2 (2026-10-03 v001).
+[rollcall_open]
+- Mornin' over the fence, folks. Sound off on the horn and let the captain know the line's workin'.
+- Well now, looks like the dust is settlin'. Check in on your channels, neighbours, nice and orderly.
+- Station's stretchin' its joints today. Give the pilot a toot on the comms so we know who's on deck.
+- Hello the house! Radios are warm and runnin'. Sound off, crew, and let folks know your call sign.
+- Sun's up over the solar banks. Roll call time, neighbours. Let's hear who's holdin' the watch.
+- Quiet mornin' out here in the black. Tap your relays and let the captain know how to ring your bell.
+- Roll call down the fence line. Make your check-in short, clean, and give the pilot your handle.
+
+[rollcall_close]
+- And that's the whole fence line accounted for. Give me a holler with {command} if you need an ear.
+- Good crew, good neighbours. If you ever want some quiet porch talk, type {command} to flag me down.
+- All square on the roster. Remember, neighbour, {command} fetches me right over if things get knotty.
+- Looks like we're in fine fettle today. Just ring {command} when you want to lean on the fence a spell.
+- Full deck, clean airlocks. Keep your wrenches handy, and type {command} whenever you need old Wilson.
+- Roll call complete, pilot. If the chatter gets thick or you need a word, {command} brings me right over.
+- Everyone's at their station. Have a peaceful shift out there, and punch in {command} if you need me.
+
+[exchange trigger=any.tim]
+Tim: Hear me out, Wilson: twin turbo-blowers on the air scrubber intake!
+Wilson: Well now, Tim, breathable air don't need to arrive at eighty miles an hour.
+Tim: But think of the cabin circulation, neighbour!
+
+[exchange trigger=any.tim]
+Tim: I just bypassed the rotor safety pins. We're gonna get twice the spin on this drill rig!
+Wilson: You keep whittlin' that pin down, Tim, and that drill's gonna go visit the next crater over.
+Tim: Just gotta hold the handles real tight, Wilson!
+
+[exchange trigger=any.tim]
+Tim: Say, neighbour, what if we double the voltage on the main hangar doors so they snap shut instantly?
+Wilson: Nothin' wrong with a slow door, Tim. Gives a body time to keep their boots out of the seam.
+
+[tim]
+- What's cookin', captain? Put down that factory wrench, I've got three ideas to double our torque output right now!
+- Tim here! Don't let the manual scare ya; every stock part is just an upgrade waiting for some real tools!
+- You rang the right workshop, ace! Let's bore out those manifolds and see what this rig can really do!
+- Just happened to be in the neighbourhood! Need a heavier weld-arc or a high-output blower strapped to that hull?
+- Don't settle for factory specs, captain! A couple of extra coils and we'll have this whole grid humming like a wasp!
+- Looking for extra kick? I was just eyein' your thruster feeds; with the right wrench, we can pull another ten percent!
+- Workshop's open! If it doesn't move fast enough, we just haven't bolted a big enough motor to it yet, hotshot!
 
 [idle]
 - You push a conveyor tube too hard, neighbour, and it's liable to push back right through your bulkhead.
@@ -177,19 +211,3 @@ OreScout: Yeah, but Uncle Albert, my drills feel so lonely when they don't get t
 OreScout: Blank screen. No iron, no nickel, no nothing. Total dud.
 BaR Maid: Well, on the bright side, at least you didn't track any fresh red dust across my landing pads this time.
 Wilson: There's always another rock floatin' down the lane, scout. The stars ain't running out of gravel anytime soon.
-
-[exchange trigger=any.greeting]
-Stockpile Manager: The Grand Vaults open. May our inventory be blessed with divine precision and holy balance.
-BaR Maid: Lockers open, coffee's hot, and mind the clean decks. Let's see what you packrats broke today.
-Fat Albert: Let's burn some fuel, folks! Make sure your lift curves are green before you give 'er the gas!
-Wilson: Mornin' neighbours. Looks like the whole fence line is up and runnin'. Try to keep the peace out there.
-
-[exchange trigger=any.greeting]
-Script to Plugin: Native execution threads hooked and ready. Running bypass operations directly on host processor.
-OreScout: Scanner is singing and the needles are twitching! Let's go punch some holes in the asteroids!
-Wilson: Well now, listen to that chatter. Sounds like a proper station again. Don't go bustin' nothin' too dear.
-
-[exchange trigger=any.greeting]
-BaR Maid: Assemblers are up, taps are flowing. Try to dock without tearing the bay doors off this shift.
-Fat Albert: Don't you worry about my docking, sister, I set 'er down lighter than a feather on fresh snow!
-BaR Maid: Yeah, and the crater you left in Pad Three last week was just a love tap, right? Get to work, Albert.

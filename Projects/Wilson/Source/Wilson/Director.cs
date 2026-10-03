@@ -2,51 +2,72 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Sandbox.ModAPI;
+using TimShared;
 using VRage.Utils;
 
 namespace Wilson;
 
 /// <summary>
 /// The banter director on the plugins' personality channel (see "Banter (the director)" in Shared/README.md). The
-/// plugins send Wilson their events instead of talking themselves; for each one he either asks that plugin to say
-/// one of its own lines ("say"), or plays a written exchange between several characters from Wilson.txt, one line
-/// every few seconds. Everything runs on the game thread: mod messages are delivered there, straight from the
-/// sender's call.
+/// plugins send Wilson their events instead of talking themselves. He keeps one rhythm for everyone: one turn per
+/// cycle, where a turn is one plugin saying one of its own lines ("say"), or a short exchange between several
+/// characters from Wilson.txt, one line every few seconds. On world load he calls a roll call, and when the player
+/// types /tim his guest Tim sometimes pops up. Everything runs on the game thread: mod messages are delivered
+/// there, straight from the sender's call.
 /// </summary>
 internal static class Director
 {
 	/// <summary>Private message channel for the plugins' personalities ("TIM_PERS"), the same as Shared/Personality.cs.</summary>
 	private const long Channel = 0x54494D5F50455253L;
 
-	/// <summary>After anyone speaks, nobody else does for this long (the same as Shared/Personality.cs).</summary>
-	private static readonly TimeSpan Floor = TimeSpan.FromSeconds(8);
+	/// <summary>Ticks after the world loads before the roll call, about when the plugins used to greet.</summary>
+	private const int RollCallTicks = 600;
 
-	/// <summary>A plugin isn't asked to comment on the same event again for this long (the same as Shared/Personality.cs).</summary>
-	private static readonly TimeSpan EventCooldown = TimeSpan.FromMinutes(3);
+	/// <summary>An exchange trigger doesn't come round again for this long.</summary>
+	private static readonly TimeSpan TriggerCooldown = TimeSpan.FromMinutes(30);
 
-	/// <summary>Ticks after the first plugin's greeting before the greeting is played, so every plugin's has arrived.</summary>
-	private const int GreetingGatherTicks = 120;
+	/// <summary>Tim doesn't pop up again for at least this long.</summary>
+	private static readonly TimeSpan TimCooldown = TimeSpan.FromMinutes(10);
 
-	/// <summary>Ticks after the world loads before Wilson greets on his own, if no plugin has (they greet after 600).</summary>
-	private const int GreetingLatestTicks = 1500;
+	/// <summary>Wilson's proverb comes after this many cycles without a word.</summary>
+	private const int IdleCycles = 3;
 
 	private const int MaxLog = 40;
 
-	/// <summary>A character Wilson has heard from this session.</summary>
+	/// <summary>A plugin character Wilson has heard from this session.</summary>
 	public sealed class Character
 	{
+		/// <summary>Its own name: how it's addressed on the channel and named in Wilson.txt.</summary>
 		public readonly string Name;
 
 		/// <summary>The plugin's own Personality setting. Plugins built before the level was sent count as Normal.</summary>
 		public Level Level = Level.Normal;
 
-		/// <summary>When this character may next be asked to say one of its own lines.</summary>
+		/// <summary>The player's name for it, or null for its own.</summary>
+		public string DisplayName;
+
+		/// <summary>When this character may next have an ordinary turn (its own setting's cycle after its last line).</summary>
 		public DateTime NextAt;
 
 		public Character(string name)
 		{
 			Name = name;
 		}
+	}
+
+	/// <summary>One step of a turn: a line shown by Wilson, or a plugin asked to say one of its own lines.</summary>
+	private sealed class Step
+	{
+		public string Speaker;
+
+		public string Text;
+
+		public string SayKey;
+
+		public string[] SayValues;
+
+		/// <summary>Only played if someone answered the steps before it (the roll call's closing line).</summary>
+		public bool NeedsAnswer;
 	}
 
 	private static readonly Dictionary<string, Character> s_roster = new Dictionary<string, Character>(StringComparer.OrdinalIgnoreCase);
@@ -68,31 +89,38 @@ internal static class Director
 
 	private static bool s_directing;
 
-	private static DateTime s_floorFreeAt;
+	/// <summary>When anyone last showed a line (important lines wait 30 s after it).</summary>
+	private static DateTime s_lastLineAt;
 
-	private static DateTime s_nextExchangeAt;
-
-	private static DateTime s_nextIdleAt;
+	/// <summary>When the last turn ended; the next ordinary turn waits a cycle after it.</summary>
+	private static DateTime s_turnEndAt;
 
 	private static int s_tick;
 
-	private static int s_firstGreetingTick;
+	private static bool s_rollCallDone;
 
-	private static bool s_greetingDone;
+	private static bool s_timSeen;
 
-	// The exchange being played: its lines (filled in), the next one to show, and when.
-	private static List<ExchangeLine> s_playing;
+	private static DateTime s_timNextAt;
 
-	private static int s_playIndex;
+	// The turn being played: its steps, the next one to play, and when.
+	private static List<Step> s_playing;
 
-	private static DateTime s_nextLineAt;
+	private static int s_stepIndex;
+
+	private static DateTime s_nextStepAt;
 
 	private static bool s_squabbleChecked;
+
+	private static int s_answers;
+
+	/// <summary>Who showed a line during the last "say" we sent (the plugin answers from inside the call).</summary>
+	private static string s_lastSpeaker;
 
 	/// <summary>Wilson is directing: the plugins send him their events.</summary>
 	public static bool Directing => s_directing;
 
-	/// <summary>An exchange is playing right now.</summary>
+	/// <summary>A turn (exchange, roll call) is playing right now.</summary>
 	public static bool Playing => s_playing != null;
 
 	/// <summary>Newest first: what Wilson decided about each event, for the window.</summary>
@@ -112,12 +140,13 @@ internal static class Director
 		s_lastPlayed.Clear();
 		s_log.Clear();
 		s_tick = 0;
-		s_firstGreetingTick = 0;
-		s_greetingDone = false;
+		s_rollCallDone = false;
+		s_timSeen = false;
+		s_timNextAt = DateTime.MinValue;
 		s_playing = null;
-		s_floorFreeAt = DateTime.MinValue;
-		s_nextExchangeAt = DateTime.MinValue;
-		ScheduleIdle();
+		s_lastLineAt = DateTime.MinValue;
+		// The first turn after the roll call still waits a full cycle.
+		s_turnEndAt = DateTime.UtcNow;
 		MyAPIGateway.Utilities.RegisterMessageHandler(Channel, OnMessage);
 		s_registered = true;
 		ApplyLevel();
@@ -158,14 +187,13 @@ internal static class Director
 		bool direct = Settings.Level != Level.Off;
 		if (direct == s_directing)
 		{
-			ScheduleIdle();
 			return;
 		}
 		s_directing = direct;
 		if (direct)
 		{
 			AddLog("Wilson is directing: the plugins send him their events.");
-			// Loaded plugins answer with "here", so Wilson knows who's around and how much each one talks.
+			// Loaded plugins answer with "here", so Wilson knows who's around, how much each talks and its name.
 			Send("director");
 		}
 		else
@@ -174,13 +202,26 @@ internal static class Director
 			AddLog("Wilson is Off: each plugin talks on its own.");
 			Send("bye");
 		}
-		ScheduleIdle();
 	}
 
-	/// <summary>Every character but Wilson that he has heard from this session, by chat name.</summary>
+	/// <summary>A plugin character Wilson has heard from this session, by its own name.</summary>
 	public static Character Find(string chatName)
 	{
 		return chatName != null && s_roster.TryGetValue(chatName, out Character c) ? c : null;
+	}
+
+	/// <summary>The name a character's lines show under: the player's name for it, or its own.</summary>
+	public static string DisplayFor(string name)
+	{
+		if (Cast.IsWilson(name))
+		{
+			return Settings.WilsonName ?? Cast.WilsonName;
+		}
+		if (Cast.IsTim(name))
+		{
+			return Settings.TimName ?? Cast.TimName;
+		}
+		return Find(name)?.DisplayName ?? name;
 	}
 
 	/// <summary>Call every tick from the session component (game thread).</summary>
@@ -193,40 +234,39 @@ internal static class Director
 		s_tick++;
 		if (!s_directing)
 		{
-			// Turned on later in the session: no "world loaded" greeting then.
-			s_greetingDone |= s_tick >= GreetingLatestTicks;
+			// Turned on later in the session: no roll call then.
+			s_rollCallDone |= s_tick >= RollCallTicks;
 			return;
 		}
 		DateTime now = DateTime.UtcNow;
 		if (s_playing != null)
 		{
-			if (now >= s_nextLineAt)
+			if (now >= s_nextStepAt)
 			{
-				PlayNextLine(now);
+				PlayNextStep(now);
 			}
 			return;
 		}
-		if (!s_greetingDone)
+		if (!s_rollCallDone)
 		{
-			if ((s_firstGreetingTick > 0 && s_tick >= s_firstGreetingTick + GreetingGatherTicks) || s_tick >= GreetingLatestTicks)
+			if (s_tick >= RollCallTicks)
 			{
-				Greet();
+				RollCall(now);
 			}
 			return;
 		}
-		if (now >= s_nextIdleAt && now >= s_floorFreeAt)
+		if (Settings.Level >= Level.Normal && now >= s_turnEndAt + TimeSpan.FromTicks(Settings.Cycle.Ticks * IdleCycles))
 		{
-			// Rarely: half the time the quiet spell just goes on.
-			if (Settings.Level >= Level.Normal && s_random.NextDouble() < 0.5)
+			// Rarely: half the time the quiet spell just goes on for another cycle.
+			if (s_random.NextDouble() < 0.5 && Lines.Own("idle") is string line)
 			{
-				string line = Lines.Own("idle");
-				if (line != null)
-				{
-					AddLog("A long quiet spell: Wilson shares a proverb.");
-					ShowLine(Cast.WilsonName, line, now);
-				}
+				AddLog("A long quiet spell: Wilson shares a proverb.");
+				Play(new List<Step> { new Step { Speaker = Cast.WilsonName, Text = line } }, now);
 			}
-			ScheduleIdle();
+			else
+			{
+				s_turnEndAt = now - TimeSpan.FromTicks(Settings.Cycle.Ticks * (IdleCycles - 1));
+			}
 		}
 	}
 
@@ -252,7 +292,7 @@ internal static class Director
 
 	private static void Handle(object message)
 	{
-		if (!(message is object[] parts) || parts.Length < 2 || !(parts[0] is string kind) || !(parts[1] is string name) || Cast.IsWilson(name))
+		if (!(message is object[] parts) || parts.Length < 2 || !(parts[0] is string kind) || !(parts[1] is string name) || Cast.IsHome(name))
 		{
 			return;
 		}
@@ -272,12 +312,15 @@ internal static class Director
 			Character c = Seen(name, parts);
 			if (s_directing && parts.Length > 2 && parts[2] is string key && key.Length > 0)
 			{
-				OnEvent(c, key, parts.Length > 3 ? parts[3] as string[] : null);
+				OnEvent(c, key, parts.Length > 3 ? parts[3] as string[] : null, parts.Length > 6 && parts[6] is string important && important == "1");
 			}
 			break;
 		case "spoke":
-			Seen(name, parts);
-			Spoke(DateTime.UtcNow);
+			Character speaker = Seen(name, parts);
+			DateTime now = DateTime.UtcNow;
+			s_lastLineAt = now;
+			speaker.NextAt = now + Personality.Cycle(Settings.ToChattiness(speaker.Level));
+			s_lastSpeaker = name;
 			break;
 		case "director":
 			AddLog($"Another director ({name}) announced itself; Wilson carries on.");
@@ -285,7 +328,7 @@ internal static class Director
 		}
 	}
 
-	/// <summary>Adds the sender to the roster and notes its Personality setting, if the message carries it.</summary>
+	/// <summary>Adds the sender to the roster and notes its setting and name, if the message carries them.</summary>
 	private static Character Seen(string name, object[] parts)
 	{
 		if (!s_roster.TryGetValue(name, out Character c))
@@ -299,78 +342,91 @@ internal static class Director
 			c.Level = level;
 			AddLog($"{name}'s chat is {level}.");
 		}
+		if (parts.Length > 5 && parts[5] is string shown)
+		{
+			string display = Personality.CleanName(shown);
+			display = display != null && display.Equals(name, StringComparison.Ordinal) ? null : display;
+			if (display != c.DisplayName)
+			{
+				c.DisplayName = display;
+				AddLog(display == null ? $"{name} goes by its own name again." : $"{name} now goes by {display}.");
+			}
+		}
 		return c;
-	}
-
-	private static void Spoke(DateTime now)
-	{
-		s_floorFreeAt = now + Floor;
-		ScheduleIdle();
 	}
 
 	// ---- Events ----
 
-	private static void OnEvent(Character c, string key, string[] values)
+	private static void OnEvent(Character c, string key, string[] values, bool important)
 	{
-		if (c.Level == Level.Off)
+		// Greetings are retired (the roll call replaces them); older plugin builds may still send one.
+		if (c.Level == Level.Off || key.Equals("greeting", StringComparison.OrdinalIgnoreCase))
 		{
-			return;
-		}
-		if (key.Equals("greeting", StringComparison.OrdinalIgnoreCase))
-		{
-			// Gathered: one greeting for everyone plays once they've all had their say.
-			if (!s_greetingDone && s_firstGreetingTick == 0)
-			{
-				s_firstGreetingTick = s_tick;
-			}
 			return;
 		}
 		Cast.Member member = Cast.ByChatName(c.Name);
-		string trigger = member != null ? member.Id + "." + key : null;
+		string trigger = member != null ? member.Id + "." + key : c.Name + " " + key;
 		DateTime now = DateTime.UtcNow;
 		if (s_playing != null)
 		{
-			AddLog($"{Label(c, key)}: an exchange is playing, so it passes.");
+			AddLog($"{trigger}: a turn is playing, so it passes.");
 			return;
 		}
-		if (now < s_floorFreeAt)
+		if (important)
 		{
-			AddLog($"{Label(c, key)}: someone just spoke, so it passes.");
+			if (now < s_lastLineAt + Personality.ImportantFloor)
+			{
+				AddLog($"{trigger} (important): someone spoke under 30 s ago, so it passes.");
+				return;
+			}
+		}
+		else if (now < s_turnEndAt + Settings.Cycle)
+		{
+			AddLog($"{trigger}: waiting for the cycle, so it passes.");
+			return;
+		}
+		else if (now < c.NextAt)
+		{
+			AddLog($"{trigger}: {c.Name} spoke within its own cycle, so it passes.");
 			return;
 		}
 		string eventKey = c.Name + "|" + key;
-		if (trigger != null && TryExchange(trigger, values, c, now))
+		if (s_eventNext.TryGetValue(eventKey, out DateTime next) && now < next)
 		{
-			s_eventNext[eventKey] = now + EventCooldown;
+			AddLog($"{trigger}: said in the last 10 minutes, so it passes.");
 			return;
 		}
-		if (now < c.NextAt || (s_eventNext.TryGetValue(eventKey, out DateTime next) && now < next))
+		s_eventNext[eventKey] = now + Personality.EventCooldown;
+		if (member != null && TryExchange(trigger, values, c, now))
 		{
-			AddLog($"{Label(c, key)}: said too recently, so it passes.");
 			return;
 		}
-		c.NextAt = now + Gap(c.Level);
-		s_eventNext[eventKey] = now + EventCooldown;
-		AddLog($"{Label(c, key)}: {c.Name} says its own line.");
+		// The plugin answers from inside this call, so we know straight away whether it had a line.
+		s_lastSpeaker = null;
 		Send("say", c.Name, key, values);
+		if (s_lastSpeaker != null)
+		{
+			AddLog($"{trigger}: {c.Name} says its own line.");
+			s_turnEndAt = now;
+		}
+		else
+		{
+			AddLog($"{trigger}: {c.Name} has no line for it.");
+		}
 	}
 
 	private static bool TryExchange(string trigger, string[] values, Character c, DateTime now)
 	{
-		if (c.Level < Level.Normal)
+		if (c.Level < Level.Normal || ExchangeChance() <= 0.0)
 		{
 			return false;
 		}
 		List<Exchange> all = Lines.ExchangesFor(trigger);
-		if (all.Count == 0)
+		if (all.Count == 0 || (s_triggerNext.TryGetValue(trigger, out DateTime next) && now < next))
 		{
 			return false;
 		}
-		if (now < s_nextExchangeAt || (s_triggerNext.TryGetValue(trigger, out DateTime next) && now < next))
-		{
-			return false;
-		}
-		List<Exchange> playable = all.Where(e => e.Lines.All(l => CanSpeak(l.Speaker) && !Lines.HasPlaceholder(Lines.Fill(l.Text, values)))).ToList();
+		List<Exchange> playable = all.Where(e => e.Lines.All(l => CanSpeak(l.Speaker) && !Lines.HasPlaceholder(Personality.Fill(l.Text, values)))).ToList();
 		if (playable.Count == 0)
 		{
 			AddLog($"{trigger}: no exchange has all its speakers here with chat on.");
@@ -380,9 +436,9 @@ internal static class Director
 		{
 			return false;
 		}
-		s_triggerNext[trigger] = now + TriggerCooldown();
+		s_triggerNext[trigger] = now + TriggerCooldown;
 		AddLog($"{trigger}: Wilson stages an exchange.");
-		Play(Pick(trigger, playable), values, now);
+		PlayExchange(Pick(trigger, playable), values, now);
 		return true;
 	}
 
@@ -395,150 +451,211 @@ internal static class Director
 		return picked;
 	}
 
-	/// <summary>Wilson always can; another character only when its plugin is loaded with chat on Normal or Chatty.</summary>
+	/// <summary>Wilson and Tim always can; a plugin character only when it's loaded with chat on Normal or Chatty.</summary>
 	private static bool CanSpeak(string chatName)
 	{
-		if (Cast.IsWilson(chatName))
+		if (Cast.IsHome(chatName))
 		{
 			return true;
 		}
 		return Cast.ByChatName(chatName) != null && s_roster.TryGetValue(chatName, out Character c) && c.Level >= Level.Normal;
 	}
 
-	// ---- Greeting ----
+	// ---- Roll call ----
 
 	/// <summary>
-	/// When the world loads: with other characters here, one any.greeting exchange with only the lines of those
-	/// that are loaded; alone, one of Wilson's own greetings.
+	/// About ten seconds after the world loads: Wilson calls the roll, each loaded character answers once with how
+	/// to call it up, and Wilson wraps up. Nothing at all when no other character is loaded.
 	/// </summary>
-	private static void Greet()
+	private static void RollCall(DateTime now)
 	{
-		s_greetingDone = true;
-		DateTime now = DateTime.UtcNow;
-		List<ExchangeLine> best = null;
-		int bestScore = 0;
-		int ties = 0;
-		foreach (Exchange exchange in Lines.ExchangesFor("any.greeting"))
+		s_rollCallDone = true;
+		List<Step> steps = new List<Step>();
+		foreach (Cast.Member member in Cast.Others)
 		{
-			// Keep the loaded speakers' lines, but never one character twice in a row (they'd be answering someone absent).
-			List<ExchangeLine> kept = new List<ExchangeLine>();
-			foreach (ExchangeLine line in exchange.Lines)
+			if (s_roster.TryGetValue(member.ChatName, out Character c) && c.Level != Level.Off)
 			{
-				if (CanSpeak(line.Speaker) && (kept.Count == 0 || !kept[kept.Count - 1].Speaker.Equals(line.Speaker, StringComparison.OrdinalIgnoreCase)))
+				steps.Add(new Step { Speaker = member.ChatName, SayKey = "rollcall", SayValues = new[] { "command", member.Command } });
+			}
+		}
+		if (steps.Count == 0)
+		{
+			AddLog("World loaded: nobody else is here, so no roll call.");
+			return;
+		}
+		if (Lines.Own("rollcall_open") is string open)
+		{
+			steps.Insert(0, new Step { Speaker = Cast.WilsonName, Text = open });
+		}
+		if (Lines.Own("rollcall_close") is string close)
+		{
+			steps.Add(new Step { Speaker = Cast.WilsonName, Text = Personality.Fill(close, new[] { "command", Cast.WilsonCommand }), NeedsAnswer = true });
+		}
+		AddLog($"World loaded: Wilson calls the roll ({steps.Count(s => s.SayKey != null)} to answer).");
+		Play(steps, now);
+	}
+
+	// ---- Tim ----
+
+	/// <summary>The player typed /tim: sometimes Wilson's guest Tim pops up. Rare: the first time, then now and then.</summary>
+	public static void OnTimCommand()
+	{
+		if (!s_directing || s_playing != null || !s_rollCallDone)
+		{
+			return;
+		}
+		DateTime now = DateTime.UtcNow;
+		double chance = !s_timSeen ? 1.0 : Settings.Level == Level.Chatty ? 0.35 : Settings.Level == Level.Normal ? 0.2 : 0.0;
+		if (now < s_timNextAt || now < s_lastLineAt + Personality.ImportantFloor || s_random.NextDouble() >= chance)
+		{
+			return;
+		}
+		List<Exchange> exchanges = Lines.ExchangesFor("any.tim");
+		if (exchanges.Count > 0 && s_random.NextDouble() < 0.5)
+		{
+			AddLog("/tim: Tim drops by, and Wilson has a word with him.");
+			PlayExchange(Pick("any.tim", exchanges), null, now);
+		}
+		else if (Lines.Own("tim") is string line)
+		{
+			AddLog("/tim: Tim drops by.");
+			Play(new List<Step> { new Step { Speaker = Cast.TimName, Text = line } }, now);
+		}
+		else
+		{
+			return;
+		}
+		s_timSeen = true;
+		s_timNextAt = now + TimCooldown;
+	}
+
+	// ---- Playing a turn ----
+
+	private static void PlayExchange(Exchange exchange, string[] values, DateTime now)
+	{
+		Play(exchange.Lines.Select(l => new Step { Speaker = l.Speaker, Text = Personality.Fill(l.Text, values) }).ToList(), now);
+	}
+
+	private static void Play(List<Step> steps, DateTime now)
+	{
+		s_playing = steps;
+		s_stepIndex = 0;
+		s_answers = 0;
+		s_squabbleChecked = false;
+		s_nextStepAt = now;
+		PlayNextStep(now);
+	}
+
+	private static void PlayNextStep(DateTime now)
+	{
+		while (true)
+		{
+			if (s_stepIndex >= s_playing.Count && !s_squabbleChecked)
+			{
+				s_squabbleChecked = true;
+				if (EndsInArgument() && s_random.NextDouble() < SquabbleChance() && Lines.Own("squabble") is string line)
 				{
-					kept.Add(line);
+					AddLog("That ended in an argument: Wilson steps in.");
+					s_playing.Add(new Step { Speaker = Cast.WilsonName, Text = line });
 				}
 			}
-			int others = kept.Count(l => !Cast.IsWilson(l.Speaker));
-			if (others == 0)
+			if (s_stepIndex >= s_playing.Count)
+			{
+				Finish(now);
+				return;
+			}
+			Step step = s_playing[s_stepIndex++];
+			if (step.NeedsAnswer && s_answers == 0)
 			{
 				continue;
 			}
-			// Whole exchanges first, then the ones with the most of the cast in them.
-			int score = (exchange.Lines.All(l => CanSpeak(l.Speaker)) ? 100 : 0) + others;
-			if (score > bestScore)
+			if (step.SayKey == null)
 			{
-				best = kept;
-				bestScore = score;
-				ties = 1;
+				ShowLine(step.Speaker, step.Text, now);
+				s_nextStepAt = now + LineDelay(step.Text);
+				return;
 			}
-			else if (score == bestScore && s_random.Next(++ties) == 0)
+			// A plugin's own line. It answers from inside the call; one that doesn't is skipped without a pause.
+			s_lastSpeaker = null;
+			Send("say", step.Speaker, step.SayKey, step.SayValues);
+			if (s_lastSpeaker != null)
 			{
-				best = kept;
+				s_answers++;
+				s_nextStepAt = now + TimeSpan.FromSeconds(5);
+				return;
 			}
+			AddLog($"{step.Speaker} didn't answer.");
 		}
-		if (best != null)
-		{
-			AddLog("World loaded: Wilson stages a greeting.");
-			Play(best, null, now);
-			return;
-		}
-		string own = Lines.Own("greeting");
-		if (own != null)
-		{
-			AddLog("World loaded: nobody else to greet with, so Wilson says hello himself.");
-			ShowLine(Cast.WilsonName, own, now);
-		}
-	}
-
-	// ---- Playing an exchange ----
-
-	private static void Play(Exchange exchange, string[] values, DateTime now)
-	{
-		Play(exchange.Lines, values, now);
-	}
-
-	private static void Play(List<ExchangeLine> lines, string[] values, DateTime now)
-	{
-		s_playing = lines.Select(l => new ExchangeLine(l.Speaker, Lines.Fill(l.Text, values))).ToList();
-		s_playIndex = 0;
-		s_squabbleChecked = false;
-		s_nextLineAt = now;
-		PlayNextLine(now);
-	}
-
-	private static void PlayNextLine(DateTime now)
-	{
-		if (s_playIndex >= s_playing.Count && !s_squabbleChecked)
-		{
-			s_squabbleChecked = true;
-			if (EndsInArgument(s_playing) && s_random.NextDouble() < SquabbleChance())
-			{
-				string line = Lines.Own("squabble");
-				if (line != null)
-				{
-					AddLog("That ended in an argument: Wilson steps in.");
-					s_playing.Add(new ExchangeLine(Cast.WilsonName, line));
-				}
-			}
-		}
-		if (s_playIndex >= s_playing.Count)
-		{
-			Finish(now);
-			return;
-		}
-		ExchangeLine next = s_playing[s_playIndex++];
-		ShowLine(next.Speaker, next.Text, now);
-		s_nextLineAt = now + LineDelay(next.Text);
 	}
 
 	/// <summary>Someone answered back and Wilson didn't get the last word: A, B, then A again.</summary>
-	private static bool EndsInArgument(List<ExchangeLine> lines)
+	private static bool EndsInArgument()
 	{
-		if (lines.Count < 3)
+		List<Step> lines = s_playing.Where(s => s.SayKey == null).ToList();
+		if (lines.Count < 3 || lines.Count != s_playing.Count)
 		{
 			return false;
 		}
 		string last = lines[lines.Count - 1].Speaker;
-		return !Cast.IsWilson(last) && lines.Take(lines.Count - 1).Any(l => l.Speaker.Equals(last, StringComparison.OrdinalIgnoreCase));
+		return !Cast.IsHome(last) && lines.Take(lines.Count - 1).Any(l => l.Speaker.Equals(last, StringComparison.OrdinalIgnoreCase));
 	}
 
 	private static void Finish(DateTime now)
 	{
-		foreach (string speaker in s_playing.Select(l => l.Speaker).Distinct(StringComparer.OrdinalIgnoreCase))
-		{
-			if (s_roster.TryGetValue(speaker, out Character c))
-			{
-				c.NextAt = now + Gap(c.Level);
-			}
-		}
 		s_playing = null;
-		s_nextExchangeAt = now + ExchangeGap();
-		Spoke(now);
+		s_turnEndAt = now;
 	}
 
 	private static void ShowLine(string speaker, string text, DateTime now)
 	{
-		MyAPIGateway.Utilities.ShowMessage(speaker, text);
-		Spoke(now);
+		Personality.Show(speaker, DisplayFor(speaker), text);
+		s_lastLineAt = now;
+		if (s_roster.TryGetValue(speaker, out Character c))
+		{
+			c.NextAt = now + Personality.Cycle(Settings.ToChattiness(c.Level));
+		}
 		Send("spoke");
 	}
 
 	/// <summary>Time to read a line before the next one: longer lines get longer.</summary>
 	private static TimeSpan LineDelay(string text)
 	{
-		double seconds = 2.5 + 0.04 * (text?.Length ?? 0);
-		return TimeSpan.FromSeconds(Math.Max(3.0, Math.Min(7.0, seconds)));
+		double seconds = 3.0 + 0.04 * (text?.Length ?? 0);
+		return TimeSpan.FromSeconds(Math.Max(4.0, Math.Min(7.0, seconds)));
+	}
+
+	// ---- Renaming ----
+
+	/// <summary>
+	/// Gives a character a new name (null or blank for its own). Wilson and Tim keep theirs in Wilson's settings; a
+	/// plugin character is asked to rename itself, saves it in its own settings, and confirms with "here".
+	/// </summary>
+	public static string Rename(string name, string newName)
+	{
+		newName = Personality.CleanName(newName);
+		string shown = newName ?? name;
+		if (Cast.IsWilson(name) || Cast.IsTim(name))
+		{
+			newName = newName != null && newName.Equals(name, StringComparison.Ordinal) ? null : newName;
+			if (Cast.IsWilson(name))
+			{
+				Settings.WilsonName = newName;
+			}
+			else
+			{
+				Settings.TimName = newName;
+			}
+			Settings.Save();
+			AddLog($"{name} now goes by {shown}.");
+			return $"{name} now goes by {shown}.";
+		}
+		Character c = Find(name);
+		if (c == null)
+		{
+			return $"{name} isn't loaded, so it can't be renamed from here.";
+		}
+		Send("rename", name, newName ?? "");
+		return (c.DisplayName ?? c.Name) == shown ? $"{name} now goes by {shown}." : $"Asked {name} to go by {shown}. If the name doesn't change, that plugin needs updating.";
 	}
 
 	// ---- Trying it out ----
@@ -565,7 +682,7 @@ internal static class Director
 		}
 		if (s_playing != null)
 		{
-			return "An exchange is already playing.";
+			return "A turn is already playing.";
 		}
 		List<Exchange> playable = Lines.AllExchanges().Where(e => e.Lines.All(l => CanSpeak(l.Speaker))).ToList();
 		if (playable.Count == 0)
@@ -574,8 +691,23 @@ internal static class Director
 		}
 		Exchange exchange = Pick("(tried from the window)", playable);
 		AddLog($"Tried from the window: an exchange for {exchange.Trigger}.");
-		Play(exchange, SampleValues, DateTime.UtcNow);
+		PlayExchange(exchange, SampleValues, DateTime.UtcNow);
 		return $"Playing an exchange for {exchange.Trigger} in chat (with made-up names and numbers).";
+	}
+
+	/// <summary>Plays the roll call again now, ignoring the timers.</summary>
+	public static string RollCallNow()
+	{
+		if (!s_directing)
+		{
+			return "Wilson is Off. Pick another setting first.";
+		}
+		if (s_playing != null)
+		{
+			return "A turn is already playing.";
+		}
+		RollCall(DateTime.UtcNow);
+		return s_playing != null ? "Calling the roll in chat." : "Nobody else is loaded with chat on, so there's no roll to call.";
 	}
 
 	/// <summary>How many exchanges could play with the characters loaded now, and how many there are.</summary>
@@ -586,61 +718,19 @@ internal static class Director
 		return $"{playable} of {total} exchanges have all their speakers here.";
 	}
 
-	// ---- Timing by level ----
+	// ---- Chances by level ----
 
-	/// <summary>The least time between two of a character's own lines (the same as Shared/Personality.cs).</summary>
-	private static TimeSpan Gap(Level level)
-	{
-		switch (level)
-		{
-		case Level.Chatty:
-			return TimeSpan.FromSeconds(15);
-		case Level.Normal:
-			return TimeSpan.FromSeconds(45);
-		default:
-			return TimeSpan.FromMinutes(2);
-		}
-	}
-
-	/// <summary>Chance that an event with a playable exchange gets the exchange instead of the plugin's own line.</summary>
+	/// <summary>Chance that a turn with a playable exchange gets the exchange instead of the plugin's own line.</summary>
 	private static double ExchangeChance()
 	{
 		switch (Settings.Level)
 		{
 		case Level.Chatty:
-			return 0.6;
+			return 0.5;
 		case Level.Normal:
-			return 0.35;
+			return 0.3;
 		default:
-			return 0.15;
-		}
-	}
-
-	/// <summary>The least time between the end of one exchange and the start of the next.</summary>
-	private static TimeSpan ExchangeGap()
-	{
-		switch (Settings.Level)
-		{
-		case Level.Chatty:
-			return TimeSpan.FromSeconds(90);
-		case Level.Normal:
-			return TimeSpan.FromMinutes(4);
-		default:
-			return TimeSpan.FromMinutes(10);
-		}
-	}
-
-	/// <summary>No exchange for the same trigger again for this long.</summary>
-	private static TimeSpan TriggerCooldown()
-	{
-		switch (Settings.Level)
-		{
-		case Level.Chatty:
-			return TimeSpan.FromMinutes(10);
-		case Level.Normal:
-			return TimeSpan.FromMinutes(20);
-		default:
-			return TimeSpan.FromMinutes(30);
+			return 0.0;
 		}
 	}
 
@@ -653,37 +743,11 @@ internal static class Director
 		case Level.Normal:
 			return 0.4;
 		default:
-			return 0.15;
+			return 0.0;
 		}
-	}
-
-	/// <summary>Next time Wilson may share a proverb, counted from now (anyone speaking starts it over).</summary>
-	private static void ScheduleIdle()
-	{
-		double minutes;
-		switch (Settings.Level)
-		{
-		case Level.Chatty:
-			minutes = 12 + 13 * s_random.NextDouble();
-			break;
-		case Level.Normal:
-			minutes = 25 + 20 * s_random.NextDouble();
-			break;
-		default:
-			// Quiet and Off: no proverbs.
-			s_nextIdleAt = DateTime.MaxValue;
-			return;
-		}
-		s_nextIdleAt = DateTime.UtcNow + TimeSpan.FromMinutes(minutes);
 	}
 
 	// ---- Log ----
-
-	private static string Label(Character c, string key)
-	{
-		Cast.Member member = Cast.ByChatName(c.Name);
-		return member != null ? member.Id + "." + key : c.Name + " " + key;
-	}
 
 	private static void AddLog(string text)
 	{
