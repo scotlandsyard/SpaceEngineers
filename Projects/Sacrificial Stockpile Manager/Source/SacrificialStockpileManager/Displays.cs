@@ -17,7 +17,13 @@ namespace SacrificialStockpileManager;
 /// </summary>
 internal static class Displays
 {
-	public static readonly string[] Pages = { "Overview", "Ores", "Ingots", "Components", "Ammo", "Tools & bottles", "All items", "Containers", "Stock limits", "Quotas", "Warnings", "Log" };
+	public static readonly string[] Pages = { "Overview", "Ores", "Ingots", "Components", "Ammo", "Tools & bottles", "All items", "Containers", "Containers + docked", "Stock limits", "Quotas", "Warnings", "Log" };
+
+	/// <summary>Seconds each page of a list shows when it doesn't fit on the screen.</summary>
+	private const int PageSeconds = 6;
+
+	/// <summary>Lines at the top of every page: grid name, page name, rule.</summary>
+	private const int HeaderLines = 3;
 
 	private const string DefaultFont = "Monospace";
 
@@ -80,9 +86,10 @@ internal static class Displays
 			{
 				continue;
 			}
-			GridSnapshot grid = rule.SourceGrid != 0 ? Store.Grid(rule.SourceGrid) : construct?.Snapshot;
+			GridSnapshot grid = rule.SourceGrid != 0 ? Store.Grid(rule.SourceGrid) : OwnGrid(construct, block);
 			Construct live = rule.SourceGrid != 0 ? session.FindConstruct(rule.SourceGrid) : construct;
-			string text = Render(rule.Page, grid, live, Columns(surface));
+			Measure(surface, out int columns, out int rows);
+			string text = Render(rule.Page, grid, live, columns, rows);
 			if (surface.GetText() != text)
 			{
 				surface.WriteText(text);
@@ -90,34 +97,79 @@ internal static class Displays
 		}
 	}
 
-	private static int Columns(IngameSurface surface)
+	/// <summary>
+	/// The grid a screen shows by default: the ship or station its block is on. A screen on a ship docked to a
+	/// station is in the station's terminal system, but shows the ship.
+	/// </summary>
+	private static GridSnapshot OwnGrid(Construct construct, IMyTerminalBlock block)
 	{
+		long unit = construct.Find(block.EntityId)?.Unit ?? construct.CoreUnit;
+		if (unit != construct.CoreUnit)
+		{
+			DockedShip ship = construct.Snapshot?.DockedShips?.FirstOrDefault(d => d.Unit == unit);
+			GridSnapshot view = ship != null ? Store.Grid(ship.Key) : null;
+			if (view != null)
+			{
+				return view;
+			}
+		}
+		return construct.Snapshot;
+	}
+
+	/// <summary>How many characters fit across the screen and how many lines fit down it, in its font and size.</summary>
+	private static void Measure(IngameSurface surface, out int columns, out int rows)
+	{
+		columns = 40;
+		rows = 18;
 		try
 		{
 			Vector2 size = surface.SurfaceSize;
 			Vector2 glyph = surface.MeasureStringInPixels(new StringBuilder("W"), surface.Font, surface.FontSize);
+			float usable = 1f - 2f * surface.TextPadding / 100f;
 			if (glyph.X > 0f)
 			{
-				int columns = (int)(size.X * (1f - 2f * surface.TextPadding / 100f) / glyph.X);
-				return Math.Max(16, Math.Min(120, columns));
+				columns = Math.Max(12, Math.Min(120, (int)(size.X * usable / glyph.X)));
+			}
+			if (glyph.Y > 0f)
+			{
+				rows = Math.Max(HeaderLines + 2, Math.Min(200, (int)(size.Y * usable / glyph.Y)));
 			}
 		}
 		catch (Exception)
 		{
 		}
-		return 40;
 	}
 
-	public static string Render(string page, GridSnapshot grid, Construct live, int columns)
+	/// <summary>
+	/// The page's text for a screen <paramref name="columns"/> wide and <paramref name="rows"/> high. A page longer
+	/// than the screen is shown a screenful at a time, changing every few seconds, with "1/3" after its name.
+	/// </summary>
+	public static string Render(string page, GridSnapshot grid, Construct live, int columns, int rows)
 	{
-		StringBuilder text = new StringBuilder();
 		if (grid == null)
 		{
 			return "Sacrificial Stockpile Manager\n\nNo data for this grid yet.";
 		}
+		StringBuilder body = new StringBuilder();
+		RenderBody(body, page, grid, live, columns, rows - HeaderLines);
+		List<string> lines = body.ToString().TrimEnd('\n').Split('\n').ToList();
+		int perPage = Math.Max(1, rows - HeaderLines);
+		int pages = Math.Max(1, (lines.Count + perPage - 1) / perPage);
+		int current = pages == 1 ? 0 : (int)(DateTime.UtcNow.Ticks / TimeSpan.TicksPerSecond / PageSeconds % pages);
+		string pageLabel = pages > 1 ? $" {current + 1}/{pages}" : "";
+		StringBuilder text = new StringBuilder();
 		text.Append(Fit(grid.Name, columns)).Append('\n');
-		text.Append(Fit($"{page}{(live == null ? " - last seen " + Ago(grid.LastSeenUtc) : "")}", columns)).Append('\n');
+		text.Append(Fit($"{page}{pageLabel}{(live == null ? " - last seen " + Ago(grid.LastSeenUtc) : "")}", columns)).Append('\n');
 		text.Append(new string('-', columns)).Append('\n');
+		foreach (string line in lines.Skip(current * perPage).Take(perPage))
+		{
+			text.Append(line).Append('\n');
+		}
+		return text.ToString();
+	}
+
+	private static void RenderBody(StringBuilder text, string page, GridSnapshot grid, Construct live, int columns, int rows)
+	{
 		GridRules rules = Store.GridRules(grid);
 		switch (page)
 		{
@@ -147,7 +199,10 @@ internal static class Displays
 			}
 			break;
 		case "Containers":
-			ContainerList(text, grid, columns);
+			ContainerList(text, grid, columns, rows, withDocked: false);
+			break;
+		case "Containers + docked":
+			ContainerList(text, grid, columns, rows, withDocked: true);
 			break;
 		case "Stock limits":
 			StockList(text, grid, columns);
@@ -165,7 +220,6 @@ internal static class Displays
 			Overview(text, grid, rules, live, columns);
 			break;
 		}
-		return text.ToString();
 	}
 
 	private static void Overview(StringBuilder text, GridSnapshot grid, GridRules rules, Construct live, int columns)
@@ -220,27 +274,58 @@ internal static class Displays
 		}
 	}
 
-	/// <summary>Each storage and stock block with its fill: name and percentage, then a bar.</summary>
-	private static void ContainerList(StringBuilder text, GridSnapshot grid, int columns)
+	/// <summary>
+	/// Each storage and stock block with its fill. With room, a line for the name and percentage and one for a bar;
+	/// otherwise one line each (Render pages through them when there are more than fit). Only the screen's own ship
+	/// or station, unless <paramref name="withDocked"/>: then ships docked to it too, marked with "&gt;".
+	/// </summary>
+	private static void ContainerList(StringBuilder text, GridSnapshot grid, int columns, int rows, bool withDocked)
 	{
-		Construct.StorageVolume(grid, out double used, out double max);
-		text.Append(Row("All storage", max > 0.0 ? $"{used / max:P0}" : "-", columns)).Append('\n');
-		text.Append(Bar(max > 0.0 ? used / max : 0.0, columns)).Append('\n');
+		// The view of a docked ship holds only that ship's blocks; they count as its own storage.
+		bool dockedView = grid.DockedTo != null;
 		List<BlockSnapshot> blocks = grid.Blocks
-			.Where(b => !b.Docked && b.MaxVolume > 0.0)
-			.Where(b => Construct.Resolve(b) == Effective.Storage || Construct.Resolve(b) == Effective.Stock)
-			.OrderBy(b => b.Name, StringComparer.OrdinalIgnoreCase)
+			.Where(b => b.MaxVolume > 0.0 && (!b.Docked || dockedView || withDocked))
+			.Where(b => IsStorage(b, asOwn: dockedView || b.Docked))
+			.OrderBy(b => b.Docked && !dockedView)
+			.ThenBy(b => b.Name, StringComparer.OrdinalIgnoreCase)
 			.ToList();
+		double used = blocks.Sum(b => b.Volume);
+		double max = blocks.Sum(b => b.MaxVolume);
+		text.Append(Row(withDocked && !dockedView ? "All, docked too" : "All storage", max > 0.0 ? $"{used / max:P0}" : "-", columns)).Append('\n');
+		text.Append(Bar(max > 0.0 ? used / max : 0.0, columns)).Append('\n');
 		if (blocks.Count == 0)
 		{
 			text.Append("No storage blocks.\n");
 			return;
 		}
+		bool twoLines = 2 + 2 * blocks.Count <= rows;
 		foreach (BlockSnapshot block in blocks)
 		{
-			text.Append(Row(block.Name, $"{block.Fill:P0}", columns)).Append('\n');
-			text.Append(Bar(block.Fill, columns)).Append('\n');
+			string name = (block.Docked && !dockedView ? "> " : "") + block.Name;
+			if (twoLines)
+			{
+				text.Append(Row(name, $"{block.Fill:P0}", columns)).Append('\n');
+				text.Append(Bar(block.Fill, columns)).Append('\n');
+			}
+			else
+			{
+				string value = columns >= 28 ? $"{MiniBar(block.Fill, 6)} {block.Fill,4:P0}" : $"{block.Fill:P0}";
+				text.Append(Row(name, value, columns)).Append('\n');
+			}
 		}
+	}
+
+	/// <summary>A storage or stock block; <paramref name="asOwn"/> resolves a docked ship's block as if undocked.</summary>
+	private static bool IsStorage(BlockSnapshot block, bool asOwn)
+	{
+		Effective role = asOwn ? Construct.Resolve(block.Kind, Store.BlockRules(block.Id), false, block.NotYours) : Construct.Resolve(block);
+		return role == Effective.Storage || role == Effective.Stock;
+	}
+
+	private static string MiniBar(double fraction, int width)
+	{
+		int filled = (int)Math.Round(Math.Max(0.0, Math.Min(1.0, fraction)) * width);
+		return "[" + new string('|', filled) + new string('\'', width - filled) + "]";
 	}
 
 	private static void StockList(StringBuilder text, GridSnapshot grid, int columns)

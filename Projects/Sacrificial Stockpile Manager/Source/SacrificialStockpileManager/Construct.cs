@@ -120,6 +120,9 @@ internal class Construct
 	/// <summary>Per unit and quota item ("unit:item"): whether it was short at the last autocraft pass.</summary>
 	public readonly Dictionary<string, bool> QuotaShort = new Dictionary<string, bool>();
 
+	/// <summary>The same keys: the quota at that pass, so an edited quota doesn't count as stock coming in.</summary>
+	public readonly Dictionary<string, double> QuotaSeen = new Dictionary<string, double>();
+
 	/// <summary>Per item key: game time before which autocraft won't queue it again (waits for the server).</summary>
 	public readonly Dictionary<string, double> CraftCooldown = new Dictionary<string, double>();
 
@@ -328,6 +331,7 @@ internal class Construct
 		GridRules gridRules = Store.GridRules(Key, Units[CoreUnit]);
 		long me = MyAPIGateway.Session?.Player?.IdentityId ?? 0;
 		bool includeShared = gridRules != null && gridRules.IncludeShared;
+		Dictionary<long, GridRules> unitRules = new Dictionary<long, GridRules>();
 		foreach (IMyTerminalBlock block in found)
 		{
 			long unit = UnitOf(block.CubeGrid, unitOfGrid);
@@ -349,7 +353,14 @@ internal class Construct
 			}
 			live.Role = Resolve(live.Kind, live.Rules, live.Docked, live.NotYours);
 			live.Limits = live.Rules?.Limits.ToList() ?? new List<ItemLimit>();
-			TypeLimits typeLimits = live.Docked ? null : gridRules?.Type(live.Kind);
+			// Type limits come from the block's own ship or station: a docked ship's from its own settings, filled
+			// from anything connected, the station it's docked to included.
+			if (!unitRules.TryGetValue(unit, out GridRules ownRules))
+			{
+				ownRules = unit == CoreUnit ? gridRules : Store.GridRules(unit, Units[unit]);
+				unitRules[unit] = ownRules;
+			}
+			TypeLimits typeLimits = ownRules?.Type(live.Kind);
 			if (typeLimits != null)
 			{
 				live.Limits.AddRange(typeLimits.Limits.Where(t => !live.Limits.Any(l => l.Item == t.Item)));

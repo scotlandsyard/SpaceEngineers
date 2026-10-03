@@ -178,7 +178,7 @@ public partial class SsmScreen
 		if (grid.DockedTo != null)
 		{
 			// While docked, the ship's blocks are part of the grid it's docked to and items move by that grid's settings.
-			rows.Add(Row("docked", WarningColor, "Docked to", $"{grid.DockedTo.Name}. Its settings move items; this ship's quotas and autocraft still run"));
+			rows.Add(Row("docked", WarningColor, "Docked to", $"{grid.DockedTo.Name}. Its settings move items; this ship's quotas, type limits and autocraft still run"));
 		}
 		bool automation = rules != null && rules.Automation;
 		rows.Add(Row("set:automation", automation ? GoodColor : WarningColor, "Automation", automation ? "On: limits, sorting and draining are applied" : "Off: nothing is moved (settings are kept)"));

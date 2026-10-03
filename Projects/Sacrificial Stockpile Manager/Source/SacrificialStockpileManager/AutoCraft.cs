@@ -157,14 +157,17 @@ internal static class AutoCraft
 			unit.Totals.TryGetValue(key, out double have);
 			if (quota.HasMin && quota.Min > 0.0)
 			{
-				// quota_met is for a quota that was short and is now met; the first look only sets the baseline.
+				// quota_met is for a quota that was short and is now met because stock came in, not because the quota
+				// was lowered in the menu. The first look, and the first look after an edit, only set the baseline.
 				string shortKey = unit.Id + ":" + key;
 				bool isShort = have < quota.Min - 1e-6;
-				if (!isShort && construct.QuotaShort.TryGetValue(shortKey, out bool wasShort) && wasShort)
+				bool sameQuota = construct.QuotaSeen.TryGetValue(shortKey, out double seenMin) && Math.Abs(seenMin - quota.Min) < 1e-6;
+				if (!isShort && sameQuota && construct.QuotaShort.TryGetValue(shortKey, out bool wasShort) && wasShort)
 				{
 					s_quotaMet ??= Items.Name(key);
 				}
 				construct.QuotaShort[shortKey] = isShort;
+				construct.QuotaSeen[shortKey] = quota.Min;
 			}
 			MyBlueprintDefinitionBase blueprint = Items.Blueprint(key);
 			if (quota.HasMax && have > quota.Max)

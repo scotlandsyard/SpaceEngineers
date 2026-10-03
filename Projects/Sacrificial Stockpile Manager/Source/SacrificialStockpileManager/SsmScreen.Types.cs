@@ -54,10 +54,13 @@ public partial class SsmScreen
 		};
 	}
 
-	/// <summary>The blocks a type limit applies to: that type, on the grid itself, and yours.</summary>
+	/// <summary>
+	/// The blocks a type limit applies to: that type, on the grid itself (for a docked ship's view, the ship), and
+	/// yours.
+	/// </summary>
 	private static List<BlockSnapshot> TypeBlocks(GridSnapshot grid, BlockKind kind)
 	{
-		return grid.Blocks.Where(b => b.Kind == kind && !b.Docked && Construct.Resolve(b) != Effective.Manual).ToList();
+		return grid.Blocks.Where(b => b.Kind == kind && (!b.Docked || grid.DockedTo != null) && Construct.Resolve(b) != Effective.Manual).ToList();
 	}
 
 	private List<RowData> TypeRows(GridSnapshot grid)

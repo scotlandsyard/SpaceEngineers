@@ -95,11 +95,11 @@ Set in the Overview. All are off for a new grid except Clean production blocks, 
 
 Quotas stay with the grid they were set on. Each mechanical group in a terminal system (the station itself, each docked ship) is handled on its own: its settings are looked up only among its own grids, and its quotas count only its own stock and queue only on its own assemblers. A docked ship's quotas keep working while it's docked, but they never drive the station's assemblers, and the station's quotas never use the ship's.
 
-A docked ship has its own entry in the Grid list, under the grid it's docked to. Picking it shows only the ship's blocks and items, and its own settings, quotas and notes. The entry uses the ship's main grid as its key, so it's the same entry the ship has once it undocks, and settings made there carry over. Type limits and the other grid settings set there apply once it undocks.
+A docked ship has its own entry in the Grid list, under the grid it's docked to. Picking it shows only the ship's blocks and items, and its own settings, quotas and notes. The entry uses the ship's main grid as its key, so it's the same entry the ship has once it undocks, and settings made there carry over. Its type limits apply while it's docked too, and fill from anything connected, the station included. The other grid settings set there apply once it undocks.
 
 ## LCD pages
 
-Overview, Ores, Ingots, Components, Ammo, Tools & bottles, All items, Containers (each storage block's fill), Stock limits, Quotas, Warnings, Log. A screen can show the grid it's on or any other known grid. When a page is first assigned, the screen is switched to text mode with a monospace font. After that, font and size are left as you set them.
+Overview, Ores, Ingots, Components, Ammo, Tools & bottles, All items, Containers (each storage block's fill, the screen's own ship or station only), Containers + docked (ships docked to it too, marked `>`), Stock limits, Quotas, Warnings, Log. A screen shows the ship or station its block is on (a screen on a docked ship shows the ship, not the station), or any other known grid. Pages are fitted to the screen's width and height in its font and size: the Containers page switches to one line per container when two don't fit, and a page longer than the screen shows a screenful at a time, turning every 6 seconds (`1/3` after the page name). When a page is first assigned, the screen is switched to text mode with a monospace font. After that, font and size are left as you set them.
 
 ## Where settings are stored
 

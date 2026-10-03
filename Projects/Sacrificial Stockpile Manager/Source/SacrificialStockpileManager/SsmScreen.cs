@@ -921,9 +921,9 @@ public partial class SsmScreen : MyGuiScreenBase
 		case View.Types:
 			if (grid.DockedTo != null)
 			{
-				return $"Docked to {grid.DockedTo.Name}: type limits set here apply once this ship undocks.";
+				return $"Limits for this ship's blocks of this type; while docked they fill from {grid.DockedTo.Name} too.";
 			}
-			return "Limits for every block of this type on the grid (not docked ships). A block's own limit for the item wins." + offline;
+			return "Limits for every block of this type on the grid (docked ships use their own). A block's own limit wins." + offline;
 		case View.Items:
 			return "Pick an item, type an amount: Set quota to keep at least that many (autocraft), Set maximum to disassemble above it." + offline;
 		case View.Blocks:
