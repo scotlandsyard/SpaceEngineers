@@ -46,7 +46,7 @@ internal static class ScriptHelp
 		"The same limits as a programmable block: 50,000 instructions per run, and a script stops if it throws an error. The list shows how long each script takes per tick, so you can see what it costs your frame rate.",
 		"",
 		"# Chat personality",
-		"Script to Plugin comments in chat now and then, in electric cyan: when a script compiles, starts, stops, fails to compile or crashes. Only you see it. Choose how much it talks with the dropdown above the list: Off, Quiet (only compile errors and crashes), Normal or Chatty. Chat as sets the name its lines show under (press Enter; clear it for Script to Plugin), or type /stp name <name>. Both settings are yours and the same in every world.",
+		"Script to Plugin comments in chat now and then, in electric cyan: when a script compiles, starts, stops, fails to compile or crashes. Only you see it. Chat: Off/Quiet/Normal/Chatty at the top right of the window sets how much it talks, and Chat as sets the name its lines show under (press Enter; clear it for Script to Plugin), or type /stp name <name>. Both settings are yours and the same in every world.",
 		"Our plugins take turns: after any of them speaks, the next ordinary line waits 2 minutes on Chatty, 5 on Normal and 15 on Quiet. Compile errors and crashes can come sooner, but never within 30 seconds of the last line. The same kind of event is commented on at most every 10 minutes.",
 		"",
 		"# Where scripts are kept",

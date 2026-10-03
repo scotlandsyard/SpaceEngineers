@@ -244,14 +244,6 @@ public class ScriptSession : MySessionComponentBase
 
 	// Chat lines (Shared/Personality.cs). All called on the game thread.
 
-	/// <summary>Sets how much Script to Plugin talks, and saves it.</summary>
-	internal void SetPersonality(Personality.Chattiness level)
-	{
-		ScriptSettings.Chattiness = level;
-		Personality.Level = level;
-		ScriptSettings.Save();
-	}
-
 	internal void OnScriptCompiled(VirtualProgram program)
 	{
 		if (Settled)
@@ -281,6 +273,7 @@ public class ScriptSession : MySessionComponentBase
 	{
 		string name = Personality.DisplayName;
 		ScriptSettings.DisplayName = name == null || name == ChatSender ? null : name;
+		ScriptSettings.Chattiness = Personality.Level;
 		ScriptSettings.Save();
 	}
 

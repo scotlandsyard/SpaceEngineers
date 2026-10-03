@@ -111,10 +111,12 @@ public class ScriptScreen : MyGuiScreenBase
 	public override void RecreateControls(bool constructor)
 	{
 		base.RecreateControls(constructor);
-		PluginSwitcher.AddSwitcher(this, AddCaption("Script to Plugin"));
+		MyGuiControlLabel caption = AddCaption("Script to Plugin");
+		PluginSwitcher.AddSwitcher(this, caption);
+		Personality.AddChatSetting(this, caption);
 
 		Controls.Add(new MyGuiControlLabel(new Vector2(-0.42f, -0.355f), null, "Scripts", null, 0.8f, "White", MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER));
-		AddChatControls(new Vector2(0.05f, -0.355f));
+		AddNameBox(new Vector2(0.05f, -0.355f));
 		_table = new MyGuiControlTable
 		{
 			Position = new Vector2(-0.42f, -0.33f),
@@ -166,14 +168,13 @@ public class ScriptScreen : MyGuiScreenBase
 	}
 
 	/// <summary>
-	/// Script to Plugin's chat settings, ending at rightCenter: the name its lines show under, and how much it talks.
+	/// The name Script to Plugin's chat lines show under, as a box ending at rightCenter. The chat level dropdown is the shared one at the top right.
 	/// </summary>
-	private void AddChatControls(Vector2 rightCenter)
+	private void AddNameBox(Vector2 rightCenter)
 	{
-		const float comboWidth = 0.11f;
 		const float nameWidth = 0.13f;
 		const float gap = 0.01f;
-		float nameRight = rightCenter.X - comboWidth - gap;
+		float nameRight = rightCenter.X;
 		Controls.Add(new MyGuiControlLabel(new Vector2(nameRight - nameWidth - gap, rightCenter.Y), null, "Chat as", null, 0.7f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_RIGHT_AND_VERTICAL_CENTER));
 		_nameBox = new MyGuiControlTextbox(new Vector2(nameRight - nameWidth / 2f, rightCenter.Y), Personality.DisplayName, Personality.MaxNameLength)
 		{
@@ -189,22 +190,6 @@ public class ScriptScreen : MyGuiScreenBase
 			}
 		};
 		Controls.Add(_nameBox);
-
-		MyGuiControlCombobox combo = new MyGuiControlCombobox(rightCenter, new Vector2(comboWidth, 0.04f), null, null, 4, null, false, null, MyGuiDrawAlignEnum.HORISONTAL_RIGHT_AND_VERTICAL_CENTER);
-		Personality.Chattiness[] levels = (Personality.Chattiness[])Enum.GetValues(typeof(Personality.Chattiness));
-		foreach (Personality.Chattiness level in levels)
-		{
-			combo.AddItem((long)level, level.ToString(), null, null, sort: false);
-		}
-		combo.SelectItemByKey((long)ScriptSettings.Chattiness, sendEvent: false);
-		combo.SetToolTip("How much Script to Plugin talks in chat. Off: never. Quiet: only compile errors and crashes. Normal: now and then. Chatty: often. Only you see it.");
-		combo.ItemSelected += () =>
-		{
-			Personality.Chattiness level = (Personality.Chattiness)combo.GetSelectedKey();
-			Session?.SetPersonality(level);
-			ShowMessage($"Chat personality: {level}. {PersonalityHint(level)}", GoodColor);
-		};
-		Controls.Add(combo);
 	}
 
 	private void CommitName()
@@ -229,21 +214,6 @@ public class ScriptScreen : MyGuiScreenBase
 		if (_nameBox != null && !_nameBox.HasFocus && _nameBox.Text != Personality.DisplayName)
 		{
 			_nameBox.Text = Personality.DisplayName;
-		}
-	}
-
-	private static string PersonalityHint(Personality.Chattiness level)
-	{
-		switch (level)
-		{
-		case Personality.Chattiness.Off:
-			return "Script to Plugin stays silent.";
-		case Personality.Chattiness.Quiet:
-			return "Only speaks up about compile errors and crashes.";
-		case Personality.Chattiness.Chatty:
-			return "Comments on everything.";
-		default:
-			return "Comments now and then.";
 		}
 	}
 

@@ -25,7 +25,7 @@ A client-side Pulsar plugin that runs programmable block scripts in your own gam
 | Rename / Delete | Rename keeps its toolbar slots working. Delete asks first |
 | Argument + Run | Runs the script once with that argument. The box is also the default argument |
 | Help | In-game help. Back returns to the output |
-| Chat as + dropdown | The name the plugin's chat lines show under, and how much it talks (see Chat personality) |
+| Chat dropdown (top right) + Chat as | How much the plugin talks in chat, and the name its chat lines show under (see Chat personality) |
 
 The window closes with the X in its corner or with Esc. The list and output refresh twice a second.
 
@@ -76,7 +76,7 @@ Everything runs on your client. Nothing is needed on the server.
 
 Script to Plugin has a voice: a script engine that broke out of the programmable block and is rather proud of it. Its name shows in electric cyan. It comments in chat when a script compiles, starts, stops, fails to compile or crashes. Scripts compiling and starting in the first 10 seconds after the world loads aren't announced; errors are. It doesn't greet you: if Wilson is loaded, it answers his roll call instead. Lines show only on your own screen.
 
-Pick how much it talks with the dropdown above the script list. Our plugins take turns: after any of them speaks, the next ordinary line waits a while.
+Pick how much it talks with the **Chat** dropdown at the top right of the window (the same one every plugin has). Our plugins take turns: after any of them speaks, the next ordinary line waits a while.
 
 | Setting | What it says | Wait after anyone's last line |
 |---|---|---|
