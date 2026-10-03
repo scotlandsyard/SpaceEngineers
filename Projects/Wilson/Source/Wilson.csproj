@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Wilson</AssemblyName>
+    <RootNamespace>Wilson</RootNamespace>
+    <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
+    <TargetFramework>net481</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>latest</LangVersion>
+    <!-- The DLL is shared publicly: build no debug-symbol file, so the DLL doesn't record a path to one, and map
+         source paths to "." so no folder from this computer ends up inside the DLL. -->
+    <DebugType>none</DebugType>
+    <PathMap>$(MSBuildProjectDirectory)=.</PathMap>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+  <!--
+    Path to the Space Engineers Bin64 folder. Change it here if the game is installed
+    somewhere else, or pass it on the command line:
+      dotnet build -c Release -p:Bin64="D:\SteamLibrary\steamapps\common\SpaceEngineers\Bin64"
+  -->
+  <PropertyGroup>
+    <Bin64 Condition="'$(Bin64)' == ''">C:\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64</Bin64>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Lets the project build against .NET Framework 4.8.1 without a separate targeting pack install. -->
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- Game assemblies: referenced from the install, never copied to the output. -->
+  <ItemGroup>
+    <Reference Include="Sandbox.Common"><HintPath>$(Bin64)\Sandbox.Common.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="Sandbox.Game"><HintPath>$(Bin64)\Sandbox.Game.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="Sandbox.Graphics"><HintPath>$(Bin64)\Sandbox.Graphics.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="VRage"><HintPath>$(Bin64)\VRage.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="VRage.Game"><HintPath>$(Bin64)\VRage.Game.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="VRage.Library"><HintPath>$(Bin64)\VRage.Library.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="VRage.Math"><HintPath>$(Bin64)\VRage.Math.dll</HintPath><Private>False</Private></Reference>
+  </ItemGroup>
+
+  <!-- Shared with our other plugins: one copy in the repo's Shared folder, compiled into each plugin. Wilson is the
+       banter director, so he speaks the Shared/Personality.cs protocol himself instead of linking that file. -->
+  <ItemGroup>
+    <Compile Include="../../../Shared/PluginSwitcher.cs" Link="Shared/PluginSwitcher.cs" />
+  </ItemGroup>
+
+  <!-- Wilson's own lines and the exchanges he stages between the other characters. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Wilson.txt" LogicalName="Wilson.txt" />
+  </ItemGroup>
+</Project>
