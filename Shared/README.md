@@ -59,6 +59,58 @@ How a plugin uses it:
 
 Modes are only ever filled in, never swapped, so two plugins can't fight over an assembler.
 
+## Personality.cs
+
+Gives a plugin a voice: short in-character lines in chat when something happens. Lines only show on your own screen; nothing is sent to the server or other players.
+
+How a plugin uses it:
+1. Link the file, and embed the plugin's lines (kept next to its csproj):
+   ```xml
+   <EmbeddedResource Include="Personality.txt" LogicalName="Personality.txt" />
+   ```
+2. In `BeforeStart`, set `Personality.Level` from the plugin's saved settings, then call `Personality.Register("Name shown in chat")`. In `UnloadData`, call `Personality.Unregister()`.
+3. Add a **Personality** setting to the plugin's settings page: Off, Quiet, Normal (the default) or Chatty. Save it with the plugin's other settings and set `Personality.Level` when it changes.
+4. Call `Personality.Say("event_key")` on the game thread whenever something worth a comment happens. Pass name/value pairs to fill placeholders: `Say("starved", "item", "Steel Plate")` turns `{item}` into `Steel Plate`. It's cheap to call often, because the cooldowns decide whether anything is said.
+
+`Personality.txt`:
+
+```
+# Comments and blank lines are skipped.
+[starved]
+Out of {item} again. I'm a maid, not a miracle worker.
+- A leading "- " is dropped, so pasted bullet lists work.
+[!grid_lost]
+Lines under a key marked with ! are important: said even on Quiet.
+```
+
+When it talks:
+
+| Level | What it says | Least time between its own lines |
+|---|---|---|
+| Off | Nothing | - |
+| Quiet | Important events only | 2 minutes |
+| Normal | Everything | 45 seconds |
+| Chatty | Everything | 15 seconds |
+
+On every level, the same event isn't commented on again for 3 minutes, the same line is never used twice in a row, and after any of our plugins speaks, the others wait 8 seconds.
+
+### Banter (the director)
+
+The plugins share a private message channel (`0x54494D5F50455253`, "TIM_PERS"). A banter plugin can act as the **director**: it announces itself, and from then on the plugins send it their events instead of talking themselves. The director decides who speaks. It can ask a plugin to say one of its own lines, or show a written exchange between several characters itself.
+
+Messages are `object[]` arrays:
+
+| Message | Sent by | Meaning |
+|---|---|---|
+| `{"hello", name}` | Plugin, on load | Asks whether a director is loaded. |
+| `{"director", directorName}` | Director | Sent on load and in answer to "hello". Plugins send it their events from then on. |
+| `{"bye", directorName}` | Director, on unload | Plugins go back to talking themselves. |
+| `{"event", name, key, values}` | Plugin | Something happened. `values` is the name/value `string[]` passed to `Say`. Not sent when the plugin's Personality is Off. |
+| `{"say", directorName, targetName, key, values}` | Director | The target says one of its own lines for that event now, ignoring cooldowns. |
+| `{"spoke", name}` | Anyone who showed a line | Everyone holds back for 8 seconds. |
+
+Every plugin keeps working on its own, with or without the director.
+
 ## Releasing a plugin that uses these files
 
 A plugin that links a file from here needs this folder when it's built from the repo. If a plugin is published through the Pulsar plugin hub, its hub entry must include `Shared` in its source directories as well as the plugin's own folder, or the hub build won't find the file.
