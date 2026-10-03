@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Sandbox.Game.Gui;
+using Sandbox.Graphics.GUI;
 using Sandbox.ModAPI;
 using VRage.Utils;
 using VRageMath;
@@ -92,6 +93,7 @@ internal static class Personality
 			{
 				Send("here");
 			}
+			RaiseChanged();
 		}
 	}
 
@@ -120,19 +122,51 @@ internal static class Personality
 			{
 				Send("here");
 			}
-			try
-			{
-				Changed?.Invoke();
-			}
-			catch (Exception ex)
-			{
-				MyLog.Default.WriteLineAndConsole($"[{s_name}] Personality name change: {ex.Message}");
-			}
+			RaiseChanged();
 		}
 	}
 
-	/// <summary>Fires when DisplayName changes, from the plugin or from Wilson's window. Save the name here.</summary>
+	/// <summary>
+	/// Fires when DisplayName or Level changes: from the plugin itself, the chat dropdown (AddChatSetting) or Wilson's
+	/// window. Save both here.
+	/// </summary>
 	public static event Action Changed;
+
+	private static void RaiseChanged()
+	{
+		try
+		{
+			Changed?.Invoke();
+		}
+		catch (Exception ex)
+		{
+			MyLog.Default.WriteLineAndConsole($"[{s_name}] Personality change: {ex.Message}");
+		}
+	}
+
+	/// <summary>
+	/// Adds the family's chat setting to a plugin window: a "Chat: Normal" dropdown at the top right, level with the
+	/// caption (the plugin switcher sits top left). Picking a level sets Level, and the plugin saves it from Changed.
+	/// Call right after AddCaption, with the caption it returned.
+	/// </summary>
+	public static MyGuiControlCombobox AddChatSetting(MyGuiScreenBase screen, MyGuiControlLabel caption)
+	{
+		if (screen?.Size == null || caption == null)
+		{
+			return null;
+		}
+		float right = screen.Size.Value.X / 2f - 0.03f;
+		MyGuiControlCombobox combo = new MyGuiControlCombobox(new Vector2(right, caption.Position.Y), new Vector2(0.15f, 0.04f), null, null, 4, null, false, null, MyGuiDrawAlignEnum.HORISONTAL_RIGHT_AND_VERTICAL_CENTER);
+		foreach (Chattiness level in Enum.GetValues(typeof(Chattiness)))
+		{
+			combo.AddItem((long)level, "Chat: " + level, (int)level, null, sort: false);
+		}
+		combo.SelectItemByKey((long)Level, sendEvent: false);
+		combo.SetToolTip("How often this character talks in chat. Only you see the lines.\nOff: never. Quiet: about every 15 minutes, plus important moments. Normal: about every 5 minutes. Chatty: about every 2 minutes.");
+		combo.ItemSelected += () => Level = (Chattiness)combo.GetSelectedKey();
+		screen.Controls.Add(combo);
+		return combo;
+	}
 
 	/// <summary>Call once the session has started (BeforeStart). characterName is the character's own name.</summary>
 	public static void Register(string characterName)
