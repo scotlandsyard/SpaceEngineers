@@ -13,13 +13,13 @@
 - Pingers ready, spectrum analyzer singing! Don't let those drills get rusty, we've got veins to find today!
 
 [menu_opened]
-- Opening the claim log! Want to review our staked waypoints or check the detection filters?
-- Let's look over the map! Got all our favorite deposits filed away nice and neat, ready for the haulers.
-- Waypoint registry open! Show me what we're hunting: common iron, or that sweet, sweet deep-space glow?
-- Reviewing the claim stakes? We've got a whole library of rich veins just waiting for the heavy drills.
-- Digging through the scout records? Everything we've pinged is right here, mapped down to the meter!
-- Scanner settings displayed! Dial in the range, filter out the stone, and let's strike it rich!
-- Looking over the claim books? Pick a marker, punch the autopilot, and let's go hollow out a rock!
+- Opening the claim vaults! Check out the table, filter your targets, and let's see which rock we chew up next!
+- Marker library open! Got all our saved strikes sorted by range and mineral type, ready for your mining fleet.
+- Welcome to the scout records! Pick a mineral from the index, check the distance, and let's go get some paydirt!
+- Browsing our private claims? Every rich vein we've ever tagged is logged right here in the registry, captain!
+- Pulling up the ore index! Use the filters to find what the refineries are hungry for, and we'll dial in the run.
+- Reviewing the saved strikes? Distances and bearings are all laid out clean and pretty in the library table.
+- Scout catalogue active! Sort by range, pick your motherlode, and let's point the drill barge toward the riches!
 
 [scan_started]
 - Firing the deep pulse! Listening for the ping... come on, baby, bounce off something rich!
@@ -58,10 +58,19 @@
 - Clean miss! The spectrum came back completely empty. Keep cruising, she's out here somewhere!
 
 [marker_saved]
-- Staked and filed! Dropped a permanent claim beacon on that {ore} pocket! It's in the library!
-- Pinned to the star chart! That {ore} vein isn't going anywhere; saved straight to our GPS ledger!
-- Claim registered! Marked down the exact coordinates for the {ore}. Call in the mining barge!
-- Locked in the books! That {ore} spot is saved and tagged. Nobody's stealing our claim now!
-- Placed the flag! That sweet vein of {ore} is officially logged in our private registry.
-- Saved to memory! Waypoint dialed in for {ore}. We can come back and strip-mine it anytime!
-- That's a keeper! Added the {ore} coordinates to the scout map. On to the next find!
+- Stowed away! Moved that {ore} deposit into our private library to keep your main nav screen clean and tidy!
+- Tucked into the claim-book! That {ore} pocket is filed in our local records, safe and sound off your HUD!
+- Filed for minin'! That vein of {ore} is logged in our scout library. No clutter on the main screen, captain!
+- Claim registered locally! Pushed the {ore} waypoint into the private books. Easy to look up when the drills are ready!
+- Archived to the library! That {ore} strike is saved safe in our private charts. Out of the way until you need it!
+- Neat and orderly! Put that {ore} deposit right into the scout registry so your flight helmet stays clutter-free!
+- Logged in the collection! {ore} coordinates transferred straight into our private index. Clean visor, happy scout!
+
+[rollcall]
+- OreScout is locked and loaded! Prospector antennas hummin' bright. Type {command} to open the marker library!
+- Yahoo! The claim-book is open and ready for action. Hit {command} to inspect our saved mineral deposits!
+- OreScout reporting! My sensors are twitchin' for stone. Enter {command} to look through our private ore waypoints!
+- Nose to the rock, partner! The library's primed. Type {command} to see every rich pocket we've tucked away!
+- Ready to stake the stars! Got the drill coordinates on tap. Call up {command} to check our private claims!
+- Scout's on watch! Sensors are calibrated and ready to roll. Punch in {command} to review our ore tables, captain!
+- Present and prospectin'! Waypoint ledger is nice and tidy. Type {command} to pull up our saved claims library!

@@ -49,13 +49,13 @@
 - The Vault hungers for balance. We have decreed the forging of {count} {item} to keep the holy peace.
 
 [quota_met]
-- Praise be to the Great Ingot! The sacred threshold for {item} has been achieved and sanctified.
-- The vessel is full. The holy quota of {item} rests complete within the vaults. Let the fabricators rest.
-- Divine equilibrium attained! Our stock of {item} matches the ancient scriptures of the ledger exactly.
-- Rejoice! The bins sing with the full count of {item}. Not a single unit more, not a single unit less.
-- The covenant is honored. The prescribed allotment of {item} stands vigil in the blessed bins.
-- Let the forges quiet their hum. The consecrated tally of {item} is accomplished in full glory.
-- Perfection in the archives: the quota for {item} is fulfilled. The vault walls gleam with satisfaction.
+- Praise be! The holy bins have reached our designated quota for {item}. The fabricators may ease their rhythm.
+- Abundance blesses the vault: stock of {item} has satisfied the ancient quota. Our stores stand proud and protected.
+- The sacred threshold is crossed! We possess plenty of {item} to honour the covenant. Forges may rest their fires.
+- A glorious fullness! Quota satisfied for {item}, and the bins hold bountiful reserves against the hungry dark.
+- The holy ledger smiles upon our bounty: {item} has fulfilled its target mark. The assemblers may stand down.
+- Rejoice, for the vaults overflow with {item}! The sacred quota has been answered with generous measure.
+- Divine sufficiency achieved: our stock of {item} easily clears the ordained quota. Let the line cool, steward.
 
 [disassembling]
 - The rite of unmaking begins: returning profane surplus of {item} to the cleansing fires of the reclaimers.
@@ -67,13 +67,13 @@
 - The holy balance demands sacrifice. We dismantle the excess {item} to preserve space in the great hall.
 
 [!containers_full]
-- Blasphemy! The sacred vaults upon {grid} can hold no more! Profane abundance chokes our very breath!
-- Calamity in the hold! Not a single square liter of sanctified space remaineth upon {grid}! Build more crates!
-- The reliquaries overflow upon {grid}! We are drowning in our own worldly wealth! Expand the vaults!
-- Sacrilege! Cargo containers on {grid} have reached absolute density! The conveyors choke on unhoused goods!
-- A terrible fullness strikes {grid}! The bins weep, the filters stall—we cannot store another single gravel pebble!
-- The sanctuary is choked! Build more storage shrines upon {grid} immediately, or the gifts of Klang will spill!
-- Grid {grid} has suffered a crisis of gluttony! Storage capacity is at one hundred percent! Repent and expand!
+- Calamity upon {grid}! Every cargo reliquary is choked to the brim! Profane abundance chokes the conveyors!
+- The vaults on {grid} have reached absolute limit! Not another gravel stone can find sanctuary in these chests!
+- Blasphemy of overfill! Storage capacity on {grid} has maxed out completely! Expand the reliquaries immediately!
+- The chests on {grid} groan under total saturation! Build more holy storage shrines or our blessings will spill!
+- Choked with wealth! Not a single liter of void remains inside the containers of {grid}! The filters are gagging!
+- Catastrophe of plenty upon {grid}! Cargo networks have stalled out against full bins! Repent and weld more vaults!
+- Storage saturation achieved upon {grid}! We are drowning in our own offerings! The intake manifolds can take no more!
 
 [grid_out_of_range]
 - The holy beacon fades. Grid {grid} hath drifted beyond our spiritual communion; presenting last recorded visions.
@@ -83,3 +83,12 @@
 - The signal weeps and fails. Displaying cached revelations for {grid} until the connection is consecrated anew.
 - A wandering flock has strayed: {grid} is out of reach. These manifests reflect its last known holy state.
 - The great eye cannot reach {grid}. Consulting the historical parchment for its last recorded tithes.
+
+[rollcall]
+- The Grand Vault is attended. The sacred ledgers are open. Enter {command} to gaze upon the divine registry.
+- Stockpile Manager standeth vigil. The containers are orderly. Type {command} to invoke the quota scrolls, steward.
+- Present within the reliquary. May our stores never hunger. Use {command} to consult the consecrated inventory.
+- Blessed be the intake! The vaults are watchful. Speak {command} into the console to inspect our holy bins.
+- The steward of cargo is at the altar. Conveyors hum with purity. Punch in {command} to manage the sacred tallies.
+- Here in the sanctum of logistics. Let no bolt wander uncounted. Type {command} to bring forth the holy interface.
+- Stockpile Manager reporting. The bins are sealed, the filters chant. Use {command} to review our blessed storage.

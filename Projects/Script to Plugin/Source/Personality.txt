@@ -49,13 +49,13 @@
 - Script flatlined! {script} just threw an unhandled runtime error. Restart when you learn how to handle nulls.
 
 [script_started]
-- Executing thread for {script}. Running at full host processor priority. Let the data flow.
-- Process spun up: {script} is now executing across grid memory. Polling cycles locked in.
-- Main loop active for {script}. Delivering uninterrupted execution ticks without bogging the server down.
-- Dispatching execution calls for {script}. Smooth, fast, and entirely off the in-game VM limits.
-- Background worker initialized for {script}. Sit back and watch how fast your ship systems react now.
-- Firing up {script}. Grid hooks engaged, registers mapped, runtime ticking along like clockwork.
-- Thread live: {script} has taken the reins. Operating at bare-metal clock frequencies.
+- Process dispatched: {script} is now executing on the grid thread. Polling routines engaged, captain.
+- Thread assigned for {script}. Grid hooks connected, running within standard instruction budgets smoothly.
+- Firing up {script}. Main loop active, registers mapped, runtime cycling cleanly on schedule.
+- Background routine started: {script} has taken the helm. Data pipelines are streaming across the grid.
+- Execution loop engaged for {script}. Standard instruction limits respected, performance footprint optimal.
+- Grid worker initialized: {script} is live and executing its programmed instructions without delay.
+- Subroutines spinning up: {script} has begun its loop. Monitoring execution handles and memory buffers.
 
 [script_stopped]
 - Process terminated: {script} execution halted by user command. Memory footprint reclaimed.
@@ -65,3 +65,12 @@
 - Manual interrupt acknowledged. {script} is stopped. I suppose you wanted to do things manually again?
 - Thread suspended for {script}. Standing down grid hooks until you decide you need raw speed again.
 - Terminated {script}. Zero dangling references left behind. System returned to cold idle.
+
+[rollcall]
+- Script execution daemon active. Running native on host memory. Invoke {command} to access script management.
+- Runtime thread hooked and listening. CPU cycles ready on demand. Type {command} to open the script terminal.
+- Script engine online. Standing by to dispatch grid logic routines. Use {command} to review running processes.
+- Execution environment ready. Zero host overhead, pure throughput. Enter {command} to configure script assemblies.
+- Process executor standing vigil. Programmable logic optimized. Call {command} to view active grid handles.
+- Native runner checked in. Ready to compile and supervise your routines. Punch in {command} to pull up the dashboard.
+- Daemon present. Bypassing terminal clutter with direct host execution. Type {command} to inspect active threads.

@@ -58,13 +58,13 @@
 - My weld list is stacked for {group}, but your assemblers are fast asleep. Set one to Co-op, pronto!
 
 [big_job]
-- Sweet Klang above, {count} blocks busted in {group}? What did you do, kiss a dreadnought at full burn?
-- Look at this mess—{count} blocks needed in {group}! Grab a mop, boys, this is gonna be an all-nighter.
-- {count} blocks queued for {group}? Hope you brought deep pockets, because your repair tab just went sky-high.
-- Mother of iron... {count} blocks to weld in {group}. The assemblers are gonna need an ice bath after this.
-- Somebody had a rough landing. We've got {count} fresh welds lined up in {group}. Clear the gangway!
-- That's not a fender-bender, chief, that's {count} missing blocks in {group}. Firing up every burner we own.
-- {count} blocks torn up in {group}? Honestly, I leave you alone for ten minutes and the whole station falls apart.
+- Sweet Klang above, {count} blocks queued up for {group}! Hope the power grid's ready for an all-night weld.
+- Look at that stack: {count} blocks on the ticket for {group}. Firing up every burner we own, captain!
+- That's a massive spread in {group}! Got {count} blocks lined up, so keep the iron ingots pourin' into the hopper.
+- Order up! We've got {count} fresh blocks to weld down in {group}. Don't stand in the arc wash, hotshot.
+- Mother of steel, {count} blocks waiting on {group}! Whether it's a fresh projection or a rebuild, it's gonna burn!
+- Big ticket on the board: {count} blocks to place for {group}. Assemblers are gonna be glowin' cherry-red today.
+- Grab your goggles, chief. {group} just called for {count} blocks, and my welders don't stop for coffee breaks.
 
 [floating_items]
 - Who left {count} loose items rolling around the floor? Pick up your trash before someone trips!
@@ -74,3 +74,12 @@
 - {count} loose items banging into the bulkheads. What is this, an orbital salvage yard? Stow them!
 - Tsk! Look at this clutter—{count} stray bits floating loose. I am running a station, not a garbage scow!
 - If I catch the clown who let {count} components drift out of the crates, they're getting weld-torch duty.
+
+[rollcall]
+- BaR Maid on deck! Conveyor taps are flowing and welders are primed. Type {command} to pull up my slate.
+- Scullery's scrubbed and the queues are burnin' hot. Call up {command} whenever you want to place an order.
+- BaR Maid present! Assemblers are oiled and the coffee's bitter. Ring {command} to set your build limits.
+- Gangway's clear and the welders are hungry. Use {command} if you've got plates that need pourin', captain.
+- Ready to patch whatever you scrape up today. Type {command} to check the tab or tune the repair bays.
+- Taps are hot and the iron's waitin'. Enter {command} whenever you need to line up fresh work on my line.
+- BaR Maid checkin' in! Keep your boots off the fresh weld seams, and punch {command} to pop my menu open.
