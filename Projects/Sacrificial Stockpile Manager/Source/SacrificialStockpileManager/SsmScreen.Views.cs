@@ -191,7 +191,6 @@ public partial class SsmScreen
 		bool shared = rules != null && rules.IncludeShared;
 		int notYours = grid.Blocks.Count(b => b.NotYours);
 		rows.Add(Row("set:shared", shared ? WarningColor : (Color?)null, "Blocks shared with me", shared ? "Included: faction-shared, shared-with-all and unowned blocks are managed too" : notYours > 0 ? $"Left alone: only your own blocks are touched ({notYours} aren't yours)" : "Left alone: only your own blocks are touched"));
-		rows.Add(Row("set:personality", null, "Personality (all grids)", PersonalityText(Store.Chattiness)));
 		rows.Add(Row("set:name", null, "Chat name (all grids)", $"{TimShared.Personality.DisplayName}  (type /ssm name <name> in chat)"));
 
 		Vector3D player = MyAPIGateway.Session?.Player?.GetPosition() ?? Vector3D.Zero;
@@ -250,40 +249,8 @@ public partial class SsmScreen
 		ToggleGridSetting(key.Substring(4));
 	}
 
-	private static string PersonalityText(TimShared.Personality.Chattiness level)
-	{
-		switch (level)
-		{
-		case TimShared.Personality.Chattiness.Off:
-			return "Off: no chat lines";
-		case TimShared.Personality.Chattiness.Quiet:
-			return "Quiet: only when containers fill up";
-		case TimShared.Personality.Chattiness.Chatty:
-			return "Chatty: comments often";
-		default:
-			return "Normal: comments now and then in chat";
-		}
-	}
-
-	/// <summary>Steps how much Stockpile Manager says in chat: Off, Quiet, Normal, Chatty. Not a grid setting.</summary>
-	private void CyclePersonality()
-	{
-		TimShared.Personality.Chattiness next = Store.Chattiness == TimShared.Personality.Chattiness.Chatty ? TimShared.Personality.Chattiness.Off : Store.Chattiness + 1;
-		Store.Chattiness = next;
-		TimShared.Personality.Level = next;
-		Store.SavePreferences();
-		ShowMessage($"Personality: {PersonalityText(next)}. Only you see these lines.", GoodColor);
-		_rowsSignature = null;
-		RefreshAll();
-	}
-
 	private void ToggleGridSetting(string setting)
 	{
-		if (setting == "personality")
-		{
-			CyclePersonality();
-			return;
-		}
 		if (setting == "name")
 		{
 			ShowMessage($"To rename {TimShared.Personality.DisplayName} in chat, type /ssm name <new name> (at most {TimShared.Personality.MaxNameLength} characters; /ssm name alone resets it).", null);

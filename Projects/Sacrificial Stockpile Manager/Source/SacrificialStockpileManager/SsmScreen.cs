@@ -239,7 +239,9 @@ public partial class SsmScreen : MyGuiScreenBase
 
 	private void CreateControls()
 	{
-		PluginSwitcher.AddSwitcher(this, AddCaption("Sacrificial Stockpile Manager"));
+		MyGuiControlLabel caption = AddCaption("Sacrificial Stockpile Manager");
+		PluginSwitcher.AddSwitcher(this, caption);
+		Personality.AddChatSetting(this, caption);
 		_autocraftButton = null;
 		_liveButtons.Clear();
 		_acceptBoxes.Clear();

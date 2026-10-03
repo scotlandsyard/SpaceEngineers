@@ -483,11 +483,12 @@ public class SsmSession : MySessionComponentBase
 		Personality.DisplayName = name;
 	}
 
-	/// <summary>Saves the chat name whenever it changes, here or from Wilson's window.</summary>
+	/// <summary>Saves the chat name and level whenever either changes: from the chat dropdown, /ssm name or Wilson's window.</summary>
 	private static void OnPersonalityChanged()
 	{
 		string name = Personality.DisplayName;
 		Store.DisplayName = name == CharacterName ? "" : name;
+		Store.Chattiness = Personality.Level;
 		Store.SavePreferences();
 	}
 
