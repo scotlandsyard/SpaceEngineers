@@ -64,8 +64,26 @@ internal static class Personality
 
 	private static DateTime s_ourNextAt;
 
+	private static Chattiness s_level = Chattiness.Normal;
+
 	/// <summary>How much this plugin talks. The plugin saves it in its own settings and sets it here on load.</summary>
-	public static Chattiness Level { get; set; } = Chattiness.Normal;
+	public static Chattiness Level
+	{
+		get => s_level;
+		set
+		{
+			if (s_level == value)
+			{
+				return;
+			}
+			s_level = value;
+			// The director needs to know, so it never makes a plugin that's Off speak in an exchange.
+			if (s_registered && s_director != null)
+			{
+				Send("here");
+			}
+		}
+	}
 
 	/// <summary>Call once the session has started (BeforeStart). characterName is the name shown in chat.</summary>
 	public static void Register(string characterName)
@@ -120,12 +138,17 @@ internal static class Personality
 		{
 			return;
 		}
+		bool known = s_events.TryGetValue(key, out Event ev);
 		if (s_director != null)
 		{
-			Send("event", key, values);
+			// On Quiet, the director only hears about the events this plugin would speak up for itself.
+			if (Level != Chattiness.Quiet || (known && ev.Important))
+			{
+				Send("event", key, values);
+			}
 			return;
 		}
-		if (s_events.TryGetValue(key, out Event ev))
+		if (known)
 		{
 			TrySpeak(ev, values, force: false);
 		}
@@ -239,13 +262,29 @@ internal static class Personality
 		}
 	}
 
-	/// <summary>Every message carries: kind, our name, then the kind's own arguments.</summary>
+	/// <summary>
+	/// Every message carries: kind, our name, the kind's own arguments (event key and values), then our Level as
+	/// text ("Off", "Quiet", "Normal" or "Chatty"), which the director uses to pick who may speak.
+	/// </summary>
 	private static void Send(string kind, string key = null, string[] values = null)
 	{
-		MyAPIGateway.Utilities.SendModMessage(Channel, new object[] { kind, s_name, key, values });
+		MyAPIGateway.Utilities.SendModMessage(Channel, new object[] { kind, s_name, key, values, s_level.ToString() });
 	}
 
 	private static void OnMessage(object message)
+	{
+		// Messages are delivered straight from the sender's call, so an exception here would land in its code.
+		try
+		{
+			Handle(message);
+		}
+		catch (Exception ex)
+		{
+			MyLog.Default.WriteLineAndConsole($"[{s_name}] Personality message: {ex.Message}");
+		}
+	}
+
+	private static void Handle(object message)
 	{
 		if (!(message is object[] parts) || parts.Length < 2 || !(parts[0] is string kind) || !(parts[1] is string name) || name.Equals(s_name, StringComparison.OrdinalIgnoreCase))
 		{
@@ -255,6 +294,8 @@ internal static class Personality
 		{
 		case "director":
 			s_director = name;
+			// Tells a director that loaded after us that we're here, and how much we talk.
+			Send("here");
 			break;
 		case "bye":
 			if (name.Equals(s_director, StringComparison.OrdinalIgnoreCase))

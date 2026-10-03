@@ -26,6 +26,7 @@ The plugins talk over a private mod message channel (`0x54494D5F53574954`, "TIM_
 | OreScout | OreScout | Marker library |
 | Sacrificial Stockpile Manager | Stockpile Manager | Main window |
 | Script to Plugin | Script to Plugin | Main window |
+| Wilson | Wilson | Main window |
 
 To add a plugin:
 1. Link the file into its project (above).
@@ -98,18 +99,21 @@ On every level, the same event isn't commented on again for 3 minutes, the same 
 
 The plugins share a private message channel (`0x54494D5F50455253`, "TIM_PERS"). A banter plugin can act as the **director**: it announces itself, and from then on the plugins send it their events instead of talking themselves. The director decides who speaks. It can ask a plugin to say one of its own lines, or show a written exchange between several characters itself.
 
-Messages are `object[]` arrays:
+Messages are `object[]` arrays. Every message a plugin sends has five elements, `{kind, name, key, values, level}`; `level` is the plugin's Personality setting as text (`"Off"`, `"Quiet"`, `"Normal"` or `"Chatty"`), and `key` and `values` are null when the kind doesn't use them.
 
 | Message | Sent by | Meaning |
 |---|---|---|
-| `{"hello", name}` | Plugin, on load | Asks whether a director is loaded. |
+| `{"hello", name, …, level}` | Plugin, on load | Asks whether a director is loaded. |
 | `{"director", directorName}` | Director | Sent on load and in answer to "hello". Plugins send it their events from then on. |
+| `{"here", name, …, level}` | Plugin | Answer to "director", and sent again whenever the plugin's Personality setting changes while a director is loaded. Lets a director that loads after the plugins know who's there. |
 | `{"bye", directorName}` | Director, on unload | Plugins go back to talking themselves. |
-| `{"event", name, key, values}` | Plugin | Something happened. `values` is the name/value `string[]` passed to `Say`. Not sent when the plugin's Personality is Off. |
+| `{"event", name, key, values, level}` | Plugin | Something happened. `values` is the name/value `string[]` passed to `Say`. Not sent when the plugin's Personality is Off; on Quiet, only sent for important events. |
 | `{"say", directorName, targetName, key, values}` | Director | The target says one of its own lines for that event now, ignoring cooldowns. |
-| `{"spoke", name}` | Anyone who showed a line | Everyone holds back for 8 seconds. |
+| `{"spoke", name, …}` | Anyone who showed a line | Everyone holds back for 8 seconds. |
 
-Every plugin keeps working on its own, with or without the director.
+The level element and the "here" message were added after the first version. A director must still accept the older four-element messages (treating the level as Normal), and learns about a plugin built before then from its first message. Messages are delivered straight from the sender's `SendModMessage` call, so handlers catch their own exceptions and never register or unregister a handler while handling a message.
+
+Every plugin keeps working on its own, with or without the director. The director is [Wilson](../Projects/Wilson/).
 
 ## Releasing a plugin that uses these files
 
