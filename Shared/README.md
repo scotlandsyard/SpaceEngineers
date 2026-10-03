@@ -62,16 +62,19 @@ Modes are only ever filled in, never swapped, so two plugins can't fight over an
 
 ## Personality.cs
 
-Gives a plugin a voice: short in-character lines in chat when something happens. Lines only show on your own screen; nothing is sent to the server or other players.
+Gives a plugin a voice: short in-character lines in chat when something happens, under the character's name in its own colour. Lines only show on your own screen; nothing is sent to the server or other players.
 
 How a plugin uses it:
 1. Link the file, and embed the plugin's lines (kept next to its csproj):
    ```xml
    <EmbeddedResource Include="Personality.txt" LogicalName="Personality.txt" />
    ```
-2. In `BeforeStart`, set `Personality.Level` from the plugin's saved settings, then call `Personality.Register("Name shown in chat")`. In `UnloadData`, call `Personality.Unregister()`.
+2. In `BeforeStart`, set `Personality.Level` and `Personality.DisplayName` from the plugin's saved settings, subscribe a save to `Personality.Changed`, then call `Personality.Register("Character name")`. In `UnloadData`, call `Personality.Unregister()`.
 3. Add a **Personality** setting to the plugin's settings page: Off, Quiet, Normal (the default) or Chatty. Save it with the plugin's other settings and set `Personality.Level` when it changes.
-4. Call `Personality.Say("event_key")` on the game thread whenever something worth a comment happens. Pass name/value pairs to fill placeholders: `Say("starved", "item", "Steel Plate")` turns `{item}` into `Steel Plate`. It's cheap to call often, because the cooldowns decide whether anything is said.
+4. Add a **name** field next to it: the name the character's lines show under. Set `Personality.DisplayName` when it changes (null or blank means the character's own name), and save `Personality.DisplayName` whenever `Personality.Changed` fires, because the player can also rename the character from Wilson's window. A chat command such as `/<command> name <new name>` can set it the same way.
+5. Call `Personality.Say("event_key")` on the game thread whenever something worth a comment happens. Pass name/value pairs to fill placeholders: `Say("starved", "item", "Steel Plate")` turns `{item}` into `Steel Plate`. It's cheap to call often, because the cycle and cooldowns decide whether anything is said.
+
+The character name passed to `Register` is the character's identity: it's how the director addresses it, how Wilson.txt and the checker name it, and what picks its colour. The display name only changes what's shown in chat.
 
 `Personality.txt`:
 
@@ -82,38 +85,64 @@ Out of {item} again. I'm a maid, not a miracle worker.
 - A leading "- " is dropped, so pasted bullet lists work.
 [!grid_lost]
 Lines under a key marked with ! are important: said even on Quiet.
+[rollcall]
+Answering Wilson's roll call. {command} is the plugin's chat command, filled in by Wilson.
 ```
 
-When it talks:
+### When it talks: one turn per cycle
 
-| Level | What it says | Least time between its own lines |
+The family keeps one rhythm. After any of our characters speaks, nobody says an ordinary line until a cycle has passed, measured with the setting of whoever would speak next:
+
+| Level | What it says | Cycle after anyone's last line |
 |---|---|---|
 | Off | Nothing | - |
-| Quiet | Important events only | 2 minutes |
-| Normal | Everything | 45 seconds |
-| Chatty | Everything | 15 seconds |
+| Quiet | Important events only | 15 minutes |
+| Normal | Everything | 5 minutes |
+| Chatty | Everything | 2 minutes |
 
-On every level, the same event isn't commented on again for 3 minutes, the same line is never used twice in a row, and after any of our plugins speaks, the others wait 8 seconds.
+An important line (`[!key]`) can break the cycle, but never within 30 seconds of anyone's last line. On every level, the same event isn't commented on again for 10 minutes, and the same line is never used twice in a row. Wilson uses the same table for his own setting (`Personality.Cycle`).
+
+**Greetings are retired.** `Say("greeting")` does nothing: with Wilson loaded the crew answers his roll call instead, and without him nobody greets. Plugins can drop their greeting timers and `[greeting]` lines at their next change.
+
+**Roll call.** About ten seconds after the world loads, Wilson calls the roll and asks each loaded character for its `[rollcall]` line, with `{command}` filled in (Wilson's `Cast.cs` knows each plugin's command). A plugin with no `[rollcall]` lines yet answers with a plain built-in line. A character on Quiet answers too; one that's Off doesn't.
+
+### Colours
+
+Each character's name shows in its own colour, picked so none is a colour the game uses in chat (admins are Purple, you are CornflowerBlue, allies LightGreen, neutral players and script messages PaleGoldenrod, enemies Crimson, faction text LimeGreen, private text Violet, everything else White). The palette lives in `Personality.cs`; change a colour there and every plugin picks it up on its next build.
+
+| Character | Colour | RGB |
+|---|---|---|
+| BaR Maid | Hot pink | 255, 105, 180 |
+| Fat Albert | Bright orange | 255, 140, 0 |
+| Stockpile Manager | Salmon | 250, 128, 114 |
+| Script to Plugin | Electric cyan | 0, 229, 255 |
+| OreScout | Gold | 255, 215, 0 |
+| Wilson | Fence-post tan | 222, 184, 135 |
+| Tim | Teal | 0, 206, 180 |
+| Any other | Apricot | 255, 180, 110 |
+
+Lines go through `MyHud.Chat.ShowMessage(sender, text, senderColor, messageColor)`, which only adds them to this screen's chat list (the ModAPI `ShowMessage` uses the same list, without a colour).
 
 ### Banter (the director)
 
 The plugins share a private message channel (`0x54494D5F50455253`, "TIM_PERS"). A banter plugin can act as the **director**: it announces itself, and from then on the plugins send it their events instead of talking themselves. The director decides who speaks. It can ask a plugin to say one of its own lines, or show a written exchange between several characters itself.
 
-Messages are `object[]` arrays. Every message a plugin sends has five elements, `{kind, name, key, values, level}`; `level` is the plugin's Personality setting as text (`"Off"`, `"Quiet"`, `"Normal"` or `"Chatty"`), and `key` and `values` are null when the kind doesn't use them.
+Messages are `object[]` arrays. Every message a plugin sends has seven elements, `{kind, name, key, values, level, displayName, important}`: `name` is the character name passed to `Register`, `level` is the plugin's Personality setting as text (`"Off"`, `"Quiet"`, `"Normal"` or `"Chatty"`), `displayName` is the name its lines show under, and `important` is `"1"` for an important event and `"0"` otherwise. `key` and `values` are null when the kind doesn't use them.
 
 | Message | Sent by | Meaning |
 |---|---|---|
-| `{"hello", name, …, level}` | Plugin, on load | Asks whether a director is loaded. |
+| `{"hello", name, …}` | Plugin, on load | Asks whether a director is loaded. |
 | `{"director", directorName}` | Director | Sent on load and in answer to "hello". Plugins send it their events from then on. |
-| `{"here", name, …, level}` | Plugin | Answer to "director", and sent again whenever the plugin's Personality setting changes while a director is loaded. Lets a director that loads after the plugins know who's there. |
-| `{"bye", directorName}` | Director, on unload | Plugins go back to talking themselves. |
-| `{"event", name, key, values, level}` | Plugin | Something happened. `values` is the name/value `string[]` passed to `Say`. Not sent when the plugin's Personality is Off; on Quiet, only sent for important events. |
-| `{"say", directorName, targetName, key, values}` | Director | The target says one of its own lines for that event now, ignoring cooldowns. |
-| `{"spoke", name, …}` | Anyone who showed a line | Everyone holds back for 8 seconds. |
+| `{"here", name, …}` | Plugin | Answer to "director", and sent again whenever the plugin's Personality setting or display name changes while a director is loaded. Lets a director that loads after the plugins know who's there. |
+| `{"bye", directorName}` | Director, on unload or when set to Off | Plugins go back to talking themselves. |
+| `{"event", name, key, values, level, displayName, important}` | Plugin | Something happened. `values` is the name/value `string[]` passed to `Say`. Not sent when the plugin's Personality is Off; on Quiet, only sent for important events. |
+| `{"say", directorName, targetName, key, values}` | Director | The target says one of its own lines for that event now, ignoring the cycle and cooldowns. The plugin shows it (and sends "spoke") from inside the call, so the director knows straight away whether it had a line. |
+| `{"rename", directorName, targetName, newName}` | Director | The target's display name becomes `newName` (empty for its own); the plugin saves it through `Changed` and confirms with "here". |
+| `{"spoke", name, …}` | Anyone who showed a line | Starts everyone's cycle. |
 
-The level element and the "here" message were added after the first version. A director must still accept the older four-element messages (treating the level as Normal), and learns about a plugin built before then from its first message. Messages are delivered straight from the sender's `SendModMessage` call, so handlers catch their own exceptions and never register or unregister a handler while handling a message.
+The level, display name and importance elements and the "here" and "rename" messages were added after the first version. A director must still accept shorter messages (treating a missing level as Normal, a missing name as the character's own, and a missing importance as not important), and learns about a plugin built before then from its first message. Messages are delivered straight from the sender's `SendModMessage` call, so handlers catch their own exceptions and never register or unregister a handler while handling a message.
 
-Every plugin keeps working on its own, with or without the director. The director is [Wilson](../Projects/Wilson/).
+Every plugin keeps working on its own, with or without the director. The director is [Wilson](../Projects/Wilson/). Wilson links this file for the cycle table, names and colours, but never calls `Register`.
 
 ## Releasing a plugin that uses these files
 
