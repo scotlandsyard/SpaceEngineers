@@ -168,6 +168,18 @@ internal static class AutoCraft
 				}
 				construct.QuotaShort[shortKey] = isShort;
 				construct.QuotaSeen[shortKey] = quota.Min;
+				// A docked ship's shortfall is pulled from the station's storage first (StockEngine); what's on its
+				// way isn't made again.
+				double inbound = construct.InboundFor(unit.Id, key, now);
+				if (inbound > 0.0 && have < quota.Min)
+				{
+					if (have + inbound >= quota.Min - 1e-6)
+					{
+						unit.Notes[key] = "Coming from the station";
+						continue;
+					}
+					have += inbound;
+				}
 			}
 			MyBlueprintDefinitionBase blueprint = Items.Blueprint(key);
 			if (quota.HasMax && have > quota.Max)

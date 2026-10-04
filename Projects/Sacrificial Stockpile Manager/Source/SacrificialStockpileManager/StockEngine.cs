@@ -34,6 +34,9 @@ internal class StockEngine
 
 	private const double NotConnectedSeconds = 30.0;
 
+	/// <summary>How long items sent to a docked ship count as coming for its autocraft: the server's reply plus a little.</summary>
+	private const double InboundSeconds = 8.0;
+
 	/// <summary>How long a sent transfer is assumed to be on its way when the server hasn't answered yet.</summary>
 	private const double PendingSeconds = 6.0;
 
@@ -94,6 +97,11 @@ internal class StockEngine
 	private static readonly Dictionary<string, Pending> s_pending = new Dictionary<string, Pending>();
 
 	private readonly Construct _construct;
+
+	/// <summary>The grid's own settings (its quotas protect the station's stock when a docked ship is restocked).</summary>
+	private GridRules _coreRules;
+
+	private readonly Dictionary<long, GridRules> _unitRules = new Dictionary<long, GridRules>();
 
 	// Not readonly: the docked-ship unload switches moving on for itself.
 	private bool _move;
@@ -174,6 +182,7 @@ internal class StockEngine
 		StockEngine engine = new StockEngine(construct, (rules != null && rules.Automation) || runOnce, now);
 		// Settings a grid hasn't saved yet have their defaults (Clean production blocks is on by default).
 		rules ??= new GridRules();
+		engine._coreRules = rules;
 		if (now < construct.UnloadUntil)
 		{
 			// Asked for by the player, so it goes first.
@@ -187,6 +196,7 @@ internal class StockEngine
 			engine.DrainOutputs();
 		}
 		engine.FillMinimums();
+		engine.RestockDockedShips();
 		engine.TrimMaximums();
 		if (rules.OrePriority.Count > 0)
 		{
@@ -226,7 +236,14 @@ internal class StockEngine
 					break;
 				}
 				ItemLimit limit = source.Block.Limit(key);
-				Put(source, key, Have(source, key) - (limit != null && limit.HasMin ? limit.Min : 0.0), 1);
+				double amount = Have(source, key) - (limit != null && limit.HasMin ? limit.Min : 0.0);
+				// The ship's own quota stays on board: only what the ship holds above it is unloaded.
+				ItemLimit quota = UnitRules(source.Block.Unit)?.Quota(key);
+				if (quota != null && quota.HasMin && quota.Min > 0.0)
+				{
+					amount = Math.Min(amount, UnitHave(source.Block.Unit, key) - quota.Min);
+				}
+				Put(source, key, amount, 1);
 			}
 		}
 		UnloadTransfers = _transfers - before;
@@ -460,6 +477,129 @@ internal class StockEngine
 				{
 					_restockedAmount = have - before;
 					Restocked = destination.Block.Name;
+				}
+			}
+		}
+	}
+
+	/// <summary>The settings of a unit (the grid itself or a docked ship), looked up among its own grids only.</summary>
+	private GridRules UnitRules(long unit)
+	{
+		if (!_unitRules.TryGetValue(unit, out GridRules rules))
+		{
+			rules = unit == _construct.CoreUnit ? _coreRules : _construct.Units.TryGetValue(unit, out List<long> ids) ? Store.GridRules(unit, ids) : null;
+			_unitRules[unit] = rules;
+		}
+		return rules;
+	}
+
+	/// <summary>
+	/// Everything a unit holds of an item, as its quota counts it: all its inventories in this pass (moves still on
+	/// their way included) plus the blocks the pass leaves alone (Manual or not yours), as last read.
+	/// </summary>
+	private double UnitHave(long unit, string key)
+	{
+		double total = 0.0;
+		foreach (Inv inv in _inventories)
+		{
+			if (inv.Block.Unit == unit)
+			{
+				total += Have(inv, key);
+			}
+		}
+		if (_construct.Snapshot != null)
+		{
+			foreach (BlockSnapshot block in _construct.Snapshot.Blocks)
+			{
+				if (block.Unit == unit && Construct.Resolve(block) == Effective.Manual)
+				{
+					block.ItemAmounts.TryGetValue(key, out double items);
+					block.OutputAmounts.TryGetValue(key, out double output);
+					total += items + output;
+				}
+			}
+		}
+		return total;
+	}
+
+	/// <summary>
+	/// A docked ship short of one of its own quotas gets the shortfall from this grid's storage first, so autocraft
+	/// only has to make what the station doesn't have. The station keeps its own quota (and each storage block its
+	/// own minimum). What's on its way counts as covered for autocraft (see <see cref="Construct.AddInbound"/>).
+	/// </summary>
+	private void RestockDockedShips()
+	{
+		if (!_move)
+		{
+			return;
+		}
+		foreach (long unit in _construct.Units.Keys.Where(u => u != _construct.CoreUnit).ToList())
+		{
+			GridRules ship = UnitRules(unit);
+			if (ship == null)
+			{
+				continue;
+			}
+			foreach (ItemLimit quota in ship.Quotas.Where(q => q.HasMin && q.Min > Epsilon).ToList())
+			{
+				string key = quota.Item;
+				if (!Budget)
+				{
+					break;
+				}
+				double need = quota.Min - UnitHave(unit, key);
+				if (Items.IsIntegral(key))
+				{
+					need = Math.Ceiling(need - Epsilon);
+				}
+				if (need <= Epsilon || !Items.TryParse(key, out MyDefinitionId id))
+				{
+					continue;
+				}
+				ItemLimit stationQuota = _coreRules?.Quota(key);
+				double spare = UnitHave(_construct.CoreUnit, key) - (stationQuota != null && stationQuota.HasMin ? stationQuota.Min : 0.0);
+				List<Inv> destinations = _inventories
+					.Where(d => !d.IsOutput && d.Block.Unit == unit && d.Block.Kind == BlockKind.Cargo && (d.Block.Role == Effective.Machine || d.Block.Role == Effective.Storage) && d.Inventory.CheckConstraint(id))
+					.OrderByDescending(d => Have(d, key) > 0.0)
+					.ThenByDescending(d => Free(d))
+					.ToList();
+				List<Inv> sources = _storage.Where(s => !s.Block.Docked && Available(s, key) > Epsilon).OrderBy(s => SourceRank(s, key)).ToList();
+				double sent = 0.0;
+				foreach (Inv destination in destinations)
+				{
+					foreach (Inv source in sources)
+					{
+						double amount = Math.Min(Math.Min(need - sent, spare - sent), Available(source, key));
+						if (amount <= Epsilon || !Budget)
+						{
+							break;
+						}
+						double fit = Fits(destination, key, id);
+						if (fit <= Epsilon)
+						{
+							break;
+						}
+						if (!Connected(source, destination, id, key))
+						{
+							continue;
+						}
+						sent += Transfer(source, destination, key, Math.Min(amount, fit));
+					}
+					if (need - sent <= Epsilon || spare - sent <= Epsilon || !Budget)
+					{
+						break;
+					}
+				}
+				// Autocraft only makes what the station can't cover: what was sent, and what is left to send once the
+				// budget allows, count as coming.
+				double coming = sent;
+				if (!Budget)
+				{
+					coming += Math.Max(0.0, Math.Min(need - sent, spare - sent));
+				}
+				if (coming > Epsilon)
+				{
+					_construct.AddInbound(unit, key, coming, _now + InboundSeconds);
 				}
 			}
 		}

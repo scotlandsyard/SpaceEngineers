@@ -120,6 +120,31 @@ internal class Construct
 	/// <summary>Per unit and quota item ("unit:item"): whether it was short at the last autocraft pass.</summary>
 	public readonly Dictionary<string, bool> QuotaShort = new Dictionary<string, bool>();
 
+	private readonly Dictionary<string, List<KeyValuePair<double, double>>> _inbound = new Dictionary<string, List<KeyValuePair<double, double>>>();
+
+	/// <summary>Items sent from the grid's storage to a docked ship for one of its quotas, counted as coming until <paramref name="until"/> (game seconds).</summary>
+	public void AddInbound(long unit, string key, double amount, double until)
+	{
+		string id = unit + ":" + key;
+		if (!_inbound.TryGetValue(id, out List<KeyValuePair<double, double>> entries))
+		{
+			entries = new List<KeyValuePair<double, double>>();
+			_inbound[id] = entries;
+		}
+		entries.Add(new KeyValuePair<double, double>(amount, until));
+	}
+
+	/// <summary>What's on its way to a docked ship for its quota and not in its snapshot yet; autocraft doesn't make that again.</summary>
+	public double InboundFor(long unit, string key, double now)
+	{
+		if (!_inbound.TryGetValue(unit + ":" + key, out List<KeyValuePair<double, double>> entries))
+		{
+			return 0.0;
+		}
+		entries.RemoveAll(e => e.Value <= now);
+		return entries.Sum(e => e.Key);
+	}
+
 	/// <summary>The same keys: the quota at that pass, so an edited quota doesn't count as stock coming in.</summary>
 	public readonly Dictionary<string, double> QuotaSeen = new Dictionary<string, double>();
 
