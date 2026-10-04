@@ -164,7 +164,8 @@ internal static class Personality
 		{
 			return null;
 		}
-		float right = screen.Size.Value.X / 2f - 0.03f;
+		// Leaves room for the window's close button in the top right corner.
+		float right = screen.Size.Value.X / 2f - 0.07f;
 		MyGuiControlCombobox combo = new MyGuiControlCombobox(new Vector2(right, caption.Position.Y), new Vector2(0.15f, 0.04f), null, null, 4, null, false, null, MyGuiDrawAlignEnum.HORISONTAL_RIGHT_AND_VERTICAL_CENTER);
 		foreach (Chattiness level in Enum.GetValues(typeof(Chattiness)))
 		{
