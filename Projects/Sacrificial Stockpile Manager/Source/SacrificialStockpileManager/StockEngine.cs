@@ -29,6 +29,11 @@ internal class StockEngine
 
 	private const int MaxConnectionChecks = 150;
 
+	/// <summary>How long a conveyor check stays valid across passes. A "not connected" answer lasts longer: it costs the most to find.</summary>
+	private const double ConnectedSeconds = 10.0;
+
+	private const double NotConnectedSeconds = 30.0;
+
 	/// <summary>How long a sent transfer is assumed to be on its way when the server hasn't answered yet.</summary>
 	private const double PendingSeconds = 6.0;
 
@@ -101,7 +106,9 @@ internal class StockEngine
 
 	private readonly List<Inv> _storage = new List<Inv>();
 
-	private readonly Dictionary<string, bool> _connections = new Dictionary<string, bool>();
+	// Conveyor checks are remembered between passes. Without that, a big grid used up the whole per-pass budget on the
+	// same early checks every pass, and the last steps (cleaning production outputs) never got to check anything.
+	private static readonly Dictionary<string, KeyValuePair<bool, double>> s_connections = new Dictionary<string, KeyValuePair<bool, double>>();
 
 	private int _transfers;
 
@@ -172,17 +179,18 @@ internal class StockEngine
 			// Asked for by the player, so it goes first.
 			engine.UnloadDocked();
 		}
+		// A clogged production block stops work, so it comes first: before the limits, which can use up the pass's
+		// transfers and conveyor checks on a busy grid.
+		if (rules.DrainOutputs)
+		{
+			engine.CleanAssemblerInputs();
+			engine.DrainOutputs();
+		}
 		engine.FillMinimums();
 		engine.TrimMaximums();
 		if (rules.OrePriority.Count > 0)
 		{
 			engine.PrioritizeOres(rules.OrePriority);
-		}
-		// A clogged production block stops work, so it comes before routine sorting.
-		if (rules.DrainOutputs)
-		{
-			engine.CleanAssemblerInputs();
-			engine.DrainOutputs();
 		}
 		engine.ClearStockBlocks();
 		engine.DrainIntakes();
@@ -227,6 +235,13 @@ internal class StockEngine
 
 	private static void ExpirePending(double now)
 	{
+		if (s_connections.Count > 2000)
+		{
+			foreach (string key in s_connections.Where(c => c.Value.Value <= now).Select(c => c.Key).ToList())
+			{
+				s_connections.Remove(key);
+			}
+		}
 		if (s_pending.Count == 0)
 		{
 			return;
@@ -373,17 +388,17 @@ internal class StockEngine
 	private bool Connected(Inv source, Inv destination, MyDefinitionId id, string key)
 	{
 		string cacheKey = source.Block.Block.EntityId + ":" + source.Index + ">" + destination.Block.Block.EntityId + ":" + destination.Index + ":" + key;
-		if (_connections.TryGetValue(cacheKey, out bool connected))
+		if (s_connections.TryGetValue(cacheKey, out KeyValuePair<bool, double> known) && known.Value > _now)
 		{
-			return connected;
+			return known.Key;
 		}
 		if (_checks >= MaxConnectionChecks)
 		{
 			return false;
 		}
 		_checks++;
-		connected = ((IMyInventory)source.Inventory).CanTransferItemTo(destination.Inventory, id);
-		_connections[cacheKey] = connected;
+		bool connected = ((IMyInventory)source.Inventory).CanTransferItemTo(destination.Inventory, id);
+		s_connections[cacheKey] = new KeyValuePair<bool, double>(connected, _now + (connected ? ConnectedSeconds : NotConnectedSeconds));
 		return connected;
 	}
 
@@ -660,6 +675,11 @@ internal class StockEngine
 				foreach (string key in source.Amounts.Keys.ToList())
 				{
 					Put(source, key, Have(source, key), 1);
+				}
+				// Say why, when something is left that the budget doesn't explain.
+				if (_move && Budget && source.Amounts.Any(a => a.Value > Epsilon) && !Warnings.Any(w => w.StartsWith(source.Block.Name + " output", StringComparison.Ordinal)))
+				{
+					Warnings.Add($"{source.Block.Name} output isn't being emptied: no storage connected by conveyor with room for {Items.Name(source.Amounts.First(a => a.Value > Epsilon).Key)}");
 				}
 			}
 		}
