@@ -4,7 +4,7 @@ using ProtoBuf;
 
 namespace HydrogenBottleTiers
 {
-    // The server's settings file: <world>\Storage\<mod>\HydrogenBottleTiers.xml.
+    // The server's settings file in the world's Storage folder.
     // Written with the defaults on first load; admins edit it and restart the server.
     public class TierConfig
     {
@@ -14,7 +14,8 @@ namespace HydrogenBottleTiers
 
         public string Notes =
             "Edit the values below, then restart the server (or reload the world). " +
-            "CapacityLitres: hydrogen a full bottle holds (vanilla bottle: 400). " +
+            "Enabled: false means assemblers can't build that bottle; bottles that already exist keep working. " +
+            "CapacityLitres: gas a full bottle holds (vanilla: oxygen 40, hydrogen 400). " +
             "MassKg: weight of one bottle (vanilla: 30). BuildTimeSeconds: assembler time at speed x1. " +
             "Recipe: any items, e.g. <Item Type=\"Ingot\" Subtype=\"Platinum\" Amount=\"2\" /> or Type=\"Component\". " +
             "Invalid or missing values fall back to the mod's defaults; check the server log for lines starting with [HydrogenBottleTiers]. " +
@@ -25,25 +26,30 @@ namespace HydrogenBottleTiers
 
         public static TierConfig CreateDefault()
         {
-            // Keep in step with Data\PhysicalItems_HydrogenBottleTiers.sbc and Data\Blueprints_HydrogenBottleTiers.sbc.
+            // Keep in step with Data\PhysicalItems_BottleTiers.sbc and Data\Blueprints_BottleTiers.sbc.
             var config = new TierConfig();
-            config.Bottles.Add(new BottleConfig
+            foreach (string gas in new[] { "Oxygen", "Hydrogen" })
             {
-                Subtype = "HydrogenBottleTier2", CapacityLitres = 600, MassKg = 35, BuildTimeSeconds = 15,
-                Recipe = { Ingot("Iron", 105), Ingot("Silicon", 25), Ingot("Nickel", 40), Ingot("Cobalt", 5) },
-            });
-            config.Bottles.Add(new BottleConfig
-            {
-                Subtype = "HydrogenBottleTier3", CapacityLitres = 1000, MassKg = 50, BuildTimeSeconds = 30,
-                Recipe = { Ingot("Iron", 240), Ingot("Silicon", 40), Ingot("Nickel", 65), Ingot("Cobalt", 15),
-                    Ingot("Silver", 5), Ingot("Magnesium", 0.5f) },
-            });
-            config.Bottles.Add(new BottleConfig
-            {
-                Subtype = "HydrogenBottleTier4", CapacityLitres = 1800, MassKg = 75, BuildTimeSeconds = 60,
-                Recipe = { Ingot("Iron", 400), Ingot("Silicon", 80), Ingot("Nickel", 100), Ingot("Cobalt", 22.5f),
-                    Ingot("Silver", 12.5f), Ingot("Magnesium", 2.5f), Ingot("Gold", 5), Ingot("Platinum", 2) },
-            });
+                // Capacities are 1.5x, 2.5x and 4.5x the vanilla bottle; the rest is the same for both gases.
+                float vanillaCapacity = gas == "Oxygen" ? 40 : 400;
+                config.Bottles.Add(new BottleConfig
+                {
+                    Subtype = gas + "BottleTier2", CapacityLitres = vanillaCapacity * 1.5f, MassKg = 35, BuildTimeSeconds = 15,
+                    Recipe = { Ingot("Iron", 105), Ingot("Silicon", 25), Ingot("Nickel", 40), Ingot("Cobalt", 5) },
+                });
+                config.Bottles.Add(new BottleConfig
+                {
+                    Subtype = gas + "BottleTier3", CapacityLitres = vanillaCapacity * 2.5f, MassKg = 50, BuildTimeSeconds = 30,
+                    Recipe = { Ingot("Iron", 240), Ingot("Silicon", 40), Ingot("Nickel", 65), Ingot("Cobalt", 15),
+                        Ingot("Silver", 5), Ingot("Magnesium", 0.5f) },
+                });
+                config.Bottles.Add(new BottleConfig
+                {
+                    Subtype = gas + "BottleTier4", CapacityLitres = vanillaCapacity * 4.5f, MassKg = 75, BuildTimeSeconds = 60,
+                    Recipe = { Ingot("Iron", 400), Ingot("Silicon", 80), Ingot("Nickel", 100), Ingot("Cobalt", 22.5f),
+                        Ingot("Silver", 12.5f), Ingot("Magnesium", 2.5f), Ingot("Gold", 5), Ingot("Platinum", 2) },
+                });
+            }
             return config;
         }
 
@@ -58,6 +64,7 @@ namespace HydrogenBottleTiers
         [XmlAttribute]
         public string Subtype;
 
+        public bool Enabled = true;
         public float CapacityLitres;
         public float MassKg;
         public float BuildTimeSeconds;
@@ -78,7 +85,7 @@ namespace HydrogenBottleTiers
         public float Amount;
     }
 
-    // Server -> client: the server's config as XML, so every client shows the same capacities and recipes.
+    // Server -> client: the server's config as XML, so every client shows the same bottles, capacities and recipes.
     [ProtoContract]
     public class ConfigMessage
     {

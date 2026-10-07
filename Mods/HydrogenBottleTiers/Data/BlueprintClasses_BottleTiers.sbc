@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<!--
+  Same layout as the vanilla Welder tiers: the basic assembler (SimpleEquipment) makes tier 2,
+  the assembler (EliteEquipment) makes all three. A bottle disabled in the config file is taken
+  out of SimpleEquipment/EliteEquipment by the script (keep BottleInfo in Session.cs in step).
+  OxygenBottles / HydrogenBottles are the classes generators and tanks use to accept and refill
+  bottles; those entries stay for disabled bottles too, so bottles that already exist keep working.
+-->
+<Definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <BlueprintClassEntries>
+        <Entry Class="SimpleEquipment" BlueprintSubtypeId="Position0011_OxygenBottleTier2" />
+        <Entry Class="SimpleEquipment" BlueprintSubtypeId="Position0021_HydrogenBottleTier2" />
+
+        <Entry Class="EliteEquipment" BlueprintSubtypeId="Position0011_OxygenBottleTier2" />
+        <Entry Class="EliteEquipment" BlueprintSubtypeId="Position0012_OxygenBottleTier3" />
+        <Entry Class="EliteEquipment" BlueprintSubtypeId="Position0013_OxygenBottleTier4" />
+        <Entry Class="EliteEquipment" BlueprintSubtypeId="Position0021_HydrogenBottleTier2" />
+        <Entry Class="EliteEquipment" BlueprintSubtypeId="Position0022_HydrogenBottleTier3" />
+        <Entry Class="EliteEquipment" BlueprintSubtypeId="Position0023_HydrogenBottleTier4" />
+
+        <Entry Class="OxygenBottles" BlueprintSubtypeId="OxygenBottleTier2Refill" />
+        <Entry Class="OxygenBottles" BlueprintSubtypeId="OxygenBottleTier3Refill" />
+        <Entry Class="OxygenBottles" BlueprintSubtypeId="OxygenBottleTier4Refill" />
+        <Entry Class="HydrogenBottles" BlueprintSubtypeId="HydrogenBottleTier2Refill" />
+        <Entry Class="HydrogenBottles" BlueprintSubtypeId="HydrogenBottleTier3Refill" />
+        <Entry Class="HydrogenBottles" BlueprintSubtypeId="HydrogenBottleTier4Refill" />
+    </BlueprintClassEntries>
+</Definitions>

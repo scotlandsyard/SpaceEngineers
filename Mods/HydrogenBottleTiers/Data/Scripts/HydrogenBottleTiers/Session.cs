@@ -10,7 +10,7 @@ using VRage.Utils;
 
 namespace HydrogenBottleTiers
 {
-    // Applies the server's bottle settings (capacity, mass, build time, recipe) to the definitions, on the
+    // Applies the server's bottle settings (enabled, capacity, mass, build time, recipe) to the definitions, on the
     // server and on every client. Runs once at world load and never updates, so it costs nothing while playing.
     // If this script ever fails (for example after a game update), the bottles still work with the defaults
     // from the .sbc files; only the config file and the HUD bottle count are lost.
@@ -24,13 +24,40 @@ namespace HydrogenBottleTiers
         const byte RequestConfig = 1;
         const int RequestCooldownFrames = 300; // a client is answered at most once every 5 seconds
 
-        // Our bottles and their assembly blueprints. The config can only change these.
-        static readonly Dictionary<string, string> BlueprintByBottle = new Dictionary<string, string>
+        // Our bottles: item type, assembly blueprint, and the assembler classes it's in
+        // (Data\BlueprintClasses_BottleTiers.sbc). The config can only change these.
+        class BottleInfo
         {
-            { "HydrogenBottleTier2", "Position0021_HydrogenBottleTier2" },
-            { "HydrogenBottleTier3", "Position0022_HydrogenBottleTier3" },
-            { "HydrogenBottleTier4", "Position0023_HydrogenBottleTier4" },
-        };
+            public MyDefinitionId ItemId;
+            public MyDefinitionId BlueprintId;
+            public string[] AssemblerClasses;
+            public string GasName;
+        }
+
+        static readonly Dictionary<string, BottleInfo> Bottles = CreateBottleInfo();
+
+        static Dictionary<string, BottleInfo> CreateBottleInfo()
+        {
+            var bottles = new Dictionary<string, BottleInfo>();
+            Add(bottles, typeof(MyObjectBuilder_OxygenContainerObject), "Oxygen", "001");
+            Add(bottles, typeof(MyObjectBuilder_GasContainerObject), "Hydrogen", "002");
+            return bottles;
+        }
+
+        static void Add(Dictionary<string, BottleInfo> bottles, Type itemType, string gas, string position)
+        {
+            for (int tier = 2; tier <= 4; tier++)
+            {
+                string subtype = gas + "BottleTier" + tier;
+                bottles[subtype] = new BottleInfo
+                {
+                    ItemId = new MyDefinitionId(itemType, subtype),
+                    BlueprintId = new MyDefinitionId(typeof(MyObjectBuilder_BlueprintDefinition), "Position" + position + (tier - 1) + "_" + subtype),
+                    AssemblerClasses = tier == 2 ? new[] { "SimpleEquipment", "EliteEquipment" } : new[] { "EliteEquipment" },
+                    GasName = gas == "Oxygen" ? "oxygen" : "hydrogen",
+                };
+            }
+        }
 
         bool handlerRegistered;
         byte[] configForClients;
@@ -195,17 +222,16 @@ namespace HydrogenBottleTiers
 
             foreach (BottleConfig bottle in config.Bottles)
             {
-                string blueprintSubtype;
-                if (bottle == null || bottle.Subtype == null || !BlueprintByBottle.TryGetValue(bottle.Subtype, out blueprintSubtype))
+                BottleInfo info;
+                if (bottle == null || bottle.Subtype == null || !Bottles.TryGetValue(bottle.Subtype, out info))
                 {
                     if (logProblems)
                         Log("Unknown bottle in the config, ignored: " + (bottle == null ? "(empty)" : bottle.Subtype));
                     continue;
                 }
 
-                var itemId = new MyDefinitionId(typeof(MyObjectBuilder_GasContainerObject), bottle.Subtype);
                 MyPhysicalItemDefinition itemDefinition;
-                MyDefinitionManager.Static.TryGetPhysicalItemDefinition(itemId, out itemDefinition);
+                MyDefinitionManager.Static.TryGetPhysicalItemDefinition(info.ItemId, out itemDefinition);
                 var container = itemDefinition as MyOxygenContainerDefinition;
                 if (container == null)
                 {
@@ -219,7 +245,7 @@ namespace HydrogenBottleTiers
                     container.Capacity = bottle.CapacityLitres;
                     if (container.ExtraInventoryTooltipLine != null)
                         container.ExtraInventoryTooltipLine.Clear().Append('\n')
-                            .Append("Capacity: ").Append(bottle.CapacityLitres).Append(" L of hydrogen");
+                            .Append("Capacity: ").Append(bottle.CapacityLitres).Append(" L of ").Append(info.GasName);
                 }
                 else if (logProblems)
                     Log(bottle.Subtype + ": CapacityLitres must be between 1 and 1000000, using the default.");
@@ -229,14 +255,17 @@ namespace HydrogenBottleTiers
                 else if (logProblems)
                     Log(bottle.Subtype + ": MassKg must be between 0 and 100000, using the default.");
 
-                MyBlueprintDefinitionBase blueprint = MyDefinitionManager.Static.GetBlueprintDefinition(
-                    new MyDefinitionId(typeof(MyObjectBuilder_BlueprintDefinition), blueprintSubtype));
+                MyBlueprintDefinitionBase blueprint = MyDefinitionManager.Static.GetBlueprintDefinition(info.BlueprintId);
                 if (blueprint == null)
                 {
                     if (logProblems)
                         Log("Blueprint missing for " + bottle.Subtype + ", is the mod installed correctly?");
                     continue;
                 }
+
+                SetBuildable(blueprint, info.AssemblerClasses, bottle.Enabled);
+                if (!bottle.Enabled && logProblems)
+                    Log(bottle.Subtype + " is disabled: assemblers won't build it.");
 
                 if (IsValid(bottle.BuildTimeSeconds, 0.1f, 86400))
                     blueprint.BaseProductionTimeInSeconds = bottle.BuildTimeSeconds;
@@ -246,6 +275,33 @@ namespace HydrogenBottleTiers
                 MyBlueprintDefinitionBase.Item[] recipe = BuildRecipe(bottle, logProblems);
                 if (recipe != null)
                     blueprint.Prerequisites = recipe;
+            }
+        }
+
+        // Adds the blueprint to, or takes it out of, the assembler classes. A blueprint class has no Remove, so a
+        // removal rebuilds the class without it. The game checks these classes before queueing anything, on the
+        // server too, so a disabled bottle can't be queued even by a client that still shows it.
+        static void SetBuildable(MyBlueprintDefinitionBase blueprint, string[] classNames, bool buildable)
+        {
+            foreach (string className in classNames)
+            {
+                MyBlueprintClassDefinition blueprintClass = MyDefinitionManager.Static.GetBlueprintClass(className);
+                if (blueprintClass == null || blueprintClass.ContainsBlueprint(blueprint) == buildable)
+                    continue;
+                if (buildable)
+                {
+                    blueprintClass.AddBlueprint(blueprint);
+                    continue;
+                }
+                var keep = new List<MyBlueprintDefinitionBase>();
+                foreach (MyBlueprintDefinitionBase other in blueprintClass)
+                {
+                    if (other != blueprint)
+                        keep.Add(other);
+                }
+                blueprintClass.ClearBlueprints();
+                foreach (MyBlueprintDefinitionBase other in keep)
+                    blueprintClass.AddBlueprint(other);
             }
         }
 

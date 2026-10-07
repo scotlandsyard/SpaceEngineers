@@ -11,26 +11,45 @@ using VRage.Utils;
 
 namespace HydrogenBottleTiers
 {
-    // The bottle pips next to the jetpack fuel bar. The game's own counter (same Id) only counts the vanilla
-    // hydrogen bottle; this one replaces it and counts every hydrogen bottle that isn't empty, of any tier or mod.
-    // The game finds this class by itself and creates it only where there is a HUD, so never on a dedicated server.
-    // It only reads the local player's inventory, once a second.
-    public class HydrogenBottleHudStat : IMyHudStat
+    // The oxygen and hydrogen bottle pips next to the suit's oxygen and fuel bars. The game's own counters
+    // (same Ids) only count the vanilla bottles; these replace them and count every bottle of that gas that
+    // isn't empty, of any tier or mod. The game finds these classes by itself and creates them only where there
+    // is a HUD, so never on a dedicated server. They only read the local player's inventory, once a second.
+    public class OxygenBottleHudStat : BottleHudStat
+    {
+        public OxygenBottleHudStat() : base("player_oxygen_bottles", "Oxygen") { }
+    }
+
+    public class HydrogenBottleHudStat : BottleHudStat
+    {
+        public HydrogenBottleHudStat() : base("player_hydrogen_bottles", "Hydrogen") { }
+    }
+
+    public abstract class BottleHudStat : IMyHudStat
     {
         const int CheckIntervalFrames = 60;
 
+        // Oxygen bottles are OxygenContainerObject, hydrogen bottles GasContainerObject (its base type).
         const string GasContainerTypeId = "MyObjectBuilder_GasContainerObject";
-        static readonly MyDefinitionId HydrogenId = new MyDefinitionId(typeof(MyObjectBuilder_GasProperties), "Hydrogen");
+        const string OxygenContainerTypeId = "MyObjectBuilder_OxygenContainerObject";
 
-        // Whether an item type is a hydrogen bottle. Definitions don't change during a session.
-        readonly Dictionary<MyDefinitionId, bool> isHydrogenBottle = new Dictionary<MyDefinitionId, bool>();
+        readonly MyDefinitionId gasId;
+
+        // Whether an item type is a bottle of this gas. Definitions don't change during a session.
+        readonly Dictionary<MyDefinitionId, bool> isBottleOfGas = new Dictionary<MyDefinitionId, bool>();
 
         int framesUntilCheck;
         float currentValue;
         string valueString = "0";
         bool failed;
 
-        public MyStringHash Id { get; } = MyStringHash.GetOrCompute("player_hydrogen_bottles");
+        protected BottleHudStat(string statId, string gas)
+        {
+            Id = MyStringHash.GetOrCompute(statId);
+            gasId = new MyDefinitionId(typeof(MyObjectBuilder_GasProperties), gas);
+        }
+
+        public MyStringHash Id { get; }
         public float CurrentValue => currentValue;
         public float MaxValue => 1f;
         public float MinValue => 0f;
@@ -51,7 +70,7 @@ namespace HydrogenBottleTiers
                 // Never break the HUD: stop counting and leave a line in the log.
                 failed = true;
                 SetValue(0);
-                HydrogenBottleTiersSession.Log("HUD bottle count stopped after an error: " + e);
+                HydrogenBottleTiersSession.Log("HUD bottle count (" + Id.String + ") stopped after an error: " + e);
             }
         }
 
@@ -67,26 +86,29 @@ namespace HydrogenBottleTiers
             {
                 // The light item info first; the full item (with its gas level) only for gas bottles.
                 var info = inventory.GetItemAt(i);
-                if (!info.HasValue || info.Value.Type.TypeId != GasContainerTypeId)
+                if (!info.HasValue)
+                    continue;
+                string typeId = info.Value.Type.TypeId;
+                if (typeId != GasContainerTypeId && typeId != OxygenContainerTypeId)
                     continue;
                 IMyInventoryItem item = inventory.GetItemByID(info.Value.ItemId);
                 var bottle = item?.Content as MyObjectBuilder_GasContainerObject;
-                if (bottle != null && bottle.GasLevel > 1e-6f && IsHydrogenBottle(bottle.GetId()))
+                if (bottle != null && bottle.GasLevel > 1e-6f && IsBottleOfGas(bottle.GetId()))
                     count += (int)item.Amount;
             }
             return count;
         }
 
-        bool IsHydrogenBottle(MyDefinitionId id)
+        bool IsBottleOfGas(MyDefinitionId id)
         {
             bool result;
-            if (!isHydrogenBottle.TryGetValue(id, out result))
+            if (!isBottleOfGas.TryGetValue(id, out result))
             {
                 MyPhysicalItemDefinition definition;
                 MyDefinitionManager.Static.TryGetPhysicalItemDefinition(id, out definition);
                 var container = definition as MyOxygenContainerDefinition;
-                result = container != null && container.StoredGasId == HydrogenId;
-                isHydrogenBottle[id] = result;
+                result = container != null && container.StoredGasId == gasId;
+                isBottleOfGas[id] = result;
             }
             return result;
         }
