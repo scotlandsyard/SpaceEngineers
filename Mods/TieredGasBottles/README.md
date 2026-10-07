@@ -18,7 +18,7 @@ A Space Engineers workshop mod that adds three bigger oxygen bottles and three b
 Each bottle can be enabled or disabled, and its capacity, mass, build time and recipe changed. On its first load the mod writes a settings file into the world's folder:
 
 ```
-<world folder>\Storage\<workshop id>.sbm_TieredGasBottles\TieredGasBottles.xml
+<world folder>\Storage\3815194485.sbm_TieredGasBottles\TieredGasBottles.xml
 ```
 
 Edit it while the server is stopped, or restart after editing. Clients don't need to do anything: when a player joins, the server sends its settings, so everyone sees the same bottles, capacities and recipes.
@@ -55,5 +55,6 @@ Edit it while the server is stopped, or restart after editing. Clients don't nee
 - `Data\*.sbc`: the definitions; their values are the defaults and must match `TierConfig.CreateDefault()` in `Config.cs`, and the assembler classes must match `BottleInfo` in `Session.cs`.
 - `Data\Scripts\TieredGasBottles\`: `Session.cs` (settings file, sync, applying values), `BottleHudStat.cs` (HUD counts).
 - `Source\TieredGasBottles.csproj` only checks that the scripts compile (`dotnet build -c Release`). It doesn't check the mod script whitelist, so only an in-game load proves the scripts are allowed.
-- `Stage-Mod.ps1` copies the game files (`Data`, `Textures`, `thumb.jpg`, `modinfo.sbmi`) into the local Mods folder for testing and publishing. Nothing else is published: not the build output, this README, or `ORIGINAL-MOD-FINDINGS.md`.
+- `Stage-Mod.ps1` copies the game files (`Data`, `Textures`, `thumb.jpg`) into the local Mods folder for testing and publishing. Nothing else is published: not the build output, this README, or `ORIGINAL-MOD-FINDINGS.md`.
+- Workshop: https://steamcommunity.com/sharedfiles/filedetails/?id=3815194485 (unlisted). Updates are published from the local Mods folder, where the game keeps the workshop id in `modinfo.sbmi`. That file holds the publisher's Steam ID, so it isn't in this repo.
 - `ORIGINAL-MOD-FINDINGS.md`: what we found in the mod this one replaces, including the middle-mouse-button tool problem.

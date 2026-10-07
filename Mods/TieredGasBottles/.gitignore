@@ -1,2 +1,5 @@
 Source/bin/
 Source/obj/
+# Written by the game when publishing; contains the publisher's Steam ID, so it stays out of the public repo.
+modinfo.sbmi
+metadata.mod
