@@ -9,7 +9,7 @@ using VRage.Game.ObjectBuilders.Definitions;
 using VRage.ModAPI;
 using VRage.Utils;
 
-namespace HydrogenBottleTiers
+namespace TieredGasBottles
 {
     // The oxygen and hydrogen bottle pips next to the suit's oxygen and fuel bars. The game's own counters
     // (same Ids) only count the vanilla bottles; these replace them and count every bottle of that gas that
@@ -70,7 +70,7 @@ namespace HydrogenBottleTiers
                 // Never break the HUD: stop counting and leave a line in the log.
                 failed = true;
                 SetValue(0);
-                HydrogenBottleTiersSession.Log("HUD bottle count (" + Id.String + ") stopped after an error: " + e);
+                TieredGasBottlesSession.Log("HUD bottle count (" + Id.String + ") stopped after an error: " + e);
             }
         }
 

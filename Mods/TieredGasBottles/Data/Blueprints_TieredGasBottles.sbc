@@ -14,7 +14,7 @@
             </Id>
             <DisplayName>Enhanced Oxygen Bottle</DisplayName>
             <Icon>Textures\GUI\Icons\component\OxygenBottleComponent.dds</Icon>
-            <Icon>Textures\GUI\Icons\BottleTiers\Tier2.png</Icon>
+            <Icon>Textures\GUI\Icons\TieredGasBottles\Tier2.png</Icon>
             <Prerequisites>
                 <Item Amount="105" TypeId="Ingot" SubtypeId="Iron" />
                 <Item Amount="25" TypeId="Ingot" SubtypeId="Silicon" />
@@ -33,7 +33,7 @@
             </Id>
             <DisplayName>Proficient Oxygen Bottle</DisplayName>
             <Icon>Textures\GUI\Icons\component\OxygenBottleComponent.dds</Icon>
-            <Icon>Textures\GUI\Icons\BottleTiers\Tier3.png</Icon>
+            <Icon>Textures\GUI\Icons\TieredGasBottles\Tier3.png</Icon>
             <Prerequisites>
                 <Item Amount="240" TypeId="Ingot" SubtypeId="Iron" />
                 <Item Amount="40" TypeId="Ingot" SubtypeId="Silicon" />
@@ -54,7 +54,7 @@
             </Id>
             <DisplayName>Elite Oxygen Bottle</DisplayName>
             <Icon>Textures\GUI\Icons\component\OxygenBottleComponent.dds</Icon>
-            <Icon>Textures\GUI\Icons\BottleTiers\Tier4.png</Icon>
+            <Icon>Textures\GUI\Icons\TieredGasBottles\Tier4.png</Icon>
             <Prerequisites>
                 <Item Amount="400" TypeId="Ingot" SubtypeId="Iron" />
                 <Item Amount="80" TypeId="Ingot" SubtypeId="Silicon" />
@@ -77,7 +77,7 @@
             </Id>
             <DisplayName>Enhanced Hydrogen Bottle</DisplayName>
             <Icon>Textures\GUI\Icons\component\HydrogenBottle_Component.dds</Icon>
-            <Icon>Textures\GUI\Icons\BottleTiers\Tier2.png</Icon>
+            <Icon>Textures\GUI\Icons\TieredGasBottles\Tier2.png</Icon>
             <Prerequisites>
                 <Item Amount="105" TypeId="Ingot" SubtypeId="Iron" />
                 <Item Amount="25" TypeId="Ingot" SubtypeId="Silicon" />
@@ -96,7 +96,7 @@
             </Id>
             <DisplayName>Proficient Hydrogen Bottle</DisplayName>
             <Icon>Textures\GUI\Icons\component\HydrogenBottle_Component.dds</Icon>
-            <Icon>Textures\GUI\Icons\BottleTiers\Tier3.png</Icon>
+            <Icon>Textures\GUI\Icons\TieredGasBottles\Tier3.png</Icon>
             <Prerequisites>
                 <Item Amount="240" TypeId="Ingot" SubtypeId="Iron" />
                 <Item Amount="40" TypeId="Ingot" SubtypeId="Silicon" />
@@ -117,7 +117,7 @@
             </Id>
             <DisplayName>Elite Hydrogen Bottle</DisplayName>
             <Icon>Textures\GUI\Icons\component\HydrogenBottle_Component.dds</Icon>
-            <Icon>Textures\GUI\Icons\BottleTiers\Tier4.png</Icon>
+            <Icon>Textures\GUI\Icons\TieredGasBottles\Tier4.png</Icon>
             <Prerequisites>
                 <Item Amount="400" TypeId="Ingot" SubtypeId="Iron" />
                 <Item Amount="80" TypeId="Ingot" SubtypeId="Silicon" />

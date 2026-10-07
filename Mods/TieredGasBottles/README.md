@@ -1,4 +1,4 @@
-# Hydrogen Bottle Tiers
+# Tiered Gas Bottles (O2 & H2)
 
 A Space Engineers workshop mod that adds three bigger oxygen bottles and three bigger hydrogen bottles, tiered like the vanilla hand tools. The vanilla bottles are not changed.
 
@@ -18,7 +18,7 @@ A Space Engineers workshop mod that adds three bigger oxygen bottles and three b
 Each bottle can be enabled or disabled, and its capacity, mass, build time and recipe changed. On its first load the mod writes a settings file into the world's folder:
 
 ```
-<world folder>\Storage\<workshop id>.sbm_HydrogenBottleTiers\HydrogenBottleTiers.xml
+<world folder>\Storage\<workshop id>.sbm_TieredGasBottles\TieredGasBottles.xml
 ```
 
 Edit it while the server is stopped, or restart after editing. Clients don't need to do anything: when a player joins, the server sends its settings, so everyone sees the same bottles, capacities and recipes.
@@ -40,7 +40,7 @@ Edit it while the server is stopped, or restart after editing. Clients don't nee
 - The bottles are `OxygenBottleTier2`/`3`/`4` and `HydrogenBottleTier2`/`3`/`4`.
 - `Enabled` set to `false` takes the bottle out of every assembler. Bottles that already exist keep working: they can still be refilled, used and traded.
 - A recipe can use any item type: `Ingot`, `Ore`, `Component`, or items from other mods.
-- Invalid values fall back to the mod's defaults rather than breaking anything. A whole recipe falls back if any of its lines is wrong, so a typo can't make a bottle free. Each problem is written to the server log in a line starting with `[HydrogenBottleTiers]`.
+- Invalid values fall back to the mod's defaults rather than breaking anything. A whole recipe falls back if any of its lines is wrong, so a typo can't make a bottle free. Each problem is written to the server log in a line starting with `[TieredGasBottles]`.
 - Delete the file to get the defaults back. When a new version of the mod adds settings, they're added to your file and your values are kept.
 - Changing a recipe doesn't change bottles that already exist. Changing capacity applies to all bottles, including full ones, because the game stores a bottle's fill as a percentage.
 
@@ -53,6 +53,6 @@ Edit it while the server is stopped, or restart after editing. Clients don't nee
 ## Development
 
 - `Data\*.sbc`: the definitions; their values are the defaults and must match `TierConfig.CreateDefault()` in `Config.cs`, and the assembler classes must match `BottleInfo` in `Session.cs`.
-- `Data\Scripts\HydrogenBottleTiers\`: `Session.cs` (settings file, sync, applying values), `BottleHudStat.cs` (HUD counts).
-- `Source\HydrogenBottleTiers.csproj` only checks that the scripts compile (`dotnet build -c Release`). It doesn't check the mod script whitelist, so only an in-game load proves the scripts are allowed.
+- `Data\Scripts\TieredGasBottles\`: `Session.cs` (settings file, sync, applying values), `BottleHudStat.cs` (HUD counts).
+- `Source\TieredGasBottles.csproj` only checks that the scripts compile (`dotnet build -c Release`). It doesn't check the mod script whitelist, so only an in-game load proves the scripts are allowed.
 - `Stage-Mod.ps1` copies the game files into the local Mods folder for testing and publishing, without the build output.

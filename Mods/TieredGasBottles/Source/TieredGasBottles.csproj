@@ -4,8 +4,8 @@
     this build does NOT check the mod script whitelist, so test in game too. The DLL it makes is not used.
   -->
   <PropertyGroup>
-    <AssemblyName>HydrogenBottleTiers</AssemblyName>
-    <RootNamespace>HydrogenBottleTiers</RootNamespace>
+    <AssemblyName>TieredGasBottles</AssemblyName>
+    <RootNamespace>TieredGasBottles</RootNamespace>
     <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
     <TargetFramework>net481</TargetFramework>
     <PlatformTarget>x64</PlatformTarget>
@@ -24,7 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="../Data/Scripts/HydrogenBottleTiers/**/*.cs" />
+    <Compile Include="../Data/Scripts/TieredGasBottles/**/*.cs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Xml.Serialization;
 using ProtoBuf;
 
-namespace HydrogenBottleTiers
+namespace TieredGasBottles
 {
     // The server's settings file in the world's Storage folder.
     // Written with the defaults on first load; admins edit it and restart the server.
@@ -18,7 +18,7 @@ namespace HydrogenBottleTiers
             "CapacityLitres: gas a full bottle holds (vanilla: oxygen 40, hydrogen 400). " +
             "MassKg: weight of one bottle (vanilla: 30). BuildTimeSeconds: assembler time at speed x1. " +
             "Recipe: any items, e.g. <Item Type=\"Ingot\" Subtype=\"Platinum\" Amount=\"2\" /> or Type=\"Component\". " +
-            "Invalid or missing values fall back to the mod's defaults; check the server log for lines starting with [HydrogenBottleTiers]. " +
+            "Invalid or missing values fall back to the mod's defaults; check the server log for lines starting with [TieredGasBottles]. " +
             "Delete this file to get the defaults back.";
 
         [XmlArrayItem("Bottle")]
@@ -26,7 +26,7 @@ namespace HydrogenBottleTiers
 
         public static TierConfig CreateDefault()
         {
-            // Keep in step with Data\PhysicalItems_BottleTiers.sbc and Data\Blueprints_BottleTiers.sbc.
+            // Keep in step with Data\PhysicalItems_TieredGasBottles.sbc and Data\Blueprints_TieredGasBottles.sbc.
             var config = new TierConfig();
             foreach (string gas in new[] { "Oxygen", "Hydrogen" })
             {

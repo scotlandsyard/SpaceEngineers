@@ -3,7 +3,7 @@
 #   powershell -ExecutionPolicy Bypass -File Stage-Mod.ps1
 $ErrorActionPreference = 'Stop'
 $source = $PSScriptRoot
-$target = Join-Path $env:AppData 'SpaceEngineers\Mods\HydrogenBottleTiers'
+$target = Join-Path $env:AppData 'SpaceEngineers\Mods\TieredGasBottles'
 
 # Bring back the workshop id the game wrote when the mod was published.
 $publishedInfo = Join-Path $target 'modinfo.sbmi'

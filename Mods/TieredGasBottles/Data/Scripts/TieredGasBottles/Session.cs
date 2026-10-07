@@ -8,24 +8,24 @@ using VRage.Game;
 using VRage.Game.Components;
 using VRage.Utils;
 
-namespace HydrogenBottleTiers
+namespace TieredGasBottles
 {
     // Applies the server's bottle settings (enabled, capacity, mass, build time, recipe) to the definitions, on the
     // server and on every client. Runs once at world load and never updates, so it costs nothing while playing.
     // If this script ever fails (for example after a game update), the bottles still work with the defaults
     // from the .sbc files; only the config file and the HUD bottle count are lost.
     [MySessionComponentDescriptor(MyUpdateOrder.NoUpdate)]
-    public class HydrogenBottleTiersSession : MySessionComponentBase
+    public class TieredGasBottlesSession : MySessionComponentBase
     {
-        public const string LogPrefix = "[HydrogenBottleTiers] ";
+        public const string LogPrefix = "[TieredGasBottles] ";
 
-        const string ConfigFileName = "HydrogenBottleTiers.xml";
+        const string ConfigFileName = "TieredGasBottles.xml";
         const ushort MessageId = 47213;
         const byte RequestConfig = 1;
         const int RequestCooldownFrames = 300; // a client is answered at most once every 5 seconds
 
         // Our bottles: item type, assembly blueprint, and the assembler classes it's in
-        // (Data\BlueprintClasses_BottleTiers.sbc). The config can only change these.
+        // (Data\BlueprintClasses_TieredGasBottles.sbc). The config can only change these.
         class BottleInfo
         {
             public MyDefinitionId ItemId;
@@ -155,7 +155,7 @@ namespace HydrogenBottleTiers
         // (so the admin can fix it) and the defaults are used.
         TierConfig LoadServerConfig()
         {
-            Type owner = typeof(HydrogenBottleTiersSession);
+            Type owner = typeof(TieredGasBottlesSession);
             if (!MyAPIGateway.Utilities.FileExistsInWorldStorage(ConfigFileName, owner))
             {
                 TierConfig defaults = TierConfig.CreateDefault();
@@ -205,7 +205,7 @@ namespace HydrogenBottleTiers
         {
             try
             {
-                using (var writer = MyAPIGateway.Utilities.WriteFileInWorldStorage(ConfigFileName, typeof(HydrogenBottleTiersSession)))
+                using (var writer = MyAPIGateway.Utilities.WriteFileInWorldStorage(ConfigFileName, typeof(TieredGasBottlesSession)))
                     writer.Write(MyAPIGateway.Utilities.SerializeToXML(config));
             }
             catch (Exception e)
