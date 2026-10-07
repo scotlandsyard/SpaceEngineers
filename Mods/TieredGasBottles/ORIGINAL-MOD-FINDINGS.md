@@ -5,7 +5,7 @@ This mod was written to replace that one on a server that ran it in August 2026 
 ## Summary
 
 - **We found nothing in the original that could cause the middle-mouse-button tool problem.** It has no input, toolbar or hand-tool code. The most likely cause is another mod on the server (details below).
-- One real flaw: its refill recipes produce stone ore, while the vanilla ones produce gravel. This scrambles one of the game's internal recipe lookups. We found no harm from it in play, but it's untidy.
+- One real flaw: its refill recipes produce stone ore, while the vanilla ones produce gravel. This gives stone ore a "recipe" in one of the game's internal lookups. We found no harm from it in play, but it's untidy.
 - Its HUD script works, but it uses the game's internal classes rather than the mod API, so it's more likely to break after a game update.
 - It was hydrogen-only and had no settings: changing a capacity or recipe meant editing the mod.
 
@@ -49,20 +49,23 @@ Vanilla tools and bottles are flagged to stay with you, and the original's bottl
 
 ## 2. Refill recipes produce stone ore instead of gravel
 
-The vanilla refill recipe (`HydrogenBottlesRefill`) "produces" 0.9 gravel (`Ingot/Stone`). That is just a placeholder the generator never actually outputs. The original's three refill recipes produce stone ore (`Ore/Stone`) instead.
+The vanilla refill recipes (`OxygenBottlesRefill`, `HydrogenBottlesRefill`) "produce" 0.9 gravel (`Ingot/Stone`). That is just a placeholder the generator never actually outputs. The original's three refill recipes produce stone ore (`Ore/Stone`) instead.
 
-The game keeps a lookup from each item to the recipe that makes it. With three recipes all producing stone ore, each overwrites the last, and the log shows it on every load:
+The game keeps a lookup from each item to the recipe that makes it. Vanilla already points gravel at one of its own refill recipes, so a mod whose refills produce gravel changes nothing that matters. In vanilla, nothing produces stone ore, so the original's refills gave stone ore a "recipe" for the first time: its Elite refill recipe, because each refill overwrites the last. The log shows the overwriting on every load:
 
 ```
 Overriding non-primary blueprint "...HydrogenBottle2}->{0.9x MyObjectBuilder_Ore/Stone}" with non-primary blueprint "...HydrogenBottle3}->..."
 Overriding non-primary blueprint "...HydrogenBottle3}->{0.9x MyObjectBuilder_Ore/Stone}" with non-primary blueprint "...HydrogenBottle4}->..."
 ```
 
-As a result, the game believes stone ore is made by the Elite refill recipe. That lookup is used by assembler "disassemble all", the build planner's "add to production" and the economy's price calculation.
+These "Overriding" lines are harmless on their own. Tiered Gas Bottles logs the same kind of line for its gravel refills, and so would any mod with more than one refill recipe. The problem is only which item ends up mapped. The lookup is used by:
+- assembler "disassemble all"
+- the build planner's "add to production"
+- the economy's price calculation
 
 We checked whether this could be exploited, for example by disassembling stone ore into Elite bottles. Assemblers refuse it, because the refill recipe isn't in any assembler's recipe list, so we found no harm in play. It's still a needless side effect on a base-game item.
 
-**In Tiered Gas Bottles:** the refill recipes copy vanilla exactly, gravel result included.
+**In Tiered Gas Bottles:** the refill recipes copy vanilla exactly, gravel result included, so stone ore is left alone.
 
 ## 3. HUD script uses the game's internal classes
 
