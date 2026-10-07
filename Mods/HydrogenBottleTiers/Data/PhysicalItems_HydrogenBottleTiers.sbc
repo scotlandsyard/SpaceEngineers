@@ -1,0 +1,116 @@
+<?xml version="1.0"?>
+<!--
+  Hydrogen Bottle Tiers: three bigger hydrogen bottles next to the vanilla one (400 L).
+  The vanilla bottle is not changed.
+
+  These are the defaults. A server can change capacity, mass, build time and recipe per bottle
+  in the world's config file (see README); the script applies it on load. Keep these values and
+  the defaults in Data\Scripts\HydrogenBottleTiers\Config.cs the same.
+-->
+<Definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <PhysicalItems>
+
+        <PhysicalItem xsi:type="MyObjectBuilder_OxygenContainerDefinition">
+            <Id>
+                <TypeId>GasContainerObject</TypeId>
+                <SubtypeId>HydrogenBottleTier2</SubtypeId>
+            </Id>
+            <DisplayName>Enhanced Hydrogen Bottle</DisplayName>
+            <Icon>Textures\GUI\Icons\component\HydrogenBottle_Component.dds</Icon>
+            <Icon>Textures\GUI\Icons\HydrogenBottleTiers\Tier2.png</Icon>
+            <Size>
+                <X>0.8</X>
+                <Y>0.24</Y>
+                <Z>0.08</Z>
+            </Size>
+            <Mass>35</Mass>
+            <Volume>120</Volume>
+            <Model>Models\Components\HydrogenTankItem.mwm</Model>
+            <PhysicalMaterial>Metal</PhysicalMaterial>
+            <StoredGasId>
+                <TypeId>GasProperties</TypeId>
+                <SubtypeId>Hydrogen</SubtypeId>
+            </StoredGasId>
+            <Capacity>600</Capacity>
+            <ExtraInventoryTooltipLine>Capacity: 600 L of hydrogen</ExtraInventoryTooltipLine>
+            <MinimumOfferAmount>5</MinimumOfferAmount>
+            <MaximumOfferAmount>10</MaximumOfferAmount>
+            <MinimumOrderAmount>20</MinimumOrderAmount>
+            <MaximumOrderAmount>50</MaximumOrderAmount>
+            <DepositAllEnabled>false</DepositAllEnabled>
+            <CanPlayerOrder>true</CanPlayerOrder>
+            <CanPlayerOffer>true</CanPlayerOffer>
+            <MinimumAcquisitionAmount>10</MinimumAcquisitionAmount>
+            <MaximumAcquisitionAmount>30</MaximumAcquisitionAmount>
+        </PhysicalItem>
+
+        <PhysicalItem xsi:type="MyObjectBuilder_OxygenContainerDefinition">
+            <Id>
+                <TypeId>GasContainerObject</TypeId>
+                <SubtypeId>HydrogenBottleTier3</SubtypeId>
+            </Id>
+            <DisplayName>Proficient Hydrogen Bottle</DisplayName>
+            <Icon>Textures\GUI\Icons\component\HydrogenBottle_Component.dds</Icon>
+            <Icon>Textures\GUI\Icons\HydrogenBottleTiers\Tier3.png</Icon>
+            <Size>
+                <X>0.8</X>
+                <Y>0.24</Y>
+                <Z>0.08</Z>
+            </Size>
+            <Mass>50</Mass>
+            <Volume>120</Volume>
+            <Model>Models\Components\HydrogenTankItem.mwm</Model>
+            <PhysicalMaterial>Metal</PhysicalMaterial>
+            <StoredGasId>
+                <TypeId>GasProperties</TypeId>
+                <SubtypeId>Hydrogen</SubtypeId>
+            </StoredGasId>
+            <Capacity>1000</Capacity>
+            <ExtraInventoryTooltipLine>Capacity: 1000 L of hydrogen</ExtraInventoryTooltipLine>
+            <MinimumOfferAmount>2</MinimumOfferAmount>
+            <MaximumOfferAmount>5</MaximumOfferAmount>
+            <MinimumOrderAmount>10</MinimumOrderAmount>
+            <MaximumOrderAmount>30</MaximumOrderAmount>
+            <DepositAllEnabled>false</DepositAllEnabled>
+            <CanPlayerOrder>true</CanPlayerOrder>
+            <CanPlayerOffer>true</CanPlayerOffer>
+            <MinimumAcquisitionAmount>10</MinimumAcquisitionAmount>
+            <MaximumAcquisitionAmount>20</MaximumAcquisitionAmount>
+        </PhysicalItem>
+
+        <PhysicalItem xsi:type="MyObjectBuilder_OxygenContainerDefinition">
+            <Id>
+                <TypeId>GasContainerObject</TypeId>
+                <SubtypeId>HydrogenBottleTier4</SubtypeId>
+            </Id>
+            <DisplayName>Elite Hydrogen Bottle</DisplayName>
+            <Icon>Textures\GUI\Icons\component\HydrogenBottle_Component.dds</Icon>
+            <Icon>Textures\GUI\Icons\HydrogenBottleTiers\Tier4.png</Icon>
+            <Size>
+                <X>0.8</X>
+                <Y>0.24</Y>
+                <Z>0.08</Z>
+            </Size>
+            <Mass>75</Mass>
+            <Volume>120</Volume>
+            <Model>Models\Components\HydrogenTankItem.mwm</Model>
+            <PhysicalMaterial>Metal</PhysicalMaterial>
+            <StoredGasId>
+                <TypeId>GasProperties</TypeId>
+                <SubtypeId>Hydrogen</SubtypeId>
+            </StoredGasId>
+            <Capacity>1800</Capacity>
+            <ExtraInventoryTooltipLine>Capacity: 1800 L of hydrogen</ExtraInventoryTooltipLine>
+            <MinimumOfferAmount>1</MinimumOfferAmount>
+            <MaximumOfferAmount>2</MaximumOfferAmount>
+            <MinimumOrderAmount>5</MinimumOrderAmount>
+            <MaximumOrderAmount>15</MaximumOrderAmount>
+            <DepositAllEnabled>false</DepositAllEnabled>
+            <CanPlayerOrder>true</CanPlayerOrder>
+            <CanPlayerOffer>true</CanPlayerOffer>
+            <MinimumAcquisitionAmount>5</MinimumAcquisitionAmount>
+            <MaximumAcquisitionAmount>15</MaximumAcquisitionAmount>
+        </PhysicalItem>
+
+    </PhysicalItems>
+</Definitions>

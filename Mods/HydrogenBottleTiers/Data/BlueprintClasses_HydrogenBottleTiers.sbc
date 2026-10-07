@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<!--
+  Same layout as the vanilla Welder tiers: the basic assembler (SimpleEquipment) makes tier 2,
+  the assembler (EliteEquipment) makes all three. HydrogenBottles is the class H2/O2 generators
+  and hydrogen tanks use to accept and refill bottles.
+-->
+<Definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <BlueprintClassEntries>
+        <Entry Class="SimpleEquipment" BlueprintSubtypeId="Position0021_HydrogenBottleTier2" />
+
+        <Entry Class="EliteEquipment" BlueprintSubtypeId="Position0021_HydrogenBottleTier2" />
+        <Entry Class="EliteEquipment" BlueprintSubtypeId="Position0022_HydrogenBottleTier3" />
+        <Entry Class="EliteEquipment" BlueprintSubtypeId="Position0023_HydrogenBottleTier4" />
+
+        <Entry Class="HydrogenBottles" BlueprintSubtypeId="HydrogenBottleTier2Refill" />
+        <Entry Class="HydrogenBottles" BlueprintSubtypeId="HydrogenBottleTier3Refill" />
+        <Entry Class="HydrogenBottles" BlueprintSubtypeId="HydrogenBottleTier4Refill" />
+    </BlueprintClassEntries>
+</Definitions>

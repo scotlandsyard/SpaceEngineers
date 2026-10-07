@@ -1,0 +1,116 @@
+<?xml version="1.0"?>
+<!--
+  Assembly recipes (defaults; a server can change them in the config file, see README) and
+  refill recipes. The refill recipes are what lets H2/O2 generators and hydrogen tanks accept
+  and fill the bottles. They copy the vanilla HydrogenBottlesRefill exactly, gravel result included.
+-->
+<Definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <Blueprints>
+
+        <Blueprint>
+            <Id>
+                <TypeId>BlueprintDefinition</TypeId>
+                <SubtypeId>Position0021_HydrogenBottleTier2</SubtypeId>
+            </Id>
+            <DisplayName>Enhanced Hydrogen Bottle</DisplayName>
+            <Icon>Textures\GUI\Icons\component\HydrogenBottle_Component.dds</Icon>
+            <Icon>Textures\GUI\Icons\HydrogenBottleTiers\Tier2.png</Icon>
+            <Prerequisites>
+                <Item Amount="105" TypeId="Ingot" SubtypeId="Iron" />
+                <Item Amount="25" TypeId="Ingot" SubtypeId="Silicon" />
+                <Item Amount="40" TypeId="Ingot" SubtypeId="Nickel" />
+                <Item Amount="5" TypeId="Ingot" SubtypeId="Cobalt" />
+            </Prerequisites>
+            <Result Amount="1" TypeId="GasContainerObject" SubtypeId="HydrogenBottleTier2" />
+            <BaseProductionTimeInSeconds>15</BaseProductionTimeInSeconds>
+            <IsPrimary>true</IsPrimary>
+        </Blueprint>
+
+        <Blueprint>
+            <Id>
+                <TypeId>BlueprintDefinition</TypeId>
+                <SubtypeId>Position0022_HydrogenBottleTier3</SubtypeId>
+            </Id>
+            <DisplayName>Proficient Hydrogen Bottle</DisplayName>
+            <Icon>Textures\GUI\Icons\component\HydrogenBottle_Component.dds</Icon>
+            <Icon>Textures\GUI\Icons\HydrogenBottleTiers\Tier3.png</Icon>
+            <Prerequisites>
+                <Item Amount="240" TypeId="Ingot" SubtypeId="Iron" />
+                <Item Amount="40" TypeId="Ingot" SubtypeId="Silicon" />
+                <Item Amount="65" TypeId="Ingot" SubtypeId="Nickel" />
+                <Item Amount="15" TypeId="Ingot" SubtypeId="Cobalt" />
+                <Item Amount="5" TypeId="Ingot" SubtypeId="Silver" />
+                <Item Amount="0.5" TypeId="Ingot" SubtypeId="Magnesium" />
+            </Prerequisites>
+            <Result Amount="1" TypeId="GasContainerObject" SubtypeId="HydrogenBottleTier3" />
+            <BaseProductionTimeInSeconds>30</BaseProductionTimeInSeconds>
+            <IsPrimary>true</IsPrimary>
+        </Blueprint>
+
+        <Blueprint>
+            <Id>
+                <TypeId>BlueprintDefinition</TypeId>
+                <SubtypeId>Position0023_HydrogenBottleTier4</SubtypeId>
+            </Id>
+            <DisplayName>Elite Hydrogen Bottle</DisplayName>
+            <Icon>Textures\GUI\Icons\component\HydrogenBottle_Component.dds</Icon>
+            <Icon>Textures\GUI\Icons\HydrogenBottleTiers\Tier4.png</Icon>
+            <Prerequisites>
+                <Item Amount="400" TypeId="Ingot" SubtypeId="Iron" />
+                <Item Amount="80" TypeId="Ingot" SubtypeId="Silicon" />
+                <Item Amount="100" TypeId="Ingot" SubtypeId="Nickel" />
+                <Item Amount="22.5" TypeId="Ingot" SubtypeId="Cobalt" />
+                <Item Amount="12.5" TypeId="Ingot" SubtypeId="Silver" />
+                <Item Amount="2.5" TypeId="Ingot" SubtypeId="Magnesium" />
+                <Item Amount="5" TypeId="Ingot" SubtypeId="Gold" />
+                <Item Amount="2" TypeId="Ingot" SubtypeId="Platinum" />
+            </Prerequisites>
+            <Result Amount="1" TypeId="GasContainerObject" SubtypeId="HydrogenBottleTier4" />
+            <BaseProductionTimeInSeconds>60</BaseProductionTimeInSeconds>
+            <IsPrimary>true</IsPrimary>
+        </Blueprint>
+
+        <Blueprint>
+            <Id>
+                <TypeId>BlueprintDefinition</TypeId>
+                <SubtypeId>HydrogenBottleTier2Refill</SubtypeId>
+            </Id>
+            <DisplayName>DisplayName_Item_HydrogenBottles</DisplayName>
+            <Icon>Textures\GUI\Icons\ingot\gravel_ingot.dds</Icon>
+            <Prerequisites>
+                <Item Amount="1" TypeId="GasContainerObject" SubtypeId="HydrogenBottleTier2" />
+            </Prerequisites>
+            <Result Amount="0.9" TypeId="Ingot" SubtypeId="Stone" />
+            <BaseProductionTimeInSeconds>0.1</BaseProductionTimeInSeconds>
+        </Blueprint>
+
+        <Blueprint>
+            <Id>
+                <TypeId>BlueprintDefinition</TypeId>
+                <SubtypeId>HydrogenBottleTier3Refill</SubtypeId>
+            </Id>
+            <DisplayName>DisplayName_Item_HydrogenBottles</DisplayName>
+            <Icon>Textures\GUI\Icons\ingot\gravel_ingot.dds</Icon>
+            <Prerequisites>
+                <Item Amount="1" TypeId="GasContainerObject" SubtypeId="HydrogenBottleTier3" />
+            </Prerequisites>
+            <Result Amount="0.9" TypeId="Ingot" SubtypeId="Stone" />
+            <BaseProductionTimeInSeconds>0.1</BaseProductionTimeInSeconds>
+        </Blueprint>
+
+        <Blueprint>
+            <Id>
+                <TypeId>BlueprintDefinition</TypeId>
+                <SubtypeId>HydrogenBottleTier4Refill</SubtypeId>
+            </Id>
+            <DisplayName>DisplayName_Item_HydrogenBottles</DisplayName>
+            <Icon>Textures\GUI\Icons\ingot\gravel_ingot.dds</Icon>
+            <Prerequisites>
+                <Item Amount="1" TypeId="GasContainerObject" SubtypeId="HydrogenBottleTier4" />
+            </Prerequisites>
+            <Result Amount="0.9" TypeId="Ingot" SubtypeId="Stone" />
+            <BaseProductionTimeInSeconds>0.1</BaseProductionTimeInSeconds>
+        </Blueprint>
+
+    </Blueprints>
+</Definitions>

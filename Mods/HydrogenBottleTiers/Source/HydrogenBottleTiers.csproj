@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Only for IntelliSense and catching compile errors. The game compiles Data\Scripts itself when the world loads;
+    this build does NOT check the mod script whitelist, so test in game too. The DLL it makes is not used.
+  -->
+  <PropertyGroup>
+    <AssemblyName>HydrogenBottleTiers</AssemblyName>
+    <RootNamespace>HydrogenBottleTiers</RootNamespace>
+    <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
+    <TargetFramework>net481</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <!-- The game compiles mod scripts as C# 6. -->
+    <LangVersion>6</LangVersion>
+    <DebugType>none</DebugType>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Bin64 Condition="'$(Bin64)' == ''">C:\Program Files (x86)\Steam\steamapps\common\SpaceEngineers\Bin64</Bin64>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="../Data/Scripts/HydrogenBottleTiers/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Xml" />
+    <Reference Include="Sandbox.Common"><HintPath>$(Bin64)\Sandbox.Common.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="Sandbox.Game"><HintPath>$(Bin64)\Sandbox.Game.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="VRage"><HintPath>$(Bin64)\VRage.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="VRage.Game"><HintPath>$(Bin64)\VRage.Game.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="VRage.Library"><HintPath>$(Bin64)\VRage.Library.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="VRage.Math"><HintPath>$(Bin64)\VRage.Math.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="SpaceEngineers.ObjectBuilders"><HintPath>$(Bin64)\SpaceEngineers.ObjectBuilders.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="ProtoBuf.Net"><HintPath>$(Bin64)\ProtoBuf.Net.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="ProtoBuf.Net.Core"><HintPath>$(Bin64)\ProtoBuf.Net.Core.dll</HintPath><Private>False</Private></Reference>
+  </ItemGroup>
+</Project>
