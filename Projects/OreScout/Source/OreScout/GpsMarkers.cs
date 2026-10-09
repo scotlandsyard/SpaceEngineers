@@ -58,7 +58,11 @@ public static class GpsMarkers
 	/// back) unless this scan has a marker of the same <see cref="Marker.Group"/> within this many metres,
 	/// which means the old one has been replaced (for example when a merged group's biggest asteroid changes).
 	/// </param>
-	public static Summary Apply(string kind, string legacyNamePrefix, List<Marker> markers, string detectedBy, Vector3D origin, double minDistance, double maxDistance, double? keepMissingUnlessWithin = null)
+	/// <param name="folder">
+	/// GPS Folders folder for new markers, or null for none. Markers that are already in a folder stay there, so a
+	/// rescan never undoes the player moving one.
+	/// </param>
+	public static Summary Apply(string kind, string legacyNamePrefix, List<Marker> markers, string detectedBy, Vector3D origin, double minDistance, double maxDistance, double? keepMissingUnlessWithin = null, string folder = null)
 	{
 		Summary summary = default;
 		IMyGpsCollection gpsCollection = MyAPIGateway.Session?.GPS;
@@ -100,9 +104,10 @@ public static class GpsMarkers
 			if (existing.TryGetValue(key, out IMyGps gps))
 			{
 				existing.Remove(key);
+				string folderLine = SectorFolder.FolderLine(gps.Description);
 				// The game finds the marker by its old hash, so edit the live object and let ModifyGps rehash it.
 				gps.Name = marker.Name;
-				gps.Description = description;
+				gps.Description = folderLine.Length > 0 ? folderLine + description : SectorFolder.AddTo(description, folder);
 				gps.Coords = marker.Position;
 				gps.GPSColor = marker.Color;
 				gpsCollection.ModifyGps(identityId, gps);
@@ -110,7 +115,7 @@ public static class GpsMarkers
 			}
 			else
 			{
-				IMyGps created = gpsCollection.Create(marker.Name, description, marker.Position, showOnHud: true);
+				IMyGps created = gpsCollection.Create(marker.Name, SectorFolder.AddTo(description, folder), marker.Position, showOnHud: true);
 				created.GPSColor = marker.Color;
 				gpsCollection.AddGps(identityId, created);
 				summary.Added++;

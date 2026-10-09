@@ -227,6 +227,15 @@ public class OreScoutSession : MySessionComponentBase
 			sendToOthers = false;
 			OpenMarkerLibrary();
 		}
+		else if (text.Equals(ChatCommand + " sector", StringComparison.OrdinalIgnoreCase))
+		{
+			sendToOthers = false;
+			string folder = SectorFolder.ForNewMarkers();
+			MyAPIGateway.Utilities.ShowMessage(ChatSender,
+				!SectorFolder.GpsFoldersLoaded ? "GPS Folders isn't loaded, so new markers go into no folder."
+				: folder == null ? "Could not tell which sector you are in; new markers go into no folder."
+				: $"New markers go into the GPS folder {folder}.");
+		}
 		else if (text.Equals(ChatCommand + " name", StringComparison.OrdinalIgnoreCase) || text.StartsWith(ChatCommand + " name ", StringComparison.OrdinalIgnoreCase))
 		{
 			sendToOthers = false;
@@ -410,10 +419,12 @@ public class OreScoutSession : MySessionComponentBase
 			// removed once a marker of the same ore within MergeRadius replaces them. Deposit markers are
 			// local scouting aids, so those are still removed as soon as the deposit is gone.
 			double? keepMissingUnlessWithin = separateDeposits ? null : settings.MergeRadius;
-			GpsMarkers.Summary summary = GpsMarkers.Apply(type.MarkerKind, null, markers, detectedBy, origin, 0.0, radius, keepMissingUnlessWithin);
+			// Read now, not at load: a seamless sector transfer changes it without reloading the session.
+			string folder = SectorFolder.ForNewMarkers();
+			GpsMarkers.Summary summary = GpsMarkers.Apply(type.MarkerKind, null, markers, detectedBy, origin, 0.0, radius, keepMissingUnlessWithin, folder);
 			if (settings.ShowChat && (summary.Added + summary.Updated + summary.Removed) > 0)
 			{
-				MyAPIGateway.Utilities.ShowMessage(ChatSender, "GPS: " + summary);
+				MyAPIGateway.Utilities.ShowMessage(ChatSender, "GPS: " + summary + (summary.Added > 0 && folder != null ? $" (new ones in folder {folder})" : ""));
 			}
 		}
 		catch (Exception ex)
