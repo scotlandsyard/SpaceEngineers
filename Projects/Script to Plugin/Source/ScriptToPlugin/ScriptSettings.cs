@@ -25,12 +25,12 @@ internal static class ScriptSettings
 	{
 		try
 		{
-			if (!MyAPIGateway.Utilities.FileExistsInLocalStorage(FileName, typeof(ScriptSettings)))
+			if (!PluginStorage.FileExists(FileName, typeof(ScriptSettings)))
 			{
 				return;
 			}
 			Dictionary<string, string> values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-			using (TextReader reader = MyAPIGateway.Utilities.ReadFileInLocalStorage(FileName, typeof(ScriptSettings)))
+			using (TextReader reader = PluginStorage.Read(FileName, typeof(ScriptSettings)))
 			{
 				string line;
 				while ((line = reader.ReadLine()) != null)
@@ -61,7 +61,7 @@ internal static class ScriptSettings
 	{
 		try
 		{
-			using (TextWriter writer = MyAPIGateway.Utilities.WriteFileInLocalStorage(FileName, typeof(ScriptSettings)))
+			using (TextWriter writer = PluginStorage.Write(FileName, typeof(ScriptSettings)))
 			{
 				writer.WriteLine("Personality=" + Chattiness);
 				writer.WriteLine("Name=" + (DisplayName ?? ""));

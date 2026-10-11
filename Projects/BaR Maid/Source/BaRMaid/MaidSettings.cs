@@ -25,12 +25,12 @@ internal static class MaidSettings
 	{
 		try
 		{
-			if (!MyAPIGateway.Utilities.FileExistsInLocalStorage(FileName, typeof(MaidSettings)))
+			if (!PluginStorage.FileExists(FileName, typeof(MaidSettings)))
 			{
 				return;
 			}
 			Dictionary<string, string> values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-			using (TextReader reader = MyAPIGateway.Utilities.ReadFileInLocalStorage(FileName, typeof(MaidSettings)))
+			using (TextReader reader = PluginStorage.Read(FileName, typeof(MaidSettings)))
 			{
 				string line;
 				while ((line = reader.ReadLine()) != null)
@@ -61,7 +61,7 @@ internal static class MaidSettings
 	{
 		try
 		{
-			using (TextWriter writer = MyAPIGateway.Utilities.WriteFileInLocalStorage(FileName, typeof(MaidSettings)))
+			using (TextWriter writer = PluginStorage.Write(FileName, typeof(MaidSettings)))
 			{
 				writer.WriteLine("Personality=" + Chattiness);
 				writer.WriteLine("DisplayName=" + DisplayName);

@@ -25,12 +25,12 @@ internal static class OreScoutSettings
 	{
 		try
 		{
-			if (!MyAPIGateway.Utilities.FileExistsInLocalStorage(FileName, typeof(OreScoutSettings)))
+			if (!PluginStorage.FileExists(FileName, typeof(OreScoutSettings)))
 			{
 				return;
 			}
 			Dictionary<string, string> values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-			using (TextReader reader = MyAPIGateway.Utilities.ReadFileInLocalStorage(FileName, typeof(OreScoutSettings)))
+			using (TextReader reader = PluginStorage.Read(FileName, typeof(OreScoutSettings)))
 			{
 				string line;
 				while ((line = reader.ReadLine()) != null)
@@ -61,7 +61,7 @@ internal static class OreScoutSettings
 	{
 		try
 		{
-			using (TextWriter writer = MyAPIGateway.Utilities.WriteFileInLocalStorage(FileName, typeof(OreScoutSettings)))
+			using (TextWriter writer = PluginStorage.Write(FileName, typeof(OreScoutSettings)))
 			{
 				writer.WriteLine("Personality=" + Chattiness);
 				writer.WriteLine("Name=" + (DisplayName ?? ""));

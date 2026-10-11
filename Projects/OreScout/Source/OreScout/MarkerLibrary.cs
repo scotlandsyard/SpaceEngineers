@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Sandbox.ModAPI;
+using TimShared;
 using VRage.Game.ModAPI;
 using VRage.Utils;
 using VRageMath;
@@ -230,9 +231,9 @@ public static class MarkerLibrary
 		_file = new LibraryFile();
 		try
 		{
-			if (MyAPIGateway.Utilities.FileExistsInLocalStorage(fileName, typeof(MarkerLibrary)))
+			if (PluginStorage.FileExists(fileName, typeof(MarkerLibrary)))
 			{
-				using TextReader reader = MyAPIGateway.Utilities.ReadFileInLocalStorage(fileName, typeof(MarkerLibrary));
+				using TextReader reader = PluginStorage.Read(fileName, typeof(MarkerLibrary));
 				_file = MyAPIGateway.Utilities.SerializeFromXML<LibraryFile>(reader.ReadToEnd()) ?? new LibraryFile();
 			}
 		}
@@ -246,7 +247,7 @@ public static class MarkerLibrary
 	{
 		try
 		{
-			using TextWriter writer = MyAPIGateway.Utilities.WriteFileInLocalStorage(_fileWorld, typeof(MarkerLibrary));
+			using TextWriter writer = PluginStorage.Write(_fileWorld, typeof(MarkerLibrary));
 			writer.Write(MyAPIGateway.Utilities.SerializeToXML(_file));
 		}
 		catch (Exception e)

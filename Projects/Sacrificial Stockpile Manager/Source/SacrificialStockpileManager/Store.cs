@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Sandbox.ModAPI;
+using TimShared;
 using VRage.Utils;
 
 namespace SacrificialStockpileManager;
@@ -376,7 +377,7 @@ internal static class Store
 			s_writtenSequence[fileName] = sequence;
 			try
 			{
-				using TextWriter writer = MyAPIGateway.Utilities.WriteFileInLocalStorage(fileName, typeof(Store));
+				using TextWriter writer = PluginStorage.Write(fileName, typeof(Store));
 				writer.Write(xml);
 			}
 			catch (Exception e)
@@ -390,9 +391,9 @@ internal static class Store
 	{
 		try
 		{
-			if (MyAPIGateway.Utilities.FileExistsInLocalStorage(fileName, typeof(Store)))
+			if (PluginStorage.FileExists(fileName, typeof(Store)))
 			{
-				using TextReader reader = MyAPIGateway.Utilities.ReadFileInLocalStorage(fileName, typeof(Store));
+				using TextReader reader = PluginStorage.Read(fileName, typeof(Store));
 				return MyAPIGateway.Utilities.SerializeFromXML<T>(reader.ReadToEnd());
 			}
 		}

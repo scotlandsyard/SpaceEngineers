@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Xml.Serialization;
 using Sandbox.ModAPI;
+using TimShared;
 using VRage.Utils;
 
 namespace ScriptToPlugin;
@@ -104,9 +105,9 @@ internal static class ScriptStore
 		List<ScriptEntry> scripts = new List<ScriptEntry>();
 		try
 		{
-			if (MyAPIGateway.Utilities.FileExistsInLocalStorage(_fileName, typeof(ScriptStore)))
+			if (PluginStorage.FileExists(_fileName, typeof(ScriptStore)))
 			{
-				using TextReader reader = MyAPIGateway.Utilities.ReadFileInLocalStorage(_fileName, typeof(ScriptStore));
+				using TextReader reader = PluginStorage.Read(_fileName, typeof(ScriptStore));
 				ScriptFile file = MyAPIGateway.Utilities.SerializeFromXML<ScriptFile>(reader.ReadToEnd());
 				if (file?.Scripts != null)
 				{
@@ -144,7 +145,7 @@ internal static class ScriptStore
 				file.Scripts.Add(entry);
 			}
 			string xml = MyAPIGateway.Utilities.SerializeToXML(file);
-			using TextWriter writer = MyAPIGateway.Utilities.WriteFileInLocalStorage(_fileName, typeof(ScriptStore));
+			using TextWriter writer = PluginStorage.Write(_fileName, typeof(ScriptStore));
 			writer.Write(xml);
 		}
 		catch (Exception e)

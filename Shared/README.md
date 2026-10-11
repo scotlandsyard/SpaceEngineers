@@ -148,6 +148,12 @@ The level, display name and importance elements and the "here" and "rename" mess
 
 Every plugin keeps working on its own, with or without the director. The director is [Wilson](../Projects/Wilson/). Wilson links this file for the cycle table, names and colours, but never calls `Register`.
 
+## PluginStorage.cs
+
+Local storage that survives a PluginHub build. The game's `MyAPIGateway.Utilities.*FileInLocalStorage` calls name the folder after the calling type's DLL, but the hub compiles a plugin under a new random assembly name on every rebuild, so its settings would be lost after each update. `PluginStorage.FileExists`, `Read` and `Write` take the same arguments and keep the folder the game would use for our own DLL name, `Storage\<first part of the type's namespace>`, which is the plugin's assembly name. Files saved by a plugin installed as a DLL are found again when it's built by the hub, and the other way round.
+
+Every plugin that keeps files uses these instead of the game's calls, from a type in its own root namespace. For the same reason, never look up a plugin by its assembly name: look for one of its types instead (`assembly.GetType("BaRMaid.BaRMaidSession", false)`).
+
 ## Releasing a plugin that uses these files
 
-A plugin that links a file from here needs this folder when it's built from the repo. If a plugin is published through the Pulsar plugin hub, its hub entry must include `Shared` in its source directories as well as the plugin's own folder, or the hub build won't find the file.
+A plugin that links a file from here needs this folder when it's built from the repo. Each plugin's Pulsar PluginHub entry lists its own `Source/` folder and exactly the files from here that its csproj links, one `<Directory>` each (the hub matches entries as path prefixes, so a single file works). Linking a new file here means adding it to the hub entry with the next hub update, or the hub build won't find it. Text compiled in with `EmbedText.targets` is already in the committed `.txt.cs` files.

@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using Sandbox.ModAPI;
+using TimShared;
 using VRage;
 using VRage.Game.ModAPI;
 using VRage.Utils;
@@ -234,11 +235,11 @@ internal static class PlanetNames
 		s_world = WorldName();
 		try
 		{
-			if (!MyAPIGateway.Utilities.FileExistsInLocalStorage(FileName, typeof(PlanetNames)))
+			if (!PluginStorage.FileExists(FileName, typeof(PlanetNames)))
 			{
 				return;
 			}
-			using (TextReader reader = MyAPIGateway.Utilities.ReadFileInLocalStorage(FileName, typeof(PlanetNames)))
+			using (TextReader reader = PluginStorage.Read(FileName, typeof(PlanetNames)))
 			{
 				string line;
 				while ((line = reader.ReadLine()) != null)
@@ -277,7 +278,7 @@ internal static class PlanetNames
 		}
 		try
 		{
-			using (TextWriter writer = MyAPIGateway.Utilities.WriteFileInLocalStorage(FileName, typeof(PlanetNames)))
+			using (TextWriter writer = PluginStorage.Write(FileName, typeof(PlanetNames)))
 			{
 				foreach (KeyValuePair<long, Entry> entry in s_names)
 				{

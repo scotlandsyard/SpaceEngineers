@@ -73,12 +73,12 @@ internal static class Settings
 	{
 		try
 		{
-			if (!MyAPIGateway.Utilities.FileExistsInLocalStorage(FileName, typeof(Settings)))
+			if (!PluginStorage.FileExists(FileName, typeof(Settings)))
 			{
 				return;
 			}
 			Dictionary<string, string> values = new Dictionary<string, string>();
-			using (TextReader reader = MyAPIGateway.Utilities.ReadFileInLocalStorage(FileName, typeof(Settings)))
+			using (TextReader reader = PluginStorage.Read(FileName, typeof(Settings)))
 			{
 				string line;
 				while ((line = reader.ReadLine()) != null)
@@ -149,7 +149,7 @@ internal static class Settings
 	{
 		try
 		{
-			using (TextWriter writer = MyAPIGateway.Utilities.WriteFileInLocalStorage(FileName, typeof(Settings)))
+			using (TextWriter writer = PluginStorage.Write(FileName, typeof(Settings)))
 			{
 				writer.WriteLine("Direction=" + Direction);
 				writer.WriteLine("DistanceKm=" + DistanceKm);

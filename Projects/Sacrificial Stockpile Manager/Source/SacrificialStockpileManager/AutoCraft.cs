@@ -54,8 +54,11 @@ internal static class AutoCraft
 
 	private static double s_disassembleAmount;
 
-	/// <summary>True when the BaR Maid plugin is loaded in this game, so its repair orders go before quotas.</summary>
-	public static bool YieldsToBaRMaid => s_barMaidLoaded ??= AppDomain.CurrentDomain.GetAssemblies().Any(a => a.GetName().Name == "BaRMaid");
+	/// <summary>
+	/// True when the BaR Maid plugin is loaded in this game, so its repair orders go before quotas. Looked up by its
+	/// session type, not its assembly name: PluginHub builds give every plugin a random assembly name.
+	/// </summary>
+	public static bool YieldsToBaRMaid => s_barMaidLoaded ??= AppDomain.CurrentDomain.GetAssemblies().Any(a => a.GetType("BaRMaid.BaRMaidSession", false) != null);
 
 	/// <summary>Seconds to wait for a mode switch before deciding the assembler can't disassemble.</summary>
 	private const double ModeSwitchTimeoutSeconds = 20.0;
