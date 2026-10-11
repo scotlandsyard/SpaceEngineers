@@ -40,6 +40,7 @@ Every line of code is in this repo, and the build uses only the .NET SDK and you
 | [Script to Plugin](Projects/Script%20to%20Plugin/) | Runs programmable block scripts in your own game instead of in a programmable block, each one acting like its own programmable block. | `/stp`, or the **Script to Plugin menu** toolbar action |
 | [OreScout](Projects/OreScout/) | Server-friendly ore scanning from real ore detector blocks, limited to the detector's own range, with GPS markers and a marker library. | Ore detector toolbar actions, `/scout` for the marker library |
 | [Wilson](Projects/Wilson/) | The neighbour over the fence: directs the family's chat personalities. Decides who speaks when something happens, stages short exchanges between the characters, greets once for everyone on world load, and has a few proverbs of his own. Off makes every plugin talk on its own again. | `/wilson`, or **Wilson** in the plugin switcher dropdown |
+| [Seamless Unload Fix](Projects/Seamless%20Unload%20Fix/) | Background fix: lets the game finish unloading a world when a mod throws an error while unloading, so a failed Nexus Seamless Switcher transfer no longer leaves the game unable to join anything until a restart. Also tidies up Seamless Switcher's state between worlds when that plugin is loaded. Doesn't need Seamless Switcher. | Nothing to open: it works when enabled, and says in chat when it stepped in |
 
 Each plugin has its own DLL name, action IDs, chat command and Custom Data section, so they can all be loaded together without clashing.
 
@@ -50,6 +51,8 @@ With more than one of these plugins loaded:
 - **Switching windows:** the top-left corner of each plugin's window has a dropdown that jumps to another loaded plugin's window. Type `/tim` in chat to reopen the window you used last.
 - **Chat personalities:** each plugin has a character who comments in chat when something happens, with an Off / Quiet / Normal / Chatty setting in that plugin. With Wilson loaded too, the characters talk to each other. Chat lines only show on your own screen.
 - **Assembler modes:** BaR Maid and Sacrificial Stockpile Manager share one mode per assembler: **Main** (takes the orders), **Co-op** (helps a Main one) or **Manual** (left alone). New assemblers start as Manual, so neither plugin touches an assembler until you opt it in. You can set the mode from either plugin.
+
+Seamless Unload Fix has no window or chat character, so it takes no part in the above.
 
 Each plugin still works on its own; none of them needs another to be loaded. See [`Shared/`](Shared/) for how this works.
 
