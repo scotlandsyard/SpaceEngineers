@@ -10,9 +10,9 @@ There are two ways to get a plugin. Either way, you end up with a DLL to drop in
 
 **Download it (easiest)**
 
-1. Open [Releases](../../releases) and download the plugin's `.zip`. Each plugin has its own release, and its README is inside the zip.
-2. Windows blocks files downloaded from the internet, and Pulsar can't load a blocked DLL (its log shows `0x80131515`). Before unzipping, right-click the `.zip` > **Properties**, tick **Unblock** at the bottom and press **OK**.
-3. Close the game. Copy the `.dll` from the zip into the `Legacy\Local` folder of your Pulsar install: `%AppData%\Pulsar\Legacy\Local` unless you installed Pulsar somewhere else.
+1. Open [Releases](../../releases) and download the plugin's `.zip` (the DLL plus a README), or just its `.dll`. Each plugin has its own release.
+2. Windows blocks files downloaded from the internet, and Pulsar can't load a blocked DLL (its log shows `0x80131515`). Right-click the downloaded `.zip` or `.dll` > **Properties**, tick **Unblock** at the bottom and press **OK** (for the zip, do this before unzipping).
+3. Close the game. Copy the `.dll` into the `Legacy\Local` folder of your Pulsar install: `%AppData%\Pulsar\Legacy\Local` unless you installed Pulsar somewhere else.
 4. Start the game with Pulsar, tick the plugin in the plugin list and restart when asked.
 
 If a plugin you've already copied in doesn't load, unblock the DLL itself the same way, or run this in PowerShell to unblock everything in the folder (change the path if Pulsar is elsewhere): `Get-ChildItem "$env:AppData\Pulsar\Legacy\Local" | Unblock-File`
