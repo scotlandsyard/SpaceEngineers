@@ -16,7 +16,7 @@ public class LibraryEntry
 	/// <summary>The marker's hidden key, e.g. "Asteroid:123456:Gold". Unique within the library.</summary>
 	public string Key;
 
-	/// <summary>Name prefix such as "Asteroid", "Planet Mine", "Ship" or "Station".</summary>
+	/// <summary>Name prefix such as "Asteroid", "Planet" or "Deposit".</summary>
 	public string Prefix;
 
 	/// <summary>Ore name for ore markers, block or grid name for the others.</summary>
@@ -140,6 +140,19 @@ public static class MarkerLibrary
 		{
 			Save();
 		}
+	}
+
+	/// <summary>Deletes several entries and saves once. Returns how many were removed.</summary>
+	public static int DeleteMany(IEnumerable<LibraryEntry> entries)
+	{
+		EnsureLoaded();
+		HashSet<LibraryEntry> doomed = new HashSet<LibraryEntry>(entries);
+		int removed = _file.Entries.RemoveAll(doomed.Contains);
+		if (removed > 0)
+		{
+			Save();
+		}
+		return removed;
 	}
 
 	/// <summary>Rebuilds the marker's name with the distance from <paramref name="from"/> instead of the stale one.</summary>

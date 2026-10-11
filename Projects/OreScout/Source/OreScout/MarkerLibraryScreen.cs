@@ -32,18 +32,34 @@ public class MarkerLibraryScreen : MyGuiScreenBase
 
 	private const int ColumnFromReference = 6;
 
-	private const string AllFilter = "All markers";
+	private const string AllTypes = "All types";
 
-	private class Filter
+	private const string AllOres = "All ores";
+
+	/// <summary>One entry in the Type or Ore dropdown: the name it filters by and the text shown (name and count).</summary>
+	private class Option
 	{
-		public string Name;
+		public string Label;
 
-		public Func<LibraryEntry, bool> Matches;
+		public string Text;
 	}
+
+	/// <summary>How a marker's name prefix is shown in the Type dropdown.</summary>
+	private static readonly Dictionary<string, string> TypeLabels = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+	{
+		{ "Asteroid", "Asteroids" },
+		{ "Planet", "Planets" },
+		{ "Deposit", "Deposits" }
+	};
+
+	/// <summary>The types this plugin exports into the library, always listed in the Type dropdown (with a count, even 0).</summary>
+	private static readonly string[] OfferedTypes = { "Asteroids", "Planets" };
 
 	private MyGuiControlTable _table;
 
-	private MyGuiControlCombobox _filterBox;
+	private MyGuiControlCombobox _typeBox;
+
+	private MyGuiControlCombobox _oreBox;
 
 	private MyGuiControlLabel _status;
 
@@ -53,10 +69,14 @@ public class MarkerLibraryScreen : MyGuiScreenBase
 
 	private bool _sortedOnce;
 
-	private List<Filter> _filters = new List<Filter>();
+	private List<Option> _typeOptions = new List<Option>();
 
-	// Remembered by name so it survives the option list being rebuilt after an export or delete.
-	private string _filterName = AllFilter;
+	private List<Option> _oreOptions = new List<Option>();
+
+	// Remembered by name so they survive the option lists being rebuilt after an export or delete.
+	private string _typeName = AllTypes;
+
+	private string _oreName = AllOres;
 
 	/// <summary>The marker the "From marker" column measures from, or null to leave that column empty.</summary>
 	private LibraryEntry _reference;
@@ -101,21 +121,32 @@ public class MarkerLibraryScreen : MyGuiScreenBase
 		_helpControls.Clear();
 		_showHelp = false;
 
-		MyGuiControlLabel showLabel = new MyGuiControlLabel(new Vector2(0.16f, -0.34f), null, "Show:", null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_RIGHT_AND_VERTICAL_CENTER);
-		Controls.Add(showLabel);
-		_libraryControls.Add(showLabel);
-		_filterBox = new MyGuiControlCombobox(new Vector2(0.42f, -0.34f), new Vector2(0.25f, 0.04f), originAlign: MyGuiDrawAlignEnum.HORISONTAL_RIGHT_AND_VERTICAL_CENTER, openAreaItemsCount: 12);
-		_filterBox.ItemSelected += OnFilterSelected;
-		Controls.Add(_filterBox);
-		_libraryControls.Add(_filterBox);
+		// The filter row: Type, then Ore, level with the Show row's old spot (y -0.34, just under the Chat dropdown at the
+		// top right). The switcher's list opens over the far left of this row (it ends by x = -0.20), so both dropdowns
+		// start to its right, and the Ore dropdown ends at the same right margin as the Chat dropdown.
+		MyGuiControlLabel typeLabel = new MyGuiControlLabel(new Vector2(-0.115f, -0.34f), null, "Type:", null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_RIGHT_AND_VERTICAL_CENTER);
+		Controls.Add(typeLabel);
+		_libraryControls.Add(typeLabel);
+		_typeBox = new MyGuiControlCombobox(new Vector2(-0.105f, -0.34f), new Vector2(0.23f, 0.04f), originAlign: MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER, openAreaItemsCount: 12);
+		_typeBox.SetToolTip("Show only one kind of marker: asteroids or planets. The number is how many of that kind are in the library.");
+		Controls.Add(_typeBox);
+		_libraryControls.Add(_typeBox);
+		MyGuiControlLabel oreLabel = new MyGuiControlLabel(new Vector2(0.185f, -0.34f), null, "Ore:", null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_RIGHT_AND_VERTICAL_CENTER);
+		Controls.Add(oreLabel);
+		_libraryControls.Add(oreLabel);
+		_oreBox = new MyGuiControlCombobox(new Vector2(0.195f, -0.34f), new Vector2(0.225f, 0.04f), originAlign: MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER, openAreaItemsCount: 12);
+		_oreBox.SetToolTip("Within the chosen type, show only one ore. Only the ores in that type are listed.");
+		Controls.Add(_oreBox);
+		_libraryControls.Add(_oreBox);
 
 		_table = new MyGuiControlTable
 		{
 			Position = new Vector2(0f, -0.315f),
-			Size = new Vector2(0.84f, 0.55f),
+			// Two rows shorter than before, to make room for a third row of buttons.
+			Size = new Vector2(0.84f, 0.48f),
 			OriginAlign = MyGuiDrawAlignEnum.HORISONTAL_CENTER_AND_VERTICAL_TOP,
 			ColumnsCount = 7,
-			VisibleRowsCount = 14
+			VisibleRowsCount = 12
 		};
 		_table.SetCustomColumnWidths(new float[] { 0.05f, 0.13f, 0.2f, 0.17f, 0.15f, 0.14f, 0.16f });
 		_table.SetColumnName(ColumnMark, new StringBuilder("X"));
@@ -141,17 +172,18 @@ public class MarkerLibraryScreen : MyGuiScreenBase
 		Controls.Add(_table);
 		_libraryControls.Add(_table);
 
-		_status = new MyGuiControlLabel(new Vector2(-0.42f, 0.265f), null, _statusText, null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER);
+		_status = new MyGuiControlLabel(new Vector2(-0.42f, 0.2f), null, _statusText, null, 0.8f, "Blue", MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER);
 		Controls.Add(_status);
 		_libraryControls.Add(_status);
 
-		AddButton(-0.315f, 0.315f, "Export from GPS", ExportFromGps);
-		AddButton(-0.105f, 0.315f, "Mark / Unmark", ToggleMarkSelected);
-		AddButton(0.105f, 0.315f, "Import Marked", ImportMarked);
-		AddButton(0.315f, 0.315f, "Import All Shown", ImportAllShown);
-		AddButton(-0.315f, 0.375f, "Measure From Row", MeasureFromSelected);
-		AddButton(-0.105f, 0.375f, "Measure From Me", MeasureFromMe);
-		AddButton(0.105f, 0.375f, "Delete", DeleteSelected);
+		AddButton(-0.315f, 0.255f, "Export from GPS", ExportFromGps);
+		AddButton(-0.105f, 0.255f, "Mark / Unmark", ToggleMarkSelected);
+		AddButton(0.105f, 0.255f, "Import Marked", ImportMarked);
+		AddButton(0.315f, 0.255f, "Import All Shown", ImportAllShown);
+		AddButton(-0.315f, 0.315f, "Measure From Row", MeasureFromSelected);
+		AddButton(-0.105f, 0.315f, "Measure From Me", MeasureFromMe);
+		AddButton(0.105f, 0.315f, "Delete", DeleteSelected);
+		AddButton(0.315f, 0.315f, "Delete Marked", DeleteMarked);
 		// Help / Back share the bottom-right spot, like the other plugins. Esc closes the window.
 		AddButton(0.315f, 0.375f, "Help", () => SetHelp(true));
 
@@ -205,11 +237,9 @@ public class MarkerLibraryScreen : MyGuiScreenBase
 			_reference = null;
 		}
 		RebuildFilters(entries);
-		Filter filter = _filters.FirstOrDefault(f => f.Name == _filterName) ?? _filters[0];
-		_filterName = filter.Name;
 
 		_table.Clear();
-		foreach (LibraryEntry entry in entries.Where(filter.Matches))
+		foreach (LibraryEntry entry in entries.Where(Matches))
 		{
 			MyGuiControlTable.Row row = new MyGuiControlTable.Row(entry);
 			row.AddCell(new MyGuiControlTable.Cell(_marked.Contains(entry) ? "X" : "", entry));
@@ -244,43 +274,101 @@ public class MarkerLibraryScreen : MyGuiScreenBase
 		}
 		// The header names the marker being measured from, e.g. "From Ice"; its own row says "(this one)".
 		_table.SetColumnName(ColumnFromReference, new StringBuilder(_reference == null ? "From marker" : $"From {_reference.Label}"));
-		string shown = filter == _filters[0] ? $"{entries.Count} saved marker(s)" : $"{_table.RowsCount} of {entries.Count} marker(s) shown";
+		string shown = _typeName == AllTypes && _oreName == AllOres ? $"{entries.Count} saved marker(s)" : $"{_table.RowsCount} of {entries.Count} marker(s) shown";
 		string marked = _marked.Count > 0 ? $", {_marked.Count} marked" : "";
 		SetStatus(_statusText.Length > 0 ? _statusText : $"{shown}{marked}. Click a header to sort; double-click a row to mark it.");
 	}
 
-	/// <summary>"All markers", then one option per ore, then one per non-ore marker type (ships, stores and so on).</summary>
-	private void RebuildFilters(List<LibraryEntry> entries)
+	/// <summary>The type a marker belongs to, as the Type dropdown names it ("Asteroids", "Planets", ...).</summary>
+	private static string TypeLabel(LibraryEntry entry)
 	{
-		_filters = new List<Filter>
+		string prefix = entry.Prefix;
+		if (string.IsNullOrWhiteSpace(prefix))
 		{
-			new Filter { Name = AllFilter, Matches = _ => true }
-		};
-		foreach (string ore in entries.Where(e => e.MassKg > 0).Select(e => e.Label).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(o => o, StringComparer.OrdinalIgnoreCase))
-		{
-			_filters.Add(new Filter { Name = ore, Matches = e => e.MassKg > 0 && string.Equals(e.Label, ore, StringComparison.OrdinalIgnoreCase) });
+			return "Other";
 		}
-		foreach (string type in entries.Where(e => e.MassKg <= 0).Select(e => e.Prefix ?? "").Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(t => t, StringComparer.OrdinalIgnoreCase))
-		{
-			_filters.Add(new Filter { Name = type.Length == 0 ? "Other" : type, Matches = e => e.MassKg <= 0 && string.Equals(e.Prefix ?? "", type, StringComparison.OrdinalIgnoreCase) });
-		}
-		_filterBox.ItemSelected -= OnFilterSelected;
-		_filterBox.ClearItems();
-		for (int i = 0; i < _filters.Count; i++)
-		{
-			_filterBox.AddItem(i, _filters[i].Name, sort: false);
-		}
-		int selected = Math.Max(0, _filters.FindIndex(f => f.Name == _filterName));
-		_filterBox.SelectItemByKey(selected, sendEvent: false);
-		_filterBox.ItemSelected += OnFilterSelected;
+		return TypeLabels.TryGetValue(prefix, out string label) ? label : prefix;
 	}
 
-	private void OnFilterSelected()
+	/// <summary>True if the marker passes both dropdowns. The Ore filter only ever keeps ore markers.</summary>
+	private bool Matches(LibraryEntry entry)
 	{
-		int index = (int)_filterBox.GetSelectedKey();
-		if (index >= 0 && index < _filters.Count)
+		if (_typeName != AllTypes && !string.Equals(TypeLabel(entry), _typeName, StringComparison.OrdinalIgnoreCase))
 		{
-			_filterName = _filters[index].Name;
+			return false;
+		}
+		return _oreName == AllOres || (entry.MassKg > 0 && string.Equals(entry.Label, _oreName, StringComparison.OrdinalIgnoreCase));
+	}
+
+	/// <summary>
+	/// Type: "All types", the types this plugin exports (always listed, so you can see there are none), then any other
+	/// type found in the library. Ore: "All ores", then the ores among the markers of the chosen type.
+	/// </summary>
+	private void RebuildFilters(List<LibraryEntry> entries)
+	{
+		List<string> types = OfferedTypes.ToList();
+		foreach (string type in entries.Select(TypeLabel).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(t => t, StringComparer.OrdinalIgnoreCase))
+		{
+			if (!types.Contains(type, StringComparer.OrdinalIgnoreCase))
+			{
+				types.Add(type);
+			}
+		}
+		_typeOptions = new List<Option> { new Option { Label = AllTypes, Text = $"{AllTypes} ({entries.Count})" } };
+		foreach (string type in types)
+		{
+			_typeOptions.Add(new Option { Label = type, Text = $"{type} ({entries.Count(e => string.Equals(TypeLabel(e), type, StringComparison.OrdinalIgnoreCase))})" });
+		}
+		if (!_typeOptions.Any(o => o.Label == _typeName))
+		{
+			_typeName = AllTypes;
+		}
+
+		List<LibraryEntry> ofType = entries.Where(e => _typeName == AllTypes || string.Equals(TypeLabel(e), _typeName, StringComparison.OrdinalIgnoreCase)).ToList();
+		_oreOptions = new List<Option> { new Option { Label = AllOres, Text = $"{AllOres} ({ofType.Count})" } };
+		foreach (IGrouping<string, LibraryEntry> ore in ofType.Where(e => e.MassKg > 0).GroupBy(e => e.Label ?? "", StringComparer.OrdinalIgnoreCase).OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase))
+		{
+			_oreOptions.Add(new Option { Label = ore.Key, Text = $"{ore.Key} ({ore.Count()})" });
+		}
+		if (!_oreOptions.Any(o => o.Label == _oreName))
+		{
+			_oreName = AllOres;
+		}
+
+		FillBox(_typeBox, _typeOptions, _typeName, OnTypeSelected);
+		FillBox(_oreBox, _oreOptions, _oreName, OnOreSelected);
+		// With no ore markers in the chosen type (an empty library, say), the Ore dropdown has nothing to offer.
+		_oreBox.Enabled = _oreOptions.Count > 1;
+	}
+
+	private static void FillBox(MyGuiControlCombobox box, List<Option> options, string selectedLabel, MyGuiControlCombobox.ItemSelectedDelegate handler)
+	{
+		box.ItemSelected -= handler;
+		box.ClearItems();
+		for (int i = 0; i < options.Count; i++)
+		{
+			box.AddItem(i, options[i].Text, sort: false);
+		}
+		box.SelectItemByKey(Math.Max(0, options.FindIndex(o => o.Label == selectedLabel)), sendEvent: false);
+		box.ItemSelected += handler;
+	}
+
+	private void OnTypeSelected()
+	{
+		int index = (int)_typeBox.GetSelectedKey();
+		if (index >= 0 && index < _typeOptions.Count)
+		{
+			_typeName = _typeOptions[index].Label;
+			RefreshRows(SelectedEntry());
+		}
+	}
+
+	private void OnOreSelected()
+	{
+		int index = (int)_oreBox.GetSelectedKey();
+		if (index >= 0 && index < _oreOptions.Count)
+		{
+			_oreName = _oreOptions[index].Label;
 			RefreshRows(SelectedEntry());
 		}
 	}
@@ -381,6 +469,30 @@ public class MarkerLibraryScreen : MyGuiScreenBase
 		RefreshRows(SelectedEntry());
 	}
 
+	/// <summary>Deletes every marked (X) marker after asking, showing how many. Marked markers hidden by the filter count too.</summary>
+	private void DeleteMarked()
+	{
+		if (_marked.Count == 0)
+		{
+			SetStatus("Mark some markers first: select a row and press Mark / Unmark, or double-click it.");
+			return;
+		}
+		List<LibraryEntry> doomed = _marked.ToList();
+		int hidden = doomed.Count(e => !Matches(e));
+		string hiddenNote = hidden > 0 ? $"\n\n{hidden} of them are hidden by the current Type / Ore filter." : "";
+		MyGuiSandbox.AddScreen(MyGuiSandbox.CreateMessageBox(MyMessageBoxStyleEnum.Info, MyMessageBoxButtonsType.YES_NO, messageCaption: new StringBuilder("Delete marked markers"), messageText: new StringBuilder($"Delete {doomed.Count} marked marker(s) from the library? This can't be undone.{hiddenNote}"), callback: answer =>
+		{
+			if (answer != MyGuiScreenMessageBox.ResultEnum.YES)
+			{
+				return;
+			}
+			int removed = MarkerLibrary.DeleteMany(doomed);
+			_marked.RemoveWhere(doomed.Contains);
+			_statusText = $"Deleted {removed} marker(s).";
+			RefreshRows(SelectedEntry());
+		}));
+	}
+
 	private void DeleteSelected()
 	{
 		LibraryEntry entry = SelectedEntry();
@@ -443,7 +555,7 @@ public class MarkerLibraryScreen : MyGuiScreenBase
 		"DETECTOR SETTINGS\n" +
 		"The first time you open a detector's toolbar actions, its Custom Data gets two sections, OreScout and OreScout Deposits. Ores is a comma-separated list (blank means every ore in the world). MinDepositVoxels is the smallest deposit to report, in cubic metres. YieldBonusPercent adds yield for modded drills, for example 50. MergeRadius (OreScout section) is how close asteroids must be to share a marker, in metres; 0 turns merging off. DepositSpacing (OreScout Deposits section) is how far apart ore can be and still count as one deposit. CreateGps and ShowChat turn the markers and the chat lines on or off.\n\n" +
 		"THE LIBRARY\n" +
-		"This window keeps ore markers out of your GPS list until you need them. Export from GPS moves your Scout Ore markers here (deposit markers stay in GPS). Show, at the top right, filters the list to one ore. Click a column header to sort, and click it again to reverse. From you is each marker's distance from where you are. Measure From Row makes the From marker column show every marker's distance from the selected one (its header takes that marker's name), which finds the ore nearest a spot; Measure From Me clears it. To bring markers back, select a row and press Mark / Unmark (or double-click it) to tick it with an X, then Import Marked; Import All Shown imports everything the filter shows. Markers already in your GPS list are skipped, and the distance is worked out again from where you are. Delete removes the selected row. Esc closes the window. The library is saved for each world in OreScout_Markers_<world>.xml in %AppData%\\SpaceEngineers\\Storage.\n\n" +
+		"This window keeps ore markers out of your GPS list until you need them. Export from GPS moves your Scout Ore markers here (deposit markers stay in GPS). The Type and Ore dropdowns above the list filter it: Type picks Asteroids or Planets (each shows how many there are, even 0), and Ore then narrows the list to one ore. Click a column header to sort, and click it again to reverse. From you is each marker's distance from where you are. Measure From Row makes the From marker column show every marker's distance from the selected one (its header takes that marker's name), which finds the ore nearest a spot; Measure From Me clears it. To bring markers back, select a row and press Mark / Unmark (or double-click it) to tick it with an X, then Import Marked; Import All Shown imports everything the filter shows. Markers already in your GPS list are skipped, and the distance is worked out again from where you are. Delete removes the selected row. Delete Marked removes every row ticked with an X after asking you to confirm, and tells you if some of them are hidden by the filters. Esc closes the window. The library is saved for each world in OreScout_Markers_<world>.xml in %AppData%\\SpaceEngineers\\Storage.\n\n" +
 		"COMMANDS\n" +
 		"/scout opens this window. /scout name and a name (up to 24 characters) changes what OreScout's chat lines show under; /scout name on its own puts OreScout back. /tim opens whichever of our plugin windows you used last, and the list at the top left of this window switches to another of our plugins.\n\n" +
 		"CHAT\n" +
