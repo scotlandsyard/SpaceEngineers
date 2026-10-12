@@ -74,3 +74,7 @@ A trigger is `<character>.<event>`, with the character ids `barmaid`, `fatalbert
 ## How it works
 
 Wilson is the director in the plugins' personality protocol: see "Personality.cs" in [`Shared/README.md`](../../Shared/README.md) for the rhythm, the colours and the messages. He announces himself on load, answers each plugin's "hello", and sends "bye" on unload or when set to Off, so the plugins go back to talking themselves. Plugins from older builds still work with him; they show up in his window once they've said something.
+
+## Reporting bugs
+
+Open an issue on [GitHub](https://github.com/scotlandsyard/SpaceEngineers/issues) with the plugin's name in the title. Say what you did, what you expected and what happened instead, and attach the game log (`%AppData%\SpaceEngineers\SpaceEngineers_<date>.log`) and Pulsar's log (`%AppData%\Pulsar\Legacy\info.log`) if you can.

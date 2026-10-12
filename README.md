@@ -56,6 +56,10 @@ Seamless Unload Fix has no window or chat character, so it takes no part in the 
 
 Each plugin still works on its own; none of them needs another to be loaded. See [`Shared/`](Shared/) for how this works.
 
+## Reporting bugs
+
+Open an issue on [GitHub](https://github.com/scotlandsyard/SpaceEngineers/issues) with the plugin's name in the title (one issue per bug). Say what you did, what you expected and what happened instead, and attach the game log (`%AppData%\SpaceEngineers\SpaceEngineers_<date>.log`) and Pulsar's log (`%AppData%\Pulsar\Legacy\info.log`) if you can.
+
 ## Building by hand
 
 `Build.ps1` (see [Install](#install)) is the simple way. To build one project yourself:

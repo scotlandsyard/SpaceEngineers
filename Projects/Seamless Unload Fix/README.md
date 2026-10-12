@@ -37,3 +37,7 @@ Usually nothing. When it had to step in, a chat line from **Seamless Unload Fix*
 - A mod that threw an error while unloading may have left something of its own behind. The log names the mod so it can be reported to its author.
 - It only covers mod session components and block definitions; other parts of the unload are left as they are.
 - If a server refuses your transfer (for example because you were kicked from it in the last 5 minutes), the transfer still fails. You just get back to the menu cleanly and can rejoin without restarting.
+
+## Reporting bugs
+
+Open an issue on [GitHub](https://github.com/scotlandsyard/SpaceEngineers/issues) with the plugin's name in the title. Say what you did, what you expected and what happened instead, and attach the game log (`%AppData%\SpaceEngineers\SpaceEngineers_<date>.log`) and Pulsar's log (`%AppData%\Pulsar\Legacy\info.log`) if you can.
