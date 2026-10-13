@@ -70,3 +70,9 @@ Open an issue on [GitHub](https://github.com/scotlandsyard/SpaceEngineers/issues
 The projects target .NET Framework 4.8.1 (x64) and reference the game's DLLs straight from its `Bin64` folder, without copying them. Release builds are deterministic and record no paths from the computer they were built on. `.gitattributes` fixes the line endings, so every checkout builds the same bytes.
 
 Code used by more than one project lives once in [`Shared/`](Shared/) and is linked into each project that uses it.
+
+## Licence
+
+Copyright (C) 2026 scotlandsyard. Everything in this repository is free software under the [GNU General Public License v3.0](LICENSE): you may use, change and share it, and if you share a plugin or mod built from this code, you must share its source under the same licence.
+
+If you build something with this code, I'd love to see it: please link back to this repository, or open an issue to tell me about it. That part is a request, not a condition.
